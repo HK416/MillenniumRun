@@ -1,7 +1,7 @@
 # Millennium Run
 
 [한국어](#기획서-한국어) </br>
-[English (translation)](#proposal-english) </br>
+[English (translation)](#proposal-english-translation) </br>
 
 # 기획서 (한국어)
 ### 1. 스토리
