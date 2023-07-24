@@ -1,0 +1,14 @@
+[package]
+name = "MillenniumRun"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.71"
+authors = ["HK416 <powerspirit127@gmail.com>", ]
+description = """
+    KOR: Nexon Games가 제작한 Blue Archive의 팬 제작 2차 창작 게임.
+    EN: A fan-made secondary creation game from the Blue Archive, produced by Nexon Games.
+"""
+publish = false
+
+
+[dependencies]
