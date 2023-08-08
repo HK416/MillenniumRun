@@ -112,3 +112,6 @@ rust-project.json
 # Ignore all local history of files
 .history
 .ionide
+
+### Assets key files.
+keys/

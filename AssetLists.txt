@@ -1,0 +1,23 @@
+# (한국어)
+# 어플리케이션에서 사용할 에셋 목록입니다.
+# 각 줄에 <경로> <유형>을 작성합니다.
+# · <유형>은 Static, Dynamic, Optional 세 가지가 있습니다.
+#
+# (English Translation)
+# A list of assets to use in the application.
+# Write <PATH> <TYPE> on each line.
+# · There are three types of <TYPE>: Static, Dynamic, and Optional.
+#
+# --- 예시/Example ---
+# [assets] -+- a.txt
+#           | 
+#           +- b.txt 
+#           |
+#           \- [temp] --- c.txt
+#              
+# 1>> a.txt Static
+# 2>> b.txt Dynamic
+# 3>> temp/c.txt Optional
+#
+
+user.setting Optional
