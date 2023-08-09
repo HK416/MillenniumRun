@@ -58,7 +58,7 @@ impl AssetError {
 /// #### English (Translation)
 /// These are the types of errors that can occur while managing assets.
 /// 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum AssetErrorKind {
     /// #### 한국어
     /// 알 수 없는 유형의 오류에 대한 오류 유형입니다.
@@ -172,6 +172,14 @@ pub enum AssetErrorKind {
     /// The error type corresponding to the remaining types in [`std::io::ErrorKind`].
     /// 
     IOOtherError(io::ErrorKind),
+
+    /// #### 한국어
+    /// [`ron::Error`]에 해당하는 오류 유형입니다.
+    /// 
+    /// #### English (Translation)
+    /// An error type that corresponds to [`ron::Error`].
+    /// 
+    RonParsingError(ron::Error),
 }
 
 impl From<io::Error> for AssetErrorKind {
@@ -187,5 +195,12 @@ impl From<io::Error> for AssetErrorKind {
             io::ErrorKind::OutOfMemory => Self::OutOfMemory,
             _ => Self::IOOtherError(error.kind())
         }
+    }
+}
+
+impl From<ron::Error> for AssetErrorKind {
+    #[inline]
+    fn from(error: ron::Error) -> Self {
+        Self::RonParsingError(error)
     }
 }

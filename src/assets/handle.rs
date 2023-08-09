@@ -1,8 +1,9 @@
+use std::io::{Read, Write};
 use std::fs::{File, OpenOptions};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Weak, RwLock};
+use std::path::PathBuf;
+use std::sync::{Arc, Weak, RwLock, RwLockReadGuard};
 use std::sync::atomic::{AtomicBool, Ordering as MemOrdering};
-use super::{AssetDataType, AssetResult, AssetError, AssetErrorKind};
+use super::{AssetDataType, AssetResult, AssetError, AssetErrorKind, Asset};
 
 
 /// #### 한국어
@@ -30,6 +31,9 @@ struct AssetHandleInner {
     /// If the asset has not been loaded, it has the value `None`.
     /// 
     file: RwLock<Option<File>>,
+
+
+    bytes: RwLock<Vec<u8>>,
 
     /// #### 한국어
     /// 파일 핸들의 사용 가능 유무입니다. 
@@ -62,31 +66,38 @@ impl AssetHandleInner {
         Self {
             path,
             file: RwLock::new(None),
+            bytes: RwLock::new(Vec::new()),
             available: AtomicBool::new(true),
             data_type,
         }
     }
 
     /// #### 한국어
-    /// 에셋 파일의 경로를 반환합니다.
+    /// 에셋 파일 핸들을 사용할 수 있는지 여부를 반환합니다.
     /// 
     /// #### English (Translation)
-    /// Returns the path to the asset file.
-    /// 
-    #[inline]
-    fn file_path(&self) -> &Path {
-        self.path.as_ref()
-    }
-
-    /// #### 한국어
-    /// 에셋 파일 핸들을 사용할 수 있는지 여부를 반환합니다.  
-    /// 
-    /// #### English (Translation)
-    /// Returns whether the asset file handle is available.  
+    /// Returns whether the asset file handle is available.
     /// 
     #[inline]
     fn is_available(&self) -> bool {
         self.available.load(MemOrdering::Acquire)
+    }
+
+    /// #### 한국어
+    /// 에셋 파일 핸들을 사용할 수 없는 경우 `AssetError`를 반환합니다.
+    /// 
+    /// #### English (Translation)
+    /// Return `AssetError` if asset file handle is not available.
+    /// 
+    #[inline]
+    fn assert_available(&self) -> AssetResult<()> {
+        match self.is_available() {
+            false => Err(AssetError::new(
+                AssetErrorKind::DisabledHandle,
+                format!("asset handle is disabled.")
+            )),
+            true => Ok(())
+        }
     }
 
     /// #### 한국어
@@ -100,17 +111,17 @@ impl AssetHandleInner {
     /// # Panics
     /// #### 한국어
     /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
-    /// 자세한 내용은 [`std::sync::RwLock::write`](`std::sync::RwLock`)문서를 참고하세요.  
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
     /// 
     /// #### English (Translation)
     /// Abort program execution if an error occurs while locking an internal mutex. 
-    /// See the [`std::sync::RwLock::write`](`std::sync::RwLock`) documentation for details.  
+    /// See the [`std::sync::RwLock`] documentation for details.  
     /// 
     #[inline]
     fn on_disable(&self) {
         log::warn!("handle is disabled :: <PATH:{}>, <TYPE:{:?}>", self.path.display(), self.data_type);
         self.available.store(false, MemOrdering::Release);
-        *self.file.write().expect("Failed to access file handle.") = None;
+        self.file_close();
     }
 
     /// #### 한국어
@@ -124,11 +135,11 @@ impl AssetHandleInner {
     /// # Panics
     /// #### 한국어
     /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
-    /// 자세한 내용은 [`std::sync::RwLock::read`](`std::sync::RwLock`)문서를 참고하세요.
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.
     /// 
     /// #### English (Translation)
     /// Abort program execution if an error occurs while locking an internal mutex. 
-    /// See the [`std::sync::RwLock::read`](`std::sync::RwLock`) documentation for details.
+    /// See the [`std::sync::RwLock`] documentation for details.
     /// 
     #[inline]
     fn has_loaded(&self) -> bool {
@@ -136,12 +147,14 @@ impl AssetHandleInner {
     }
 
     /// #### 한국어
+    /// 에셋 파일에서 데이터를 가져옵니다.
     /// 에셋 파일을 에셋의 데이터 유형에따라 다른 모드로 엽니다.
     /// - 정적 데이터 타입: 읽기 모드로 엽니다.
     /// - 동적 데이터 타입: 읽기/쓰기 모드로 엽니다.
     /// - 선택적 데이터 타입: 읽기/쓰기/생성 모드로 엽니다.
     /// 
     /// #### English (Translation)
+    /// Import data from asset files.
     /// Open the asset file in different modes depending on the asset's data type.
     /// - Static data type: open in read mode.
     /// - Dynamic data type: open in read/write mode.
@@ -151,13 +164,63 @@ impl AssetHandleInner {
     /// 
     /// # Errors
     /// #### 한국어
-    /// 다음과 같은 경우 `AssetErrorKind`를 반환합니다.
-    /// - 에셋 핸들이 비활성화되었을 경우 `AssetErrorKind::DisabledHandle`을 반환합니다.
+    /// 다음과 같은 경우 `AssetError`를 반환합니다.
+    /// - 에셋 핸들이 비활성화되었을 경우.
+    /// - 에셋 파일을 여는 도중 오류가 발생하는 경우.
+    /// - 에셋 파일에서 데이터를 가져오는 도중 오류가 발생하는 경우.
+    /// 
+    /// #### English (Translation)
+    /// It returns `AssetError` for the following cases:
+    /// - If asset handles are disabled.
+    /// - If an error occurs while opening the asset file.
+    /// - If an error occurs while importing data from an asset file.
+    /// 
+    /// <br>
+    /// 
+    /// # Panics
+    /// #### 한국어
+    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
+    /// 
+    /// #### English (Translation)
+    /// Abort program execution if an error occurs while locking an internal mutex. 
+    /// See the [`std::sync::RwLock`] documentation for details.  
+    /// 
+    fn load(&self) -> AssetResult<()> {
+        log::debug!("load asset handle :: <PATH:{}> <TYPE:{:?}>", self.path.display(), self.data_type);
+        self.assert_available()?;
+        if !self.has_loaded() { 
+            self.file_open()?;
+            self.file_read()?;
+        }
+        Ok(())
+    }
+
+    /// #### 한국어
+    /// 에셋 파일을 에셋의 데이터 유형에따라 다른 모드로 엽니다.
+    /// - 정적 데이터 타입: 읽기 모드로 엽니다.
+    /// - 동적 데이터 타입: 읽기/쓰기 모드로 엽니다.
+    /// - 선택적 데이터 타입: 읽기/쓰기/생성 모드로 엽니다.
+    /// 
+    /// 이 함수는 에셋 핸들이 비활성화 되었는지 검사하지 않습니다.
+    /// 
+    /// #### English (Translation)
+    /// Open the asset file in different modes depending on the asset's data type.
+    /// - Static data type: open in read mode.
+    /// - Dynamic data type: open in read/write mode.
+    /// - Optional data type: open in read/write/create mode.
+    /// 
+    /// This function does not check if the asset handle is disabled.
+    /// 
+    /// <br>
+    /// 
+    /// # Errors
+    /// #### 한국어
+    /// 다음과 같은 경우 `AssetError`를 반환합니다.
     /// - 에셋 파일을 여는 도중 오류가 발생하는 경우.
     /// 
     /// #### English (Translation)
-    /// It returns `AssetErrorKind` for the following cases:
-    /// - Return `AssetErrorKind::DisabledHandle` if the asset handle is disabled.
+    /// It returns `AssetError` for the following cases:
     /// - If an error occurs while opening the asset file.
     /// 
     /// <br>
@@ -165,45 +228,251 @@ impl AssetHandleInner {
     /// # Panics
     /// #### 한국어
     /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
-    /// 자세한 내용은 [`std::sync::RwLock::write`](`std::sync::RwLock`)문서를 참고하세요.  
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
     /// 
     /// #### English (Translation)
     /// Abort program execution if an error occurs while locking an internal mutex. 
-    /// See the [`std::sync::RwLock::write`](`std::sync::RwLock`) documentation for details.  
+    /// See the [`std::sync::RwLock`] documentation for details.  
     /// 
-    fn load(&self) -> AssetResult<()> {
-        log::debug!("load asset handle :: <PATH:{}> <TYPE:{:?}>", self.path.display(), self.data_type);
+    fn file_open(&self) -> AssetResult<()> {
+        log::debug!("file open :: <PATH:{}> <TYPE:{:?}>", self.path.display(), self.data_type);
+        *self.file.write().expect("Failed to access file handle.") = Some(
+            match self.data_type {
+                AssetDataType::StaticData => OpenOptions::new()
+                    .read(true)
+                    .open(&self.path),
+                AssetDataType::DynamicData => OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(&self.path),
+                AssetDataType::OptionalData => OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open(&self.path),
+            }.map_err(|err| AssetError::new(
+                AssetErrorKind::from(err),
+                format!("Failed to open asset file.")
+            ))?
+        );
+        Ok(())
+    }
 
-        if !self.is_available() { 
-            return Err(AssetError::new(
-                AssetErrorKind::DisabledHandle, 
-                format!("Asset handle is disabled.")
-            )); 
-        }
+    /// #### 한국어
+    /// 에셋 파일에서 데이터를 가져옵니다.
+    /// 이 함수는 에셋 핸들이 비활성화 되었는지 검사하지 않습니다.
+    /// 또한, 에셋 파일 핸들이 열려있는 것을 전재로 동작합니다.
+    /// 
+    /// #### English (Translation)
+    /// Import data from asset files.
+    /// This function does not check if the asset handle is disabled.
+    /// Also, it works assuming that the asset file handle is open.
+    /// 
+    /// <br>
+    /// 
+    /// # Errors
+    /// #### 한국어
+    /// 다음과 같은 경우 `AssetError`를 반환합니다.
+    /// - 에셋 파일을 읽는 도중 오류가 발생하는 경우.
+    /// 
+    /// #### English (Translation)
+    /// It returns `AssetError` for the following cases:
+    /// - If an error occurs while reading the asset file.
+    /// 
+    /// <br>
+    /// 
+    /// # Panics
+    /// #### 한국어
+    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
+    /// 
+    /// #### English (Translation)
+    /// Abort program execution if an error occurs while locking an internal mutex. 
+    /// See the [`std::sync::RwLock`] documentation for details.  
+    /// 
+    fn file_read(&self) -> AssetResult<()> {
+        log::debug!("file read :: <PATH:{}> <TYPE:{:?}>", self.path.display(), self.data_type);
+        let mut buf = Vec::new();
+        self.file.read().expect("Failed to access file handle")
+            .as_ref()
+            .expect("Asset file handle is empty.")
+            .read_to_end(&mut buf)
+            .map_err(|e| AssetError::new(
+                AssetErrorKind::from(e),
+                format!("Failed to read asset file data.")
+            ))?;
 
-        if !self.has_loaded() { 
-            *self.file.write().expect("Failed to access file handle.") = Some(
-                match self.data_type {
-                    AssetDataType::StaticData => OpenOptions::new()
-                        .read(true)
-                        .open(&self.path),
-                    AssetDataType::DynamicData => OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .open(&self.path),
-                    AssetDataType::OptionalData => OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .create(true)
-                        .open(&self.path),
-                }.map_err(|err| AssetError::new(
-                    AssetErrorKind::from(err),
-                    format!("Failed to open asset file.")
-                ))?
-            );
-        }
+        self.bytes.write().expect("Failed to access file data.")
+            .write_all(&buf)
+            .map_err(|e| AssetError::new(
+                AssetErrorKind::from(e),
+                format!("Failed to copy asset file data."),
+            ))?;
+        
+        Ok(())
+    }
+
+    /// #### 한국어
+    /// 에셋 파일에 데이터를 덮어 씁니다.
+    /// 이 함수는 에셋 핸들이 비활성화 되었는지 검사하지 않습니다.
+    /// 또한, 에셋 파일 핸들이 열려있는 것을 전재로 동작합니다.
+    /// 
+    /// #### English (Translation)
+    /// Overwrite the data in the asset file.
+    /// This function does not check if the asset handle is disabled.
+    /// Also, it works assuming that the asset file handle is open.
+    /// 
+    /// <br>
+    /// 
+    /// # Errors
+    /// #### 한국어
+    /// 다음과 같은 경우 `AssetError`를 반환합니다.
+    /// - 에셋 파일을 쓰는 도중 오류가 발생하는 경우.
+    /// 
+    /// #### English (Translation)
+    /// It returns `AssetError` for the following cases:
+    /// - If an error occurs while writing the asset file.
+    /// 
+    /// <br>
+    /// 
+    /// # Panics
+    /// #### 한국어
+    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
+    /// 
+    /// #### English (Translation)
+    /// Abort program execution if an error occurs while locking an internal mutex. 
+    /// See the [`std::sync::RwLock`] documentation for details.  
+    /// 
+    fn file_write<T: AsRef<[u8]>>(&self, bytes: T) -> AssetResult<()> {
+        log::debug!("file write :: <PATH:{}> <TYPE:{:?}>", self.path.display(), self.data_type);
+        self.bytes.write().expect("Failed to access file data.")
+            .write_all(bytes.as_ref())
+            .map_err(|e| AssetError::new(
+                AssetErrorKind::from(e),
+                format!("Failed to copy asset data"),
+            ))?;
+
+        self.file.write().expect("Failed to access file handle.")
+            .as_ref()
+            .expect("Asset file handle is empty")
+            .write_all(bytes.as_ref())
+            .map_err(|e| AssetError::new(
+                AssetErrorKind::from(e),
+                format!("Failed to write asset data.")
+            ))?;
 
         Ok(())
+    }
+
+    /// #### 한국어
+    /// 파일에서 가져온 데이터를 지우고, 파일을 닫습니다.
+    /// 
+    /// #### English (Translation)
+    /// Clear the imported data from the file, and close the file.
+    /// 
+    /// <br>
+    /// 
+    /// # Panics
+    /// #### 한국어
+    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
+    /// 
+    /// #### English (Translation)
+    /// Abort program execution if an error occurs while locking an internal mutex. 
+    /// See the [`std::sync::RwLock`] documentation for details.  
+    /// 
+    #[inline]
+    fn file_close(&self) {
+        log::debug!("file close :: <PATH:{}> <TYPE:{:?}>", self.path.display(), self.data_type);
+        *self.file.write().expect("Failed to access file handle.") = None;
+        self.bytes.write().expect("Failed to access file data.").clear();
+    }
+
+    /// #### 한국어
+    /// 에셋 파일의 데이터를 읽어옵니다.
+    /// 
+    /// #### English (Translation)
+    /// Read data from the asset file.
+    /// 
+    /// <br>
+    /// 
+    /// # Errors
+    /// #### 한국어
+    /// 데이터를 읽는 도중 오류가 발생한 경우 `AssetError`를 반환합니다.
+    /// 
+    /// #### English (Translation)
+    /// Return `AssetError` if an error occurred while reading the data.
+    /// 
+    /// <br>
+    /// 
+    /// # Panics
+    /// #### 한국어
+    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
+    /// 
+    /// #### English (Translation)
+    /// Abort program execution if an error occurs while locking an internal mutex. 
+    /// See the [`std::sync::RwLock`] documentation for details.  
+    /// 
+    #[inline]
+    fn read_bytes(&self) -> AssetResult<RwLockReadGuard<Vec<u8>>> {
+        self.load()?;
+        Ok(self.bytes.read().expect("Failed to access file data."))
+    }
+
+    /// #### 한국어
+    /// 에셋 파일에 데이터를 덮어 씁니다.
+    /// 
+    /// #### English (Translation)
+    /// Overwrite the data in the asset file.
+    /// 
+    /// <br>
+    /// 
+    /// # Errors
+    /// #### 한국어
+    /// 데이터를 쓰는 도중 오류가 발생한 경우 `AssetError`를 반환합니다.
+    /// 
+    /// #### English (Translation)
+    /// Return `AssetError` if an error occurred while writing the data.
+    /// 
+    /// <br>
+    /// 
+    /// # Panics
+    /// #### 한국어
+    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
+    /// 
+    /// #### English (Translation)
+    /// Abort program execution if an error occurs while locking an internal mutex. 
+    /// See the [`std::sync::RwLock`] documentation for details.  
+    /// 
+    #[inline]
+    fn write_bytes<T: AsRef<[u8]>>(&self, bytes: T) -> AssetResult<()> {
+        self.load()?;
+        self.file_write(bytes)
+    }
+
+    /// #### 한국어
+    /// 에셋 파일의 데이터가 비어있는경우 `true`를 반환합니다.
+    /// 
+    /// #### English (Translation)
+    /// Returns `true` if the asset file's data is empty.
+    /// 
+    /// <br>
+    /// 
+    /// # Panics
+    /// #### 한국어
+    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
+    /// 
+    /// #### English (Translation)
+    /// Abort program execution if an error occurs while locking an internal mutex. 
+    /// See the [`std::sync::RwLock`] documentation for details.  
+    /// 
+    #[inline]
+    fn empty_bytes(&self) -> bool {
+        self.bytes.read().expect("Failed to access file data").is_empty()
     }
 }
 
@@ -289,6 +558,47 @@ impl AssetHandle {
     #[inline]
     pub fn is_available(&self) -> bool {
         self.0.is_available()
+    }
+
+    /// #### 한국어
+    /// 에셋 핸들에서 데이터를 가져옵니다.
+    /// 
+    /// #### English (Translation)
+    /// Get data from asset handle.
+    /// 
+    /// <br>
+    /// 
+    /// # Errors
+    /// #### 한국어
+    /// 데이터를 가져오는 도중 오류가 발생한 경우 `AssetError`를 반환합니다.
+    /// 
+    /// #### English (Translation)
+    /// Return `AssetError` if an error occurred while getting the data.
+    /// 
+    /// <br>
+    /// 
+    /// # Panics
+    /// #### 한국어
+    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
+    /// 
+    /// #### English (Translation)
+    /// Abort program execution if an error occurs while locking an internal mutex. 
+    /// See the [`std::sync::RwLock`] documentation for details.  
+    /// 
+    #[inline]
+    pub fn get<T: Asset>(&self) -> AssetResult<T> {
+        match self.0.data_type.is_optional() {
+            false => T::decode_bytes(self.0.read_bytes()?.as_ref()),
+            true => match self.0.empty_bytes() {
+                false => T::decode_bytes(self.0.read_bytes()?.as_ref()),
+                true => {
+                    let def = T::default();
+                    self.0.write_bytes(def.encode_bytes()?)?;
+                    Ok(def)
+                }
+            }
+        }
     }
     
     /// #### 한국어

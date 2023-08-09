@@ -106,11 +106,9 @@ impl AssetBundle {
 
     /// #### 한국어
     /// 주어진 경로에 캐싱되어 있는 에셋을 불러옵니다.
-    /// 이 함수는 현재 스레드를 차단하지 않습니다.
     /// 
     /// #### English (Translation)
     /// Loads the cached assets in the given path.
-    /// This function does not block the current thread.
     /// 
     /// <br>
     /// 
@@ -126,13 +124,13 @@ impl AssetBundle {
     /// # Panics
     /// #### 한국어
     /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
-    /// 자세한 내용은 [`std::sync::RwLock::write`](`std::sync::RwLock`)문서를 참고하세요.  
+    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
     /// 
     /// #### English (Translation)
     /// Abort program execution if an error occurs while locking an internal mutex. 
-    /// See the [`std::sync::RwLock::write`](`std::sync::RwLock`) documentation for details.  
+    /// See the [`std::sync::RwLock`] documentation for details.  
     /// 
-    pub async fn load_asset<P: AsRef<Path>>(&self, path: P) -> AssetResult<AssetHandle> {
+    pub fn load_asset<P: AsRef<Path>>(&self, path: P) -> AssetResult<AssetHandle> {
         let path = PathBuf::from_iter([self.root_path.as_ref(), path.as_ref()]);
         log::debug!("load assets. (PATH:{})", path.display());
         if let Some(handle) = self.asset_cache.get_handle(path) {

@@ -1,7 +1,8 @@
 mod assets;
+mod locale;
+mod resolution;
+mod user_setting;
 
-use async_std::task;
-use lazy_static::lazy_static;
 use winit::{
     event_loop::EventLoop,
     window::WindowBuilder, 
@@ -9,6 +10,8 @@ use winit::{
 };
 use self::{
     assets::AssetBundle,
+    locale::get_wnd_title,
+    user_setting::UserSetting,
 };
 
 
@@ -17,18 +20,20 @@ fn main() {
     log::info!("Application Start.");
 
     let bundle = AssetBundle::new().unwrap();
-    let handle0 = task::block_on(bundle.load_asset("user.setting")).unwrap();
+    let handle = bundle.load_asset(UserSetting::ASSETS_PATH).unwrap();
+    let user_data = handle.get::<UserSetting>().unwrap();
 
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_title("Temp")
+        .with_title(get_wnd_title(&user_data.locale))
+        .with_inner_size(user_data.resolution.as_logical_size())
         .build(&event_loop)
         .expect("Window creation failed!");
 
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_wait();
 
-        assert!(handle0.is_available(), "!!!");
+        assert!(handle.is_available(), "!!!");
 
         match event {
             Event::WindowEvent { window_id, event } 

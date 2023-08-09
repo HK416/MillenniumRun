@@ -23,3 +23,9 @@ use self::{
     list::ASSET_LIST,
     path::RootAssetPath,
 };
+
+
+pub trait Asset : Default + Sized {
+    fn decode_bytes(bytes: &[u8]) -> AssetResult<Self>;
+    fn encode_bytes(&self) -> AssetResult<Vec<u8>>;
+}
