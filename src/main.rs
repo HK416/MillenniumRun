@@ -1,55 +1,31 @@
 mod assets;
+mod framework;
 mod locale;
+mod timer;
 mod resolution;
 mod user_setting;
 
-use winit::{
-    event_loop::EventLoop,
-    window::WindowBuilder, 
-    event::{Event, WindowEvent},
-};
-use self::{
-    assets::AssetBundle,
-    locale::get_wnd_title,
-    user_setting::UserSetting,
-};
+use async_std::task;
+use crate::framework::Framework;
 
 
+/// #### 한국어
+/// 프로그램의 진입점 입니다.
+/// `Windows`, `Linux`, `macOS` 이 세 가지 운영체제만 어플리케이션이 동작합니다.
+/// 
+/// #### English (Translation)
+/// It is the entry point of the program.
+/// The application works only on these three operating systems: `Windows`, `Linux`, and `macOS`.
+/// 
 fn main() {
     env_logger::init();
-    log::info!("Application Start.");
+    log::info!("❖ Application Launching. ❖");
 
-    let bundle = AssetBundle::new().unwrap();
-    let handle = bundle.load_asset(UserSetting::ASSETS_PATH).unwrap();
-    let user_data = handle.get::<UserSetting>().unwrap();
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))] {
+        task::block_on(Framework::new()).run()
+    }
 
-    let event_loop = EventLoop::new();
-    let window = WindowBuilder::new()
-        .with_title(get_wnd_title(&user_data.locale))
-        .with_inner_size(user_data.resolution.as_logical_size())
-        .build(&event_loop)
-        .expect("Window creation failed!");
-
-    event_loop.run(move |event, _, control_flow| {
-        control_flow.set_wait();
-
-        assert!(handle.is_available(), "!!!");
-
-        match event {
-            Event::WindowEvent { window_id, event } 
-            if window_id == window.id() => match event {
-                WindowEvent::CloseRequested => {
-                    control_flow.set_exit();
-                },
-                _ => { }
-            },
-            Event::MainEventsCleared => {
-                window.request_redraw();
-            },
-            Event::RedrawRequested(_) => {
-                // TODO
-            },
-            _ => { },
-        }
-    });
+    #[allow(unreachable_code)] {
+        panic!("❗️❗️❗️ This platform is not supported. ❗️❗️❗️")
+    }
 }

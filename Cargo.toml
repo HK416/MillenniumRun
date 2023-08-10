@@ -23,12 +23,13 @@ notify = "6.0.*" # CC0-1.0 or Artistic-2.0 license.
 rust-embed = { version = "6.8.*", features = ["debug-embed", "interpolate-folder-path", "include-exclude"] } # MIT license.
 sha2 = "0.10.*" # MIT or Apache-2.0 license.
 
-
+egui = "0.22.*" # UI crate / MIT or Apache-2.0 license.
 wgpu = "0.17.*" # Graphics crate / MIT or Apache-2.0 license.
 winit = "0.28.*" # Window crate / Apache-2.0 license.
 rodio = "0.17.*" # Sound crate / MIT or Apache-2.0 license.
 ab_glyph = "0.2.*" # Font crate / Apache-2.0 license.
 glam = { version = "0.24.*", features = ["debug-glam-assert"] } # Math crate / MIT or Apache-2.0 license.
+native-dialog = "0.6.*" # Window Dialog crate / MIT license.
 
 
 [build-dependencies]
