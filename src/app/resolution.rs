@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use serde::{Serialize, Deserialize};
@@ -6,8 +7,7 @@ use winit::{dpi::LogicalSize, window::{Fullscreen, Window}};
 #[cfg(target_os = "macos")] 
 use winit::platform::macos::WindowExtMacOS;
 
-#[allow(unused_imports)]
-use crate::framework::panic_msg;
+use crate::{panic_err, app::AppResult};
 
 
 
@@ -86,35 +86,40 @@ pub enum ScreenMode {
 /// 
 /// <br>
 /// 
-/// # Panics
+/// # Errors
 /// #### 한국어
 /// `screen_mode`가 `ScreenMode::FullScreen`일 때 `Windows`와 `Linux`에서 
-/// 현재 모니터 정보나 비디오 모드를 가져올 수 없는 경우 오류 메시지를 화면에 띄우고 프로그램 실행을 중단합니다.
+/// 현재 모니터 정보나 비디오 모드를 가져올 수 없는 경우 `PanicErr`를 반환합니다.
 /// 
 /// #### English (Translation)
-/// If `screen_mode` is `ScreenMode::FullScreen` and Windows and Linux cannot get the current monitor information or video mode, 
-/// display an error message and stop running the program.
+/// Return `PanicErr` if unable to get current monitor information or video mode on `Windows` and `Linux`
+/// when `screen_mode` is `ScreenMode::FullScreen`.
 /// 
 pub fn set_fullscreen(
     window: &Window,
     screen_mode: &ScreenMode,
-) {
+) -> AppResult<()> {
     match screen_mode {
-        ScreenMode::Windowed => window.set_fullscreen(None),
+        ScreenMode::Windowed => {
+            window.set_fullscreen(None);
+            Ok(())
+        },
         ScreenMode::FullScreen => {
             #[cfg(target_os = "macos")] {
                 window.set_simple_fullscreen(true);
+                Ok(())
             }
             #[cfg(not(target_os = "macos"))] {
                 let monitor = match window.current_monitor() {
                     Some(monitor) => monitor,
-                    None => panic_msg("Window system error", "Could not find the monitor where the window is currently located!"),
+                    None => return Err(panic_err!("Monitor not found", "Could not find the monitor where the window is currently located!")),
                 };
                 let video_mode = match monitor.video_modes().next() {
                     Some(mode) => mode,
-                    None => panic_msg("Window system error", "The monitor's video mode could not be found!"),
+                    None => return Err(panic_err!("Video mode not found", "The monitor's video mode could not be found!")),
                 };
                 window.set_fullscreen(Some(Fullscreen::Exclusive(video_mode)));
+                Ok(())
             }
         }
     }

@@ -1,8 +1,7 @@
 use serde::{Serialize, Deserialize};
 use crate::{
+    app::{Locale, Resolution, ScreenMode},
     assets::{Asset, AssetResult, AssetError, AssetErrorKind},
-    locale::Locale,
-    resolution::{Resolution, ScreenMode},
 };
 
 

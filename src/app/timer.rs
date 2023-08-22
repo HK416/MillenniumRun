@@ -107,6 +107,8 @@ impl GameTimer {
                 .sum();
             self.elapsed_time_sec /= self.cnt_frame_times as f64;
         }
+
+        log::trace!("`Timer::tick` (FPS: {})", self.frame_rate);
     }
 
     /// #### 한국어
@@ -158,5 +160,10 @@ impl GameTimer {
         Instant::now()
             .saturating_duration_since(self.base_timepoint)
             .as_secs_f64()
+    }
+
+    #[inline]
+    pub fn current_time_point(&self) -> Instant {
+        self.current_time_point.clone()
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "MillenniumRun"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.71"
 authors = ["HK416 <powerspirit127@gmail.com>", ]
@@ -17,11 +17,14 @@ log = "0.4.*" # MIT or Apache-2.0 license.
 env_logger = "0.10.*" # MIT or Apache-2.0 license.
 ron = "0.8.*" # MIT or Apache-2.0 license.
 serde = { version = "1.0.*", features = ["derive"] } # MIT or Apache-2.0 license.
+bytemuck = "1.13.*" # MIT or Apache-2.0 or Zlib
 async-std = "1.*" # MIT or Apache-2.0 license.
 lazy_static = "1.4.*" # MIT or Apache-2.0 license.
 notify = "6.0.*" # CC0-1.0 or Artistic-2.0 license.
 rust-embed = { version = "6.8.*", features = ["debug-embed", "interpolate-folder-path", "include-exclude"] } # MIT license.
 sha2 = "0.10.*" # MIT or Apache-2.0 license.
+raw-window-handle = "0.5.*" # MIT or Apache-2.0 or Zlib
+crossbeam = "0.8.*" # MIT or Apache-2.0 license.
 
 egui = "0.22.*" # UI crate / MIT or Apache-2.0 license.
 wgpu = "0.17.*" # Graphics crate / MIT or Apache-2.0 license.
