@@ -21,3 +21,4 @@
 #
 
 user.setting Optional
+test.wgsl Static 

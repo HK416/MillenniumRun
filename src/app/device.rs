@@ -1,41 +1,138 @@
-use std::time::Instant;
-use std::sync::{RwLock, Arc};
-use std::sync::atomic::{AtomicBool, Ordering as MemOrdering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::collections::HashMap;
 
 use lazy_static::lazy_static;
-use crossbeam::queue::ArrayQueue;
+use winit::event::{MouseButton, VirtualKeyCode};
 
-use super::GameTimer;
-
-
-
-/// #### 한국어
-/// 키보드의 식별 코드 입니다. 
-/// [`winit::event::VirtualKeyCode`]의 래퍼 타입입니다.
-/// 
-/// #### English (Translation)
-/// This is the identification code of the keyboard.
-/// This is a wrapper type for [`winit::event::VirtualKeyCode`].
-/// 
-pub type KeyCode = winit::event::VirtualKeyCode;
-
-/// #### 한국어
-/// 마우스 버튼의 식별 코드 입니다. 
-/// [`winit::event::MouseButton`]의 래퍼 타입입니다.
-/// 
-/// #### English (Translation)
-/// This is the identification code of the mouse button.
-/// This is a wrapper type for [`winit::event::MouseButton`].
-/// 
-pub type MouseButton = winit::event::MouseButton;
-
-
-pub const MAX_HISTORY_SIZE: usize = 50;
 
 
 lazy_static! {
-    static ref KEYBOARD_STATE: Arc<KeyboardStateInner> = Arc::new(KeyboardStateInner::new(MAX_HISTORY_SIZE));
+    static ref MOUSE_BTN_STATE: MouseButtonStateInner = MouseButtonStateInner::new();
+    static ref KEYBOARD_STATE: KeyboardStateInner = KeyboardStateInner::new();
+}
+
+
+
+/// #### 한국어
+/// `MouseButtonState`의 내부 데이터 입니다.
+/// 어플리케이션 실행 이후 마우스 버튼의 상태를 저장합니다.
+/// 
+/// #### English (Translation)
+/// This is the internal data of `MouseButtonState`.
+/// Stores the state of the mouse button after running the application.
+/// 
+#[derive(Debug)]
+struct MouseButtonStateInner(HashMap<MouseButton, AtomicBool>);
+
+impl MouseButtonStateInner {
+    #[inline]
+    fn new() -> Self {
+        Self(HashMap::from_iter([
+            (MouseButton::Left, false.into()),
+            (MouseButton::Right, false.into()),
+            (MouseButton::Middle, false.into()),
+        ]))
+    }
+
+    /// #### 한국어
+    /// 마우스 버튼이 눌렸을 때 호출되는 함수입니다. </br>
+    /// 
+    /// #### English (Translation)
+    /// This function is called when the mouse button is pressed. </br>
+    /// 
+    fn on_pressed(&self, button: &MouseButton) {
+        match button {
+            MouseButton::Left | MouseButton::Right | MouseButton::Middle => {
+                let mut state = self.0.get(button)
+                    .expect("Invalid mouse button!")
+                    .store(true, Ordering::Release);
+            },
+            _ => { /* empty */ }
+        };
+    }
+
+    /// #### 한국어
+    /// 마우스 버튼이 떼어졌을 때 호출되는 함수입니다. </br>
+    /// 
+    /// #### English (Translation)
+    /// This function is called when the mouse button is released. </br>
+    /// 
+    fn on_released(&self, button: &MouseButton) {
+        match button {
+            MouseButton::Left | MouseButton::Right | MouseButton::Middle => {
+                let mut state = self.0.get(button)
+                    .expect("Invalid mouse button!")
+                    .store(false, Ordering::Release);
+            },
+            _ => { /* empty */}
+        }
+    }
+
+
+    /// #### 한국어
+    /// 주어진 마우스 버튼이 눌렸는지 확인하는 함수입니다. </br>
+    /// [`Left`](winit::event::MouseButton), [`Right`](winit::event::MouseButton), [`Middle`](winit::event::MouseButton)만 확인이 가능하며
+    /// 버튼이 눌렸을 경우 `true`를 반환합니다. </br>
+    /// 
+    /// #### English (Translation)
+    /// This function checks whether the given mouse button has been pressed. </br>
+    /// Only [`Left`](winit::event::MouseButton), [`Right`](winit::event::MouseButton), and [`Middle`](winit::event::MouseButton) can be checked,
+    /// and if the button is pressed, `true` is returned. </br>
+    /// 
+    fn is_pressed(&self, button: &MouseButton) -> bool {
+        match button {
+            MouseButton::Left | MouseButton::Right | MouseButton::Middle => {
+                self.0.get(button)
+                    .expect("Invalid mouse button!")
+                    .load(Ordering::Acquire)
+            },
+            _ => false,
+        }
+    }
+}
+
+
+
+#[derive(Debug)]
+pub struct MouseButtonState;
+
+impl MouseButtonState {
+    /// #### 한국어
+    /// 마우스 버튼이 눌렸을 때 호출되는 함수입니다. </br>
+    /// 
+    /// #### English (Translation)
+    /// This function is called when the mouse button is pressed. </br>
+    /// 
+    #[inline]
+    pub fn on_pressed(button: &MouseButton) {
+        MOUSE_BTN_STATE.on_pressed(button)
+    }
+
+    /// #### 한국어
+    /// 마우스 버튼이 떼어졌을 때 호출되는 함수입니다. </br>
+    /// 
+    /// #### English (Translation)
+    /// This function is called when the mouse button is released. </br>
+    /// 
+    #[inline]
+    pub fn on_released(button: &MouseButton) {
+        MOUSE_BTN_STATE.on_released(button)
+    }
+
+    /// #### 한국어 </br>
+    /// 주어진 마우스 버튼이 눌렸는지 확인하는 함수입니다. </br>
+    /// [`Left`](winit::event::MouseButton), [`Right`](winit::event::MouseButton), [`Middle`](winit::event::MouseButton)만 확인이 가능하며
+    /// 버튼이 눌렸을 경우 `true`를 반환합니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// This function checks whether the given mouse button has been pressed. </br>
+    /// Only [`Left`](winit::event::MouseButton), [`Right`](winit::event::MouseButton), and [`Middle`](winit::event::MouseButton) can be checked,
+    /// and if the button is pressed, `true` is returned. </br>
+    /// 
+    #[inline]
+    pub fn is_pressed(button: &MouseButton) -> bool {
+        MOUSE_BTN_STATE.is_pressed(button)
+    }
 }
 
 
@@ -49,386 +146,295 @@ lazy_static! {
 /// Stores the state of the keyboard after running the application.
 /// 
 #[derive(Debug)]
-struct KeyboardStateInner {
-    state: HashMap<KeyCode, (RwLock<Option<Instant>>, AtomicBool)>,
-    history: ArrayQueue<(KeyCode, bool)>,
-}
+struct KeyboardStateInner(HashMap<VirtualKeyCode, AtomicBool>);
 
 impl KeyboardStateInner {
     #[inline]
-    pub fn new(history_capacity: usize) -> Self {
-        Self {
-            state: [
-                (KeyCode::Key1, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Key2, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Key3, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Key4, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Key5, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Key6, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Key7, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Key8, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Key9, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Key0, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::A, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::B, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::C, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::D, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::E, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::G, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::H, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::I, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::J, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::K, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::L, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::M, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::N, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::O, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::P, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Q, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::R, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::S, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::T, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::U, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::V, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::W, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::X, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Y, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Z, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Escape, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F1, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F2, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F3, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F4, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F5, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F6, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F7, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F8, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F9, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F10, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F11, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F12, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F13, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F14, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F15, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F16, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F17, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F18, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F19, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F20, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F21, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F22, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F23, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::F24, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Snapshot, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Scroll, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Pause, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Insert, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Home, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Delete, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::End, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::PageDown, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::PageUp, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Left, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Up, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Right, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Down, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Back, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Return, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Space, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Compose, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Caret, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numlock, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad0, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad1, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad2, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad3, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad4, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad5, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad6, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad7, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad8, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Numpad9, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NumpadAdd, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NumpadDivide, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NumpadDecimal, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NumpadComma, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NumpadEnter, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NumpadEquals, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NumpadMultiply, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NumpadSubtract, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::AbntC1, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::AbntC2, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Apostrophe, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Apps, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Asterisk, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::At, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Ax, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Backslash, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Calculator, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Capital, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Colon, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Comma, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Convert, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Equals, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Grave, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Kana, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Kanji, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::LAlt, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::LBracket, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::LControl, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::LShift, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::LWin, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Mail, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::MediaSelect, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::MediaStop, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Minus, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Mute, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::MyComputer, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NavigateForward, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NavigateBackward, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NextTrack, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::NoConvert, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::OEM102, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Period, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::PlayPause, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Plus, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Power, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::PrevTrack, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::RAlt, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::RBracket, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::RControl, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::RShift, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::RWin, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Semicolon, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Slash, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Sleep, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Stop, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Sysrq, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Tab, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Underline, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Unlabeled, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::VolumeDown, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::VolumeUp, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Wake, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::WebBack, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::WebFavorites, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::WebForward, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::WebHome, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::WebRefresh, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::WebSearch, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::WebStop, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Yen, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Copy, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Paste, (RwLock::new(None), AtomicBool::new(false))),
-                (KeyCode::Cut, (RwLock::new(None), AtomicBool::new(false))),
-            ].into_iter().collect(),
-            history: ArrayQueue::new(history_capacity),
-        }
+    fn new() -> Self {
+        Self(HashMap::from_iter([
+            (VirtualKeyCode::Key1, false.into()),
+            (VirtualKeyCode::Key2, false.into()),
+            (VirtualKeyCode::Key3, false.into()),
+            (VirtualKeyCode::Key4, false.into()),
+            (VirtualKeyCode::Key5, false.into()),
+            (VirtualKeyCode::Key6, false.into()),
+            (VirtualKeyCode::Key7, false.into()),
+            (VirtualKeyCode::Key8, false.into()),
+            (VirtualKeyCode::Key9, false.into()),
+            (VirtualKeyCode::Key0, false.into()),
+            (VirtualKeyCode::A, false.into()),
+            (VirtualKeyCode::B, false.into()),
+            (VirtualKeyCode::C, false.into()),
+            (VirtualKeyCode::D, false.into()),
+            (VirtualKeyCode::E, false.into()),
+            (VirtualKeyCode::F, false.into()),
+            (VirtualKeyCode::G, false.into()),
+            (VirtualKeyCode::H, false.into()),
+            (VirtualKeyCode::I, false.into()),
+            (VirtualKeyCode::J, false.into()),
+            (VirtualKeyCode::K, false.into()),
+            (VirtualKeyCode::L, false.into()),
+            (VirtualKeyCode::M, false.into()),
+            (VirtualKeyCode::N, false.into()),
+            (VirtualKeyCode::O, false.into()),
+            (VirtualKeyCode::P, false.into()),
+            (VirtualKeyCode::Q, false.into()),
+            (VirtualKeyCode::R, false.into()),
+            (VirtualKeyCode::S, false.into()),
+            (VirtualKeyCode::T, false.into()),
+            (VirtualKeyCode::U, false.into()),
+            (VirtualKeyCode::V, false.into()),
+            (VirtualKeyCode::W, false.into()),
+            (VirtualKeyCode::X, false.into()),
+            (VirtualKeyCode::Y, false.into()),
+            (VirtualKeyCode::Z, false.into()),
+            (VirtualKeyCode::Escape, false.into()),
+            (VirtualKeyCode::F1, false.into()),
+            (VirtualKeyCode::F2, false.into()),
+            (VirtualKeyCode::F3, false.into()),
+            (VirtualKeyCode::F4, false.into()),
+            (VirtualKeyCode::F5, false.into()),
+            (VirtualKeyCode::F6, false.into()),
+            (VirtualKeyCode::F7, false.into()),
+            (VirtualKeyCode::F8, false.into()),
+            (VirtualKeyCode::F9, false.into()),
+            (VirtualKeyCode::F10, false.into()),
+            (VirtualKeyCode::F11, false.into()),
+            (VirtualKeyCode::F12, false.into()),
+            (VirtualKeyCode::F13, false.into()),
+            (VirtualKeyCode::F14, false.into()),
+            (VirtualKeyCode::F15, false.into()),
+            (VirtualKeyCode::F16, false.into()),
+            (VirtualKeyCode::F17, false.into()),
+            (VirtualKeyCode::F18, false.into()),
+            (VirtualKeyCode::F19, false.into()),
+            (VirtualKeyCode::F20, false.into()),
+            (VirtualKeyCode::F21, false.into()),
+            (VirtualKeyCode::F22, false.into()),
+            (VirtualKeyCode::F23, false.into()),
+            (VirtualKeyCode::F24, false.into()),
+            (VirtualKeyCode::Snapshot, false.into()),
+            (VirtualKeyCode::Scroll, false.into()),
+            (VirtualKeyCode::Pause, false.into()),
+            (VirtualKeyCode::Insert, false.into()),
+            (VirtualKeyCode::Home, false.into()),
+            (VirtualKeyCode::Delete, false.into()),
+            (VirtualKeyCode::End, false.into()),
+            (VirtualKeyCode::PageDown, false.into()),
+            (VirtualKeyCode::PageUp, false.into()),
+            (VirtualKeyCode::Left, false.into()),
+            (VirtualKeyCode::Up, false.into()),
+            (VirtualKeyCode::Right, false.into()),
+            (VirtualKeyCode::Down, false.into()),
+            (VirtualKeyCode::Back, false.into()),
+            (VirtualKeyCode::Return, false.into()),
+            (VirtualKeyCode::Space, false.into()),
+            (VirtualKeyCode::Compose, false.into()),
+            (VirtualKeyCode::Caret, false.into()),
+            (VirtualKeyCode::Numlock, false.into()),
+            (VirtualKeyCode::Numpad0, false.into()),
+            (VirtualKeyCode::Numpad1, false.into()),
+            (VirtualKeyCode::Numpad2, false.into()),
+            (VirtualKeyCode::Numpad3, false.into()),
+            (VirtualKeyCode::Numpad4, false.into()),
+            (VirtualKeyCode::Numpad5, false.into()),
+            (VirtualKeyCode::Numpad6, false.into()),
+            (VirtualKeyCode::Numpad7, false.into()),
+            (VirtualKeyCode::Numpad8, false.into()),
+            (VirtualKeyCode::Numpad9, false.into()),
+            (VirtualKeyCode::NumpadAdd, false.into()),
+            (VirtualKeyCode::NumpadDivide, false.into()),
+            (VirtualKeyCode::NumpadDecimal, false.into()),
+            (VirtualKeyCode::NumpadComma, false.into()),
+            (VirtualKeyCode::NumpadEnter, false.into()),
+            (VirtualKeyCode::NumpadEquals, false.into()),
+            (VirtualKeyCode::NumpadMultiply, false.into()),
+            (VirtualKeyCode::NumpadSubtract, false.into()),
+            (VirtualKeyCode::AbntC1, false.into()),
+            (VirtualKeyCode::AbntC2, false.into()),
+            (VirtualKeyCode::Apostrophe, false.into()),
+            (VirtualKeyCode::Apps, false.into()),
+            (VirtualKeyCode::Asterisk, false.into()),
+            (VirtualKeyCode::At, false.into()),
+            (VirtualKeyCode::Ax, false.into()),
+            (VirtualKeyCode::Backslash, false.into()),
+            (VirtualKeyCode::Calculator, false.into()),
+            (VirtualKeyCode::Capital, false.into()),
+            (VirtualKeyCode::Colon, false.into()),
+            (VirtualKeyCode::Comma, false.into()),
+            (VirtualKeyCode::Convert, false.into()),
+            (VirtualKeyCode::Equals, false.into()),
+            (VirtualKeyCode::Grave, false.into()),
+            (VirtualKeyCode::Kana, false.into()),
+            (VirtualKeyCode::Kanji, false.into()),
+            (VirtualKeyCode::LAlt, false.into()),
+            (VirtualKeyCode::LBracket, false.into()),
+            (VirtualKeyCode::LControl, false.into()),
+            (VirtualKeyCode::LShift, false.into()),
+            (VirtualKeyCode::LWin, false.into()),
+            (VirtualKeyCode::Mail, false.into()),
+            (VirtualKeyCode::MediaSelect, false.into()),
+            (VirtualKeyCode::MediaStop, false.into()),
+            (VirtualKeyCode::Minus, false.into()),
+            (VirtualKeyCode::Mute, false.into()),
+            (VirtualKeyCode::MyComputer, false.into()),
+            (VirtualKeyCode::NavigateForward, false.into()),
+            (VirtualKeyCode::NavigateBackward, false.into()),
+            (VirtualKeyCode::NextTrack, false.into()),
+            (VirtualKeyCode::NoConvert, false.into()),
+            (VirtualKeyCode::OEM102, false.into()),
+            (VirtualKeyCode::Period, false.into()),
+            (VirtualKeyCode::PlayPause, false.into()),
+            (VirtualKeyCode::Plus, false.into()),
+            (VirtualKeyCode::Power, false.into()),
+            (VirtualKeyCode::PrevTrack, false.into()),
+            (VirtualKeyCode::RAlt, false.into()),
+            (VirtualKeyCode::RBracket, false.into()),
+            (VirtualKeyCode::RControl, false.into()),
+            (VirtualKeyCode::RShift, false.into()),
+            (VirtualKeyCode::RWin, false.into()),
+            (VirtualKeyCode::Semicolon, false.into()),
+            (VirtualKeyCode::Slash, false.into()),
+            (VirtualKeyCode::Sleep, false.into()),
+            (VirtualKeyCode::Stop, false.into()),
+            (VirtualKeyCode::Sysrq, false.into()),
+            (VirtualKeyCode::Tab, false.into()),
+            (VirtualKeyCode::Underline, false.into()),
+            (VirtualKeyCode::Unlabeled, false.into()),
+            (VirtualKeyCode::VolumeDown, false.into()),
+            (VirtualKeyCode::VolumeUp, false.into()),
+            (VirtualKeyCode::Wake, false.into()),
+            (VirtualKeyCode::WebBack, false.into()),
+            (VirtualKeyCode::WebFavorites, false.into()),
+            (VirtualKeyCode::WebForward, false.into()),
+            (VirtualKeyCode::WebHome, false.into()),
+            (VirtualKeyCode::WebRefresh, false.into()),
+            (VirtualKeyCode::WebSearch, false.into()),
+            (VirtualKeyCode::WebStop, false.into()),
+            (VirtualKeyCode::Yen, false.into()),
+            (VirtualKeyCode::Copy, false.into()),
+            (VirtualKeyCode::Paste, false.into()),
+            (VirtualKeyCode::Cut, false.into()),
+        ]))
     }
 
     /// #### 한국어
-    /// 키보드의 키가 눌렸을때 호출되는 함수 입니다.
-    /// 키보드 상태를 변경하고 기록합니다.
+    /// 키보드의 키가 눌렸을 때 호출되는 함수입니다. </br>
     /// 
     /// #### English (Translation)
-    /// This function is called when a key on the keyboard is pressed.
-    /// Change and record keyboard state.
+    /// This function is called when a key on the keyboard is pressed. </br>
     /// 
-    /// <br>
-    /// 
-    /// # Panics
-    /// #### 한국어
-    /// 1. 내부 뮤텍스 잠금에 실패할 경우 프로그램 실행을 중단시킵니다.
-    /// 자세한 내용은 [`std::sync::RwLock`]을 참고하세요.
-    /// 2. 유효하지 않은 `KeyCode`일 경우 프로그램 실행을 중단시킵니다.
-    /// 
-    /// #### English (Translation)
-    /// 1. Abort program execution if the internal mutex lock fails.
-    /// See [`std::sync::RwLock`] for details.
-    /// 2. Abort program execution if the `KeyCode` is invalid.
-    /// 
-    fn on_pressed(&self, timer: &GameTimer, keycode: KeyCode) {
-        let (beg_time_point, state) = self.state.get(&keycode).expect("Invalid Keycode!");
-        let mut beg_time_point = beg_time_point.write().expect("Failed to access keyboard time points.");
-        if beg_time_point.is_none() {
-            *beg_time_point = Some(timer.current_time_point());
-            state.store(true, MemOrdering::Release);
-            self.history.force_push((keycode, true));
-        }
+    fn on_pressed(&self, keycode: &VirtualKeyCode) {
+        let mut state = self.0
+            .get(keycode)
+            .expect("Invalid key code!")
+            .store(true, Ordering::Release);
     }
 
     /// #### 한국어
-    /// 키보드의 키가 떼어졌을 때 호출되는 함수 입니다.
-    /// 키보드의 상태를 변경하고 기록합니다.
+    /// 키보드의 키가 떼어졌을 때 호출되는 함수입니다. </br>
     /// 
     /// #### English (Translation)
-    /// This function is called when a key on the keyboard is released.
-    /// Change and record keyboard state.
+    /// This function is called when a key on the keyboard is released. </br>
     /// 
-    /// <br>
-    /// 
-    /// # Panics
-    /// #### 한국어
-    /// 1. 내부 뮤텍스 잠금에 실패할 경우 프로그램 실행을 중단시킵니다.
-    /// 자세한 내용은 [`std::sync::RwLock`]을 참고하세요.
-    /// 2. 유효하지 않은 `KeyCode`일 경우 프로그램 실행을 중단시킵니다.
-    /// 
-    /// #### English (Translation)
-    /// 1. Abort program execution if the internal mutex lock fails.
-    /// See [`std::sync::RwLock`] for details.
-    /// 2. Abort program execution if the `KeyCode` is invalid.
-    /// 
-    fn on_released(&self, keycode: KeyCode) {
-        let (beg_time_point, state) = self.state.get(&keycode).expect("Invalid Keycode!");
-        *beg_time_point.write().expect("Failed to access keyboard time points.") = None;
-        state.store(false, MemOrdering::Release);
-        self.history.force_push((keycode, false));
+    fn on_released(&self, keycode: &VirtualKeyCode) {
+        let mut state = self.0.get(keycode)
+            .expect("Invalid key code!")
+            .store(false, Ordering::Release);
     }
 
     /// #### 한국어
-    /// 주어진 `KeyCode`의 키가 눌렸을 경우 `true`를 반환합니다.
+    /// 주어진 가상 키 코드가 눌렸는지 확인하는 함수입니다. </br>
+    /// 버튼이 눌렸을 경우 `true`를 반환합니다. </br>
     /// 
     /// #### English (Translation)
-    /// Returns `true` if a key with the given `KeyCode` is pressed.
+    /// This function checks whether the given virtual key code has been pressed. </br>
+    /// if the button is pressed, `true` is returned. </br>
     /// 
-    /// <br>
-    /// 
-    /// # Panics
-    /// #### 한국어
-    /// 유효하지 않은 `KeyCode`일 경우 프로그램 실행을 중단시킵니다.
-    /// 
-    /// #### English (Translation)
-    /// Abort program execution if the `KeyCode` is invalid.
-    /// 
-    fn is_pressed(&self, keycode: KeyCode) -> bool {
-        let (_, state) = self.state.get(&keycode).expect("Invalid Keycode!");
-        state.load(MemOrdering::Acquire)
-    }
-
-    /// #### 한국어
-    /// 주어진 `KeyCode`의 키가 눌렸을 경우 눌려진 시간을 반환합니다.
-    /// 
-    /// #### English (Translation)
-    /// Returns the pressed time if a key with the given `KeyCode` is pressed.
-    /// 
-    /// <br>
-    /// 
-    /// # Panics
-    /// #### 한국어
-    /// 유효하지 않은 `KeyCode`일 경우 프로그램 실행을 중단시킵니다.
-    /// 
-    /// #### English (Translation)
-    /// Abort program execution if the `KeyCode` is invalid.
-    /// 
-    fn pressed_duration_sec(&self, timer: &GameTimer, keycode: KeyCode) -> Option<f64> {
-        let (beg_time_point, _) = self.state.get(&keycode).expect("Invalid Keycode!");
-        match *beg_time_point.read().expect("Failed to access keyboard time points.") {
-            Some(beg_time_point) => Some(
-                timer.current_time_point()
-                .saturating_duration_since(beg_time_point)
-                .as_secs_f64()
-            ),
-            None => None,
-        }
+    fn is_pressed(&self, keycode: &VirtualKeyCode) -> bool {
+        self.0.get(keycode)
+            .expect("Invalid key code!")
+            .load(Ordering::Acquire)
     }
 }
 
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct KeyboardState;
 
 impl KeyboardState {
     /// #### 한국어
-    /// 키보드의 키가 눌렸을때 호출되는 함수 입니다.
-    /// 키보드 상태를 변경하고 기록합니다.
+    /// 키보드의 키가 눌렸을 때 호출되는 함수입니다. </br>
     /// 
     /// #### English (Translation)
-    /// This function is called when a key on the keyboard is pressed.
-    /// Change and record keyboard state.
+    /// This function is called when a key on the keyboard is pressed. </br>
     /// 
     /// <br>
     /// 
     /// # Panics
     /// #### 한국어
-    /// 1. 내부 뮤텍스 잠금에 실패할 경우 프로그램 실행을 중단시킵니다.
-    /// 자세한 내용은 [`std::sync::RwLock`]을 참고하세요.
-    /// 2. 유효하지 않은 `KeyCode`일 경우 프로그램 실행을 중단시킵니다.
+    /// 다음과 같은 경우 현재 스레드의 프로그램 실행을 중단합니다. </br>
+    /// - 올바르지 않은 가상 키 코드가 주어졌을 경우. </br>
+    /// - 내부 뮤텍스 잠금에 실패한 경우. </br>
     /// 
     /// #### English (Translation)
-    /// 1. Abort program execution if the internal mutex lock fails.
-    /// See [`std::sync::RwLock`] for details.
-    /// 2. Abort program execution if the `KeyCode` is invalid.
+    /// Abort program execution in the current thread in the following cases: </br>
+    /// - If an incorrect virtual key code is given. </br>
+    /// - If locking an internal mutex fails. </br>
     /// 
     #[inline]
-    pub fn on_pressed<K: Into<KeyCode>>(timer: &GameTimer, keycode: K) {
-        KEYBOARD_STATE.on_pressed(timer, keycode.into())
+    pub fn on_pressed(keycode: &VirtualKeyCode) {
+        KEYBOARD_STATE.on_pressed(keycode)
     }
 
     /// #### 한국어
-    /// 키보드의 키가 떼어졌을 때 호출되는 함수 입니다.
-    /// 키보드의 상태를 변경하고 기록합니다.
+    /// 키보드의 키가 떼어졌을 때 호출되는 함수입니다. </br>
     /// 
     /// #### English (Translation)
-    /// This function is called when a key on the keyboard is released.
-    /// Change and record keyboard state.
+    /// This function is called when a key on the keyboard is released. </br>
     /// 
     /// <br>
     /// 
     /// # Panics
     /// #### 한국어
-    /// 1. 내부 뮤텍스 잠금에 실패할 경우 프로그램 실행을 중단시킵니다.
-    /// 자세한 내용은 [`std::sync::RwLock`]을 참고하세요.
-    /// 2. 유효하지 않은 `KeyCode`일 경우 프로그램 실행을 중단시킵니다.
+    /// 다음과 같은 경우 현재 스레드의 프로그램 실행을 중단합니다. </br>
+    /// - 올바르지 않은 가상 키 코드가 주어졌을 경우. </br>
+    /// - 내부 뮤텍스 잠금에 실패한 경우. </br>
     /// 
     /// #### English (Translation)
-    /// 1. Abort program execution if the internal mutex lock fails.
-    /// See [`std::sync::RwLock`] for details.
-    /// 2. Abort program execution if the `KeyCode` is invalid.
+    /// Abort program execution in the current thread in the following cases: </br>
+    /// - If an incorrect virtual key code is given. </br>
+    /// - If locking an internal mutex fails. </br>
     /// 
     #[inline]
-    pub fn on_released<K: Into<KeyCode>>(keycode: K) {
-        KEYBOARD_STATE.on_released(keycode.into())
+    pub fn on_released(keycode: &VirtualKeyCode) {
+        KEYBOARD_STATE.on_released(keycode)
     }
 
     /// #### 한국어
-    /// 주어진 `KeyCode`의 키가 눌렸을 경우 `true`를 반환합니다.
+    /// 주어진 가상 키 코드가 눌렸는지 확인하는 함수입니다. </br>
+    /// 버튼이 눌렸을 경우 버튼이 눌린 시점을 반환합니다. </br>
     /// 
     /// #### English (Translation)
-    /// Returns `true` if a key with the given `KeyCode` is pressed.
+    /// This function checks whether the given virtual key code has been pressed. </br>
+    /// if the button is pressed, the time when the button was pressed is returned. </br>
     /// 
     /// <br>
     /// 
     /// # Panics
     /// #### 한국어
-    /// 유효하지 않은 `KeyCode`일 경우 프로그램 실행을 중단시킵니다.
+    /// 다음과 같은 경우 현재 스레드의 프로그램 실행을 중단합니다. </br>
+    /// - 올바르지 않은 가상 키 코드가 주어졌을 경우. </br>
+    /// - 내부 뮤텍스 잠금에 실패한 경우. </br>
     /// 
     /// #### English (Translation)
-    /// Abort program execution if the `KeyCode` is invalid.
+    /// Abort program execution in the current thread in the following cases: </br>
+    /// - If an incorrect virtual key code is given. </br>
+    /// - If locking an internal mutex fails. </br>
     /// 
     #[inline]
-    pub fn is_pressed(keycode: KeyCode) -> bool {
+    pub fn is_pressed(keycode: &VirtualKeyCode) -> bool {
         KEYBOARD_STATE.is_pressed(keycode)
-    }
-
-    /// #### 한국어
-    /// 주어진 `KeyCode`의 키가 눌렸을 경우 눌려진 시간을 반환합니다.
-    /// 
-    /// #### English (Translation)
-    /// Returns the pressed time if a key with the given `KeyCode` is pressed.
-    /// 
-    /// <br>
-    /// 
-    /// # Panics
-    /// #### 한국어
-    /// 유효하지 않은 `KeyCode`일 경우 프로그램 실행을 중단시킵니다.
-    /// 
-    /// #### English (Translation)
-    /// Abort program execution if the `KeyCode` is invalid.
-    /// 
-    #[inline]
-    pub fn pressed_duration_sec(timer: &GameTimer, keycode: KeyCode) -> Option<f64> {
-        KEYBOARD_STATE.pressed_duration_sec(timer, keycode)
     }
 }

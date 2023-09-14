@@ -1,46 +1,58 @@
 use std::collections::HashMap;
+
 use lazy_static::lazy_static;
 use serde::{Serialize, Deserialize};
 
 
-/// ### 한국어 
-/// 어플리케이션에서 사용 가능한 장소 설정 목록입니다. </br>
+lazy_static! {
+    /// #### 한국어 </br>
+    /// 각 로케일의 윈도우 제목 입니다. </br>
+    /// 
+    /// #### English (machine translation) </br>
+    /// This is the window title for each locale. </br>
+    /// 
+    static ref TITLE_STR: HashMap<Locale, &'static str> = HashMap::from_iter([
+        (Locale::Unknown, "Select your language."),
+        (Locale::KOR, "밀레니엄 런"),
+    ]);
+}
+
+
+/// #### 한국어  </br>
+/// 어플리케이션의 로케일 목록 입니다. </br>
 /// 
-/// ### English (machine translation)
-/// A list of place settings available in the application. </br>
+/// #### English (machine translation) </br>
+/// This is a list of application locales. </br>
 /// 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Locale {
     #[default]
     Unknown,
-    EN,
     KOR,
 }
 
-
-/// ### 한국어 
-/// 현재 장소 설정에 맞는 윈도우 제목을 가져옵니다. </br>
-/// 
-/// ### English (machine translation) 
-/// Gets the window title that matches the current locale setting. </br>
-/// 
-#[inline]
-pub fn get_wnd_title(locale: &Locale) -> &'static str {
-    debug_assert!(WND_TITLE.get(locale).is_some(), "The window title does not exist. Please add a window title. (locale: {:?})", locale);
-    unsafe { WND_TITLE.get(locale).unwrap_unchecked() }
+impl Locale {
+    #[inline]
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            Self::Unknown => true,
+            _ => false,
+        }
+    }
 }
 
 
-lazy_static! {
-    /// ### 한국어
-    /// 각 장소 설정의 윈도우 제목 입니다. </br>
-    /// 
-    /// ### English (machine translation)
-    /// Window title for each locale setting. </br>
-    /// 
-    static ref WND_TITLE: HashMap<Locale, &'static str> = HashMap::from([
-        (Locale::Unknown, "Select your language."),
-        (Locale::EN, "Millennium Run"),
-        (Locale::KOR, "밀레니엄 런"),
-    ]);
+
+/// #### 한국어 </br>
+/// 현재 로케일에 맞는 윈도우 제목을 가져옵니다. </br>
+/// 윈도우 제목을 가져올 수 없는 경우 프로그램 실행을 중단시킵니다. </br>
+/// 
+/// ### English (machine translation) 
+/// Get the window title appropriate for the current locale. </br>
+/// If the window title cannot be retrieved, program execution will be stopped. </br>
+/// 
+#[inline]
+pub fn get_wnd_title(locale: &Locale) -> &'static str {
+    log::info!("locale: {:?}", locale);
+    TITLE_STR.get(locale).expect("Unable to get window title for given locale. Please add the window title for the given locale.")
 }

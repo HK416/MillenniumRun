@@ -1,211 +1,354 @@
 use std::io;
-use std::fs;
-use std::thread; 
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use sha2::{Sha256, Digest};
-use notify::Result as NotifyResult;
+use std::thread;
+use std::sync::{Arc, RwLock};
+use std::sync::mpsc::{self, Receiver};
+use std::sync::atomic::{AtomicBool, Ordering as MemOrdering};
 
-use super::{
-    AssetHandle,
-    AssetKeys,
-    AssetCache,
-    AssetResult,
-    AssetError,
-    AssetErrorKind,
-    watcher_main,
-    RootAssetPath, 
-    AssetDataType,
-    ASSET_LIST,
+use sha2::{Digest, Sha256};
+use notify::{
+    Event,
+    EventKind,
+    event::ModifyKind,
+    Config,
+    Watcher,
+    RecursiveMode,
+    RecommendedWatcher,
+    Result as NotifyResult,
 };
 
+use crate::{
+    panic_msg,
+    app::abort::{PanicMsg, AppResult},
+    assets::{
+        handle::{
+            AssetHandle,
+            StaticHandle,
+            DynamicHandle,
+            OptionalHandle,
+        },
+        list::{
+            ASSET_LISTS,
+            AssetKeys,
+        },
+        path::ROOT_ASSET_PATH,
+        types::Types,
+    },
+};
+
+const ERR_TITLE_VERIFICATION_FAILED: &'static str = "Asset verification failed";
+const ERR_TITLE_WATCHER_INIT_FAILED: &'static str = "Asset file watcher initialize failed";
+const ERR_VERIFICATION_FAILED: &'static str = "Asset file verification failed for the following reasons:";
+const ERR_WATCHER_INIT_FAILED: &'static str = "Asset file watcher initialization failed for following reasons:";
 
 
-/// #### 한국어
-/// 어플리케이션에서 사용하는 모든 에셋을 관리합니다.
-/// `AssetBundle`을 복제하여 여러 스레드에서 공유하여 사용할 수 있습니다.
+
+/// #### 한국어 </br>
+/// 어플리케이션의 에셋 파일을 관리합니다. </br>
+/// 에셋파일을 읽거나 쓰고, 에셋파일을 감시합니다. </br>
 /// 
-/// #### English (Translation)
-/// Manage all assets used by the application.
-/// By duplicating the `AssetBundle`, it can be shared and used by multiple threads.
+/// #### English (Translation) </br>
+/// Manage the asset files of the application. </br>
+/// Reads or writes asset files and monitors asset files. </br>
 /// 
 #[derive(Debug, Clone)]
 pub struct AssetBundle {
-    /// #### 한국어
-    /// 에셋 디렉토리 경로 입니다.
-    /// 프로그램 파일의 위치에 따라 다른 절대 경로를 가집니다.
-    /// 
-    /// #### English (Translation)
-    /// Asset directory path.
-    /// It has a different absolute path depending on where the program files are located.
-    /// 
-    root_path: RootAssetPath,
-
-    /// #### 한국어
-    /// 미리 수집한 에셋을 관리합니다.
-    /// 어플리케이션은 미리 수집한 에셋만을 사용할 수 있습니다.
-    /// `AssetLists.txt`에서 에셋을 추가하거나 제거할 수 있습니다.
-    /// 
-    /// #### English (Translation)
-    /// Manage pre-collected assets.
-    /// Application can only use pre-collected assets.
-    /// Developer can add or remove assets from `AssetLists.txt`.
-    /// 
-    asset_cache: AssetCache,
+    root_path: PathBuf,
+    asset_list: Arc<HashMap<PathBuf, Types>>,
+    loaded_assets: Arc<RwLock<HashMap<PathBuf, AssetHandle>>>,
+    integrity_flag: Arc<AtomicBool>,
 }
 
 impl AssetBundle {
-    /// #### 한국어
-    /// 새로운 `AssetBundle`을 생성합니다.
-    /// 
-    /// #### English (Translation)
-    /// Creates a new `AssetBundle`.
-    /// 
-    /// <br>
-    /// 
-    /// # Errors
-    /// #### 한국어
-    /// 에셋 디렉토리 경로를 찾을 수 없거나, 에셋 파일이 손상되었을 경우 `AssetError`를 반환합니다.
-    /// 
-    /// #### English (Translation)
-    /// Returns `AssetError` if the asset directory path is not found or if the asset file is corrupted.
-    /// 
-    /// <br>
-    /// 
-    /// # Panics
-    /// #### 한국어
-    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
-    /// 자세한 내용은 [`std::sync::RwLock::write`](`std::sync::RwLock`)문서를 참고하세요.  
-    /// 
-    /// #### English (Translation)
-    /// Abort program execution if an error occurs while locking an internal mutex. 
-    /// See the [`std::sync::RwLock::write`](`std::sync::RwLock`) documentation for details.  
-    /// 
-    pub fn new() -> AssetResult<Self> {
-        if let Some(err) = RootAssetPath::check_asset_path() {
-            return Err(err);
-        }
+    pub fn new() -> AppResult<Self> {
+        let root_path = ROOT_ASSET_PATH.clone()?;
+        let asset_list = Arc::new(ASSET_LISTS.clone()?);
+        let loaded_assets = Arc::new(RwLock::new(HashMap::with_capacity(asset_list.capacity())));
+        
+        // (한국어) 에셋 파일 감시자를 생성합니다.
+        // (English Translation) Create an asset file watcher.
+        let (sender, receiver) = mpsc::channel();
+        let mut watcher = RecommendedWatcher::new(sender, Config::default())
+            .map_err(|e| panic_msg!(
+                ERR_TITLE_WATCHER_INIT_FAILED, "{} {}", ERR_WATCHER_INIT_FAILED, e.to_string()
+            ))?;
+        watcher.watch(&root_path, RecursiveMode::Recursive)
+            .map_err(|e| panic_msg!(
+                ERR_TITLE_WATCHER_INIT_FAILED, "{} {}", ERR_WATCHER_INIT_FAILED, e.to_string()
+            ))?;
 
-        // (한국어) 안전: 이전에 경로가 존재하는지 확인했음.
-        // (English Translation) SAFETY: previously checked that the path exists.
-        let root_path = unsafe { RootAssetPath::get_unchecked() };
-        log::info!("Found the assets directory. (PATH: {})", root_path);
-
-        let asset_cache = AssetCache::new();
+        // (한국어) 에셋 파일 감시를 시작합니다.
+        // (English Translation) Start monitoring asset files.
+        let integrity_flag = Arc::new(AtomicBool::new(true));
+        let integrity_flag_cloned = integrity_flag.clone();
         let root_path_cloned = root_path.clone();
-        let asset_cache_cloned = asset_cache.clone();
-        thread::spawn(move || -> NotifyResult<()> {
-            watcher_main(root_path_cloned, asset_cache_cloned)
+        let asset_list_cloned = asset_list.clone();
+        thread::spawn(move || {
+            watcher_main(watcher, receiver, root_path_cloned, asset_list_cloned);
+            integrity_flag_cloned.store(false, MemOrdering::Release);
         });
 
-        let asset_list = check_assets(&root_path)?;
-        asset_cache.overwrite_handle_batch(asset_list)?;
+        // (한국어) 에셋 파일 검사를 시작합니다.
+        // (English Translation) Start checking asset files.
+        check_assets(&root_path, &asset_list)?;
 
-        Ok(Self { root_path, asset_cache })
+        Ok(Self { root_path, asset_list, loaded_assets, integrity_flag })
     }
 
-    /// #### 한국어
-    /// 주어진 경로에 캐싱되어 있는 에셋을 불러옵니다.
+    /// #### 한국어 </br>
+    /// 에셋 파일에 이상이 없는 경우 `true`를 반환합니다. </br>
     /// 
-    /// #### English (Translation)
-    /// Loads the cached assets in the given path.
+    /// #### English (Translation) </br>
+    /// If there is no problem with the asset file, it returns `true`. </br>
     /// 
-    /// <br>
+    #[inline]
+    pub fn check_integrity(&self) -> bool {
+        self.integrity_flag.load(MemOrdering::Acquire)
+    }
+
+    /// #### 한국어 </br>
+    /// 에셋 파일의 핸들을 가져옵니다. </br>
+    /// 핸들을 가져오는 도중 오류가 발생한 경우 `PanicMsg`를 반환합니다. </br>
     /// 
-    /// # Errors
-    /// #### 한국어
-    /// 주어진 경로에 캐싱되어 있는 에셋이 존재하지 않거나, 에셋을 로드할때 오류가 발생한 경우 `AssetError`를 반환합니다.
+    /// #### English (Translation) </br>
+    /// Gets the handle to the asset file. </br>
+    /// Returns `PanicMsg` if an error occurred while retrieving the handle. </br>
     /// 
-    /// #### English
-    /// If an asset cached in the given path does not exist or an error occurs when loading an asset, `AssetError` is returned.
-    /// 
-    /// <br>
-    /// 
-    /// # Panics
-    /// #### 한국어
-    /// 내부 뮤텍스 잠금 중에 오류가 발생할 경우 프로그램 실행을 중단시킵니다. 
-    /// 자세한 내용은 [`std::sync::RwLock`]문서를 참고하세요.  
-    /// 
-    /// #### English (Translation)
-    /// Abort program execution if an error occurs while locking an internal mutex. 
-    /// See the [`std::sync::RwLock`] documentation for details.  
-    /// 
-    pub fn load_asset<P: AsRef<Path>>(&self, path: P) -> AssetResult<AssetHandle> {
-        let path = PathBuf::from_iter([self.root_path.as_ref(), path.as_ref()]);
-        log::debug!("load assets. (PATH:{})", path.display());
-        if let Some(handle) = self.asset_cache.get_handle(path) {
-            handle.load_asset()?;
-            return Ok(handle);
+    pub async fn get<P: AsRef<Path>>(&self, rel_path: P) -> AppResult<AssetHandle> {
+        {
+            let loaded_assets = self.loaded_assets
+                .read()
+                .expect("Failed to access loaded assets.");
+            if let Some(handle) = loaded_assets.get(rel_path.as_ref()) {
+                return Ok(handle.clone())
+            }
         }
 
-        return Err(AssetError::new(
-            AssetErrorKind::NotFound, format!("Asset not found.")
-        ));
+        {
+            if let Some(types) = self.asset_list.get(rel_path.as_ref()) {
+                let abs_path = PathBuf::from_iter([&self.root_path, rel_path.as_ref()]);
+                let handle = match types {
+                    Types::Static => AssetHandle::Static(Arc::new(RwLock::new(StaticHandle::new(abs_path)?))),
+                    Types::Dynamic => AssetHandle::Dynamic(Arc::new(RwLock::new(DynamicHandle::new(abs_path)?))),
+                    Types::Optional => AssetHandle::Optional(Arc::new(RwLock::new(OptionalHandle::new(abs_path)?))),
+                };
+
+                let mut loaded_assets = self.loaded_assets
+                    .write()
+                    .expect("Failed to access loaded assets.");
+                loaded_assets.insert(rel_path.as_ref().into(), handle.clone());
+                return Ok(handle);
+            }
+        }
+
+        Err(panic_msg!(
+            "Failed to get asset handle",
+            "The asset path given in the asset list does no exist."
+        ))
     }
 }
 
 
-/// #### 한국어
-/// `AssetLists.txt`에 주어진 에셋을 확인합니다.
-/// `AssetLists.txt`목록의 에셋은 컴파일 시간에 파일이 존재하는지 확인 후 바이너리에 포함됩니다.
-/// 모든 정적 및 동적 데이터 파일이 존재하는지 검사하고, 정적 데이터에 대해 파일 무결성을 검사합니다.
+
+/// #### 한국어 </br>
+/// 에셋 파일을 감시하는 루프입니다. </br>
+/// 에셋 파일의 데이터가 손상된 경우, 혹은 오류가 발생한 경우 
+/// 프로그램 실행 중에 이 루프를 빠져나옵니다. </br>
 /// 
-/// #### English
-/// Check the assets given in `AssetLists.txt`
-/// Assets in the `AssetLists.txt` list are included in the binary after checking if the file exists at compile time.
-/// All static and dynamic data files are checked for existence, and file integrity is checked for static data.
+/// #### English (Translation) </br>
+/// This is a loop that monitors asset files. </br>
+/// If the data in the asset file is corrupted, or an error occurs, 
+/// this loop will be exited during program execution. </br>
 /// 
-/// <br>
+fn watcher_main(
+    _watcher: RecommendedWatcher, 
+    receiver: Receiver<NotifyResult<Event>>,
+    root_path: PathBuf,
+    asset_list: Arc<HashMap<PathBuf, Types>>,
+) {
+    log::info!("Start monitoring asset files.");
+
+    // (한국어) 에셋 파일 감시자로부터 받아온 이벤트를 처리합니다.
+    // (English Translation) Processes events received from the asset file watcher. 
+    for result in receiver {
+        let event = match result {
+            Ok(event) => event,
+            Err(e) => {
+                log::error!("Asset file watcher has stopped for the following reasones: {}", e.to_string());
+                return;
+            }
+        };
+
+        match &event.kind {
+            // (한국어) 파일이 삭제됬다는 이벤트를 수신한 경우.
+            // (English Translation) If an event that file has been removed is received.
+            EventKind::Remove(_) => {
+                // (한국어) 
+                // 해당 파일이 에셋 리스트에 포함되어 있는지 확인합니다.
+                // 
+                // (English Translation) 
+                // Checks if the file is included in the asset list.
+                // 
+                for path in event.paths.iter() {
+                    let path = match get_subpath(&path, &root_path) {
+                        Ok(path) => path,
+                        Err(e) => {
+                            log::error!("Asset file watcher has stopped for the following reasones: {}", e.to_string());
+                            return;
+                        }
+                    };
+
+                    if asset_list.contains_key(path) {
+                        log::error!("The data in the asset file is corrupted! (file:{})", path.display());
+                        return;
+                    }
+                }
+            },
+            EventKind::Modify(kind) => match kind {
+                // (한국어) 파일 데이터가 수정됬다는 이벤트를 수신한 경우.
+                // (English Trnaslation) If an event that file data has been modified is received.
+                ModifyKind::Data(_) => {
+                    // (한국어) 
+                    // 해당 파일이 에셋 리스트에 포함되어 있는지 확인합니다.
+                    // 포함되어 있는 경우 에셋 파일의 유형을 확인합니다.
+                    // 
+                    // (English Translation) 
+                    // Checks if the file is included in the asset list.
+                    // Checks the type of asset file, if included.
+                    // 
+                    for path in event.paths.iter() {
+                        let path = match get_subpath(&path, &root_path) {
+                            Ok(path) => path,
+                            Err(e) => {
+                                log::error!("Asset file watcher has stopped for the following reasones: {}", e.to_string());
+                                return;
+                            }
+                        };
+
+                        if let Some(types) = asset_list.get(path) {
+                            if !types.writable() {
+                                log::error!("The data in the asset file is corrupted! (file:{})", path.display());
+                                return;
+                            }
+                        }
+                    }
+                },
+                // (한국어) 파일 이름이 수정됬다는 이벤트를 수신한 경우.
+                // (English Trnaslation) If an event that file name has been modified is received.
+                ModifyKind::Name(_) => {
+                    // (한국어) 
+                    // 해당 파일이 에셋 리스트에 포함되어 있는지 확인합니다.
+                    // 
+                    // (English Translation) 
+                    // Checks if the file is included in the asset list.
+                    // 
+                    for path in event.paths.iter() {
+                        let path = match get_subpath(&path, &root_path) {
+                            Ok(path) => path,
+                            Err(e) => {
+                                log::error!("Asset file watcher has stopped for the following reasones: {}", e.to_string());
+                                return;
+                            }
+                        };
+                        
+                        if asset_list.contains_key(path) {
+                            log::error!("The data in the asset file is corrupted! (file:{})", path.display());
+                            return;
+                        }
+                    }
+                },
+                _ => { }
+            },
+            _ => { }
+        };
+    }
+
+    log::info!("Finish monitoring asset files.");
+}
+
+
+
+#[inline]
+fn get_subpath<'a>(path: &'a Path, base: &'a Path) -> Result<&'a Path, String> {
+    path.strip_prefix(base).map_err(|e| e.to_string())
+}
+
+
+
+/// #### 한국어 </br>
+/// `AssetLists.txt`목록의 에셋을 확인합니다. </br>
+/// `AssetLists.txt`목록의 에셋 중 정적 유형의 에셋 파일은 
+/// 컴파일 타임에 바이너리에 키값이 저장됩니다. </br>
+/// 모든 정적 및 동적 유형의 에셋 파일이 존재하는 검사하고, 
+/// 정적 유형의 에셋파일에 대해 키값이 일치하는지 검사합니다. </br>
+/// 검사 도중 오류가 발생한 경우 `PanicMsg`를 반환합니다. </br>
 /// 
-/// # Errors
-/// #### 한국어
-/// 에셋의 경로를 찾을 수 없거나, 파일이 손상된 경우 `AssetError`를 반환합니다.
 /// 
-/// #### English (Translation)
-/// Return `AssetError` if the path to the asset cannot be found or the file is corrupt.
+/// #### English (Translation) </br>
+/// Check the assets in the `AssetLists.txt` list. </br>
+/// Among the assets in the `AssetLists.txt` list, 
+/// the key value of static type asset files are stored in the binary at compile time. </br>
+/// Checks if all static and dynamic type asset files exist 
+/// and checks if the key values match for static type asset files. </br>
+/// If an error occurs during the check, it returns `PanicMsg`. </br>
 /// 
-fn check_assets<P: AsRef<Path>>(root_path: P) -> AssetResult<HashMap<PathBuf, AssetDataType>> {
-    let mut asset_list = HashMap::with_capacity(ASSET_LIST.capacity());
-    
-    for (path, data_type) in ASSET_LIST.iter() {
-        let asset_path = PathBuf::from_iter([root_path.as_ref(), &path]);
-        if !data_type.is_optional() && !asset_path.is_file() {
-            return Err(AssetError::new(
-                AssetErrorKind::NotFile,
-                format!("Asset is not a file or path cannot be resolved!")
+fn check_assets<P: AsRef<Path>>(
+    root_path: P, 
+    asset_list: &HashMap<PathBuf, Types>,
+) -> AppResult<()> {
+    for (rel_path, types) in asset_list.iter() {
+        let abs_path = PathBuf::from_iter([root_path.as_ref(), rel_path]);
+        if !types.creatable() && !abs_path.is_file() {
+            return Err(panic_msg!(
+                ERR_TITLE_VERIFICATION_FAILED,
+                "{} {}",
+                ERR_VERIFICATION_FAILED,
+                "Asset is not a file or path cannot be found!"
             ));
         }
 
-        if data_type.is_static_data() {
-            let embed_file = AssetKeys::get(path.to_str().unwrap()).ok_or_else(
-                || AssetError::new(
-                    AssetErrorKind::NotFound, 
-                    format!("Key value not found!")
-                )
-            )?;
+        if !types.writable() {
+            let key_file = AssetKeys::get(
+                rel_path.to_str().unwrap()
+            ).ok_or_else(|| panic_msg!(
+                ERR_TITLE_VERIFICATION_FAILED,
+                "{} {}",
+                ERR_VERIFICATION_FAILED,
+                "Asset key not found!"
+            ))?;
 
             let hash = {
-                let mut file = fs::File::open(&asset_path)
-                    .map_err(|e| AssetError::new(
-                        AssetErrorKind::from(e), format!("Unable to open asset file.")
+                let mut file = OpenOptions::new()
+                    .read(true)
+                    .open(abs_path)
+                    .map_err(|e| panic_msg!(
+                        ERR_TITLE_VERIFICATION_FAILED,
+                        "{} {}",
+                        ERR_VERIFICATION_FAILED,
+                        e.to_string()
                     ))?;
                 let mut hasher = Sha256::new();
                 io::copy(&mut file, &mut hasher)
-                    .map_err(|e| AssetError::new(
-                        AssetErrorKind::from(e), format!("Key value creation failed.")
+                    .map_err(|e| panic_msg!(
+                        ERR_TITLE_VERIFICATION_FAILED,
+                        "{} {}",
+                        ERR_VERIFICATION_FAILED,
+                        e.to_string()
                     ))?;
                 hasher.finalize()
             };
 
-            if embed_file.data.as_ref().ne(hash.as_slice()) {
-                return Err(AssetError::new(
-                    AssetErrorKind::InvalidKey,
-                    format!("The application's asset file is corrupted."),
+            if key_file.data.as_ref().ne(hash.as_slice()) {
+                return Err(panic_msg!(
+                    ERR_TITLE_VERIFICATION_FAILED,
+                    "{} {}",
+                    ERR_VERIFICATION_FAILED,
+                    "Key values in asset files do not match!"
                 ));
             }
         }
-        asset_list.insert(asset_path, *data_type);
     }
-
-    return Ok(asset_list)
+    Ok(())
 }

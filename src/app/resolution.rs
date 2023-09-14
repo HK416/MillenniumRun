@@ -1,20 +1,35 @@
-#![allow(unused_imports)]
 use std::collections::HashMap;
+
 use lazy_static::lazy_static;
 use serde::{Serialize, Deserialize};
-use winit::{dpi::LogicalSize, window::{Fullscreen, Window}};
-
-#[cfg(target_os = "macos")] 
-use winit::platform::macos::WindowExtMacOS;
-
-use crate::{panic_err, app::AppResult};
+use winit::{
+    window::Window,
+    dpi::LogicalSize, 
+};
 
 
 
-/// ### 한국어
+lazy_static! {
+    /// #### 한국어 </br>
+    /// 각 해상도의 크기 목록 입니다. </br>
+    /// 
+    /// #### English (machine translation) </br>
+    /// Size list for each resolution. </br>
+    /// 
+    static ref SIZE: HashMap<Resolution, LogicalSize<u32>> = HashMap::from([
+        (Resolution::W640H360, (640, 360).into()),
+        (Resolution::W960H540, (960, 540).into()),
+        (Resolution::W1280H720, (1280, 720).into()),
+        (Resolution::W1440H810, (1440, 810).into()),
+        (Resolution::W1600H900, (1600, 900).into()),
+        (Resolution::W1920H1080, (1920, 1080).into()),
+    ]);
+}
+
+/// #### 한국어 </br>
 /// 어플리케이션에서 사용가능한 16:9비율의 해상도 목록입니다. </br>
 /// 
-/// ### English (machine translation)
+/// #### English (machine translation) </br>
 /// A list of 16:9 aspect ratio resolutions available in the application. </br>
 /// 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -28,43 +43,20 @@ pub enum Resolution {
     W1920H1080,
 }
 
-impl Resolution {
-    /// ### 한국어
-    /// 해상도를 가로와 세로의 크기로 반환합니다.
-    /// 
-    /// ### English (machine translation)
-    /// Returns the resolution in horizontal and vertical dimensions.
-    /// 
+impl AsRef<LogicalSize<u32>> for Resolution {
     #[inline]
-    pub fn as_logical_size(&self) -> LogicalSize<u32> {
-        debug_assert!(R_SIZE.get(&self).is_some(), "Resolution size does not exist. Please add this size. (resolution: {:?})", &self);
-        unsafe { *R_SIZE.get(&self).unwrap_unchecked() }
+    fn as_ref(&self) -> &LogicalSize<u32> {
+        log::info!("resultion: {:?}", self);
+        SIZE.get(self).expect("Unable to get window size for given resolution. Please add the window size for the given resolution")
     }
 }
 
 
-lazy_static! {
-    /// ### 한국어 
-    /// 각 해상도의 크기 목록 입니다. </br>
-    /// 
-    /// ### English (machine translation) 
-    /// Size list for each resolution. </br>
-    /// 
-    static ref R_SIZE: HashMap<Resolution, LogicalSize<u32>> = HashMap::from([
-        (Resolution::W640H360, LogicalSize::new(640, 360)),
-        (Resolution::W960H540, LogicalSize::new(960, 540)),
-        (Resolution::W1280H720, LogicalSize::new(1280, 720)),
-        (Resolution::W1440H810, LogicalSize::new(1440, 810)),
-        (Resolution::W1600H900, LogicalSize::new(1600, 900)),
-        (Resolution::W1920H1080, LogicalSize::new(1920, 1080)),
-    ]);
-}
 
-
-/// ### 한국어 
+/// #### 한국어 </br>
 /// 윈도우 화면 모드 목록입니다. </br>
 /// 
-/// ### English (machine translation) 
+/// #### English (machine translation) </br>
 /// List of window screen modes. </br>
 /// 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -74,53 +66,44 @@ pub enum ScreenMode {
     FullScreen,
 }
 
-/// #### 한국어
-/// 윈도우를 전체화면 모드로 설정합니다.
-/// `screen_mode`가 `ScreenMode::FullScreen`일 때 `Windows`, `Linux`의 경우 현재 모니터 정보를 가져와 비디오 모드를 설정합니다. 
-/// 반면에 `macOS`의 경우 전용 함수를 사용합니다.
-/// 
-/// #### English (Translation)
-/// Sets the window to full screen mode. 
-/// When screen_mode is ScreenMode::FullScreen, in case of `Windows` or `Linux`, get the current monitor information and set the video mode. 
-/// On the other hand, for `macOS`, it uses a dedicated function.
-/// 
-/// <br>
-/// 
-/// # Errors
-/// #### 한국어
-/// `screen_mode`가 `ScreenMode::FullScreen`일 때 `Windows`와 `Linux`에서 
-/// 현재 모니터 정보나 비디오 모드를 가져올 수 없는 경우 `PanicErr`를 반환합니다.
-/// 
-/// #### English (Translation)
-/// Return `PanicErr` if unable to get current monitor information or video mode on `Windows` and `Linux`
-/// when `screen_mode` is `ScreenMode::FullScreen`.
-/// 
-pub fn set_fullscreen(
-    window: &Window,
-    screen_mode: &ScreenMode,
-) -> AppResult<()> {
-    match screen_mode {
-        ScreenMode::Windowed => {
-            window.set_fullscreen(None);
-            Ok(())
-        },
-        ScreenMode::FullScreen => {
-            #[cfg(target_os = "macos")] {
-                window.set_simple_fullscreen(true);
-                Ok(())
-            }
-            #[cfg(not(target_os = "macos"))] {
-                let monitor = match window.current_monitor() {
-                    Some(monitor) => monitor,
-                    None => return Err(panic_err!("Monitor not found", "Could not find the monitor where the window is currently located!")),
-                };
-                let video_mode = match monitor.video_modes().next() {
-                    Some(mode) => mode,
-                    None => return Err(panic_err!("Video mode not found", "The monitor's video mode could not be found!")),
-                };
-                window.set_fullscreen(Some(Fullscreen::Exclusive(video_mode)));
-                Ok(())
-            }
+impl ScreenMode {
+    #[inline]
+    pub fn is_fullscreen(&self) -> bool {
+        match self {
+            Self::Windowed => false,
+            Self::FullScreen => true,
         }
     }
+}
+
+
+
+/// #### 한국어 </br>
+/// 윈도우의 화면 모드를 설정합니다. </br>
+/// 전체 화면 모드로 설정할 수 없는 경우 창 모드로 설정됩니다. </br>
+/// 
+/// #### English (Translation)
+/// Set the screen mode of the window. </br>
+/// If full screen mode cannot be set, it will be set to windowed mode. </br>
+/// 
+pub fn set_screen_mode(window: &Window, mode: &ScreenMode) {
+    log::info!("screen mode: {:?}", mode);
+    if mode.is_fullscreen() {
+        #[cfg(target_os = "macos")] {
+            use winit::platform::macos::WindowExtMacOS;
+            window.set_simple_fullscreen(true);
+            return;
+        }
+        #[cfg(not(target_os = "macos"))] {
+            use winit::window::Fullscreen;
+            if let Some(monitor) = window.current_monitor() {
+                if let Some(mode) = monitor.video_modes().next() {
+                    window.set_fullscreen(Some(Fullscreen::Exclusive(mode)));
+                    return;
+                }
+            }
+            log::warn!("Window cannot be set to full screen mode!");
+        }
+    }
+    window.set_fullscreen(None);
 }

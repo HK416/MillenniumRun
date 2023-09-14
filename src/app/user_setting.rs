@@ -1,7 +1,18 @@
+use ron::ser::PrettyConfig;
 use serde::{Serialize, Deserialize};
+
+
 use crate::{
-    app::{Locale, Resolution, ScreenMode},
-    assets::{Asset, AssetResult, AssetError, AssetErrorKind},
+    panic_msg,
+    app::{
+        abort::{PanicMsg, AppResult},
+        locale::Locale,
+        resolution::{Resolution, ScreenMode},
+    },
+    assets::interface::{
+        AssetDecoder, 
+        AssetEncoder
+    },
 };
 
 
@@ -22,29 +33,41 @@ pub struct UserSetting {
     pub screen_mode: ScreenMode,
 }
 
-impl UserSetting {
-    pub const ASSETS_PATH: &'static str = "user.setting";
-}
 
-impl Asset for UserSetting {
-    fn decode_bytes(bytes: &[u8]) -> AssetResult<Self> {
-        ron::de::from_bytes(bytes)
-            .map_err(|e| AssetError::new(
-                AssetErrorKind::from(e.code),
-                format!("Failed to parse with RON(rusty object Notation). ({})", e.position)
+
+#[derive(Debug)]
+pub struct Decoder;
+
+impl AssetDecoder for Decoder {
+    type Output = UserSetting;
+
+    fn decode(buf: &[u8]) -> AppResult<Self::Output> {
+        ron::de::from_bytes(buf)
+            .map_err(|e| panic_msg!(
+                "Asset decoding failed",
+                "Asset decoding failed for the following reasons: {}",
+                e.to_string()
             ))
     }
+}
 
-    fn encode_bytes(&self) -> AssetResult<Vec<u8>> {
-        let pretty = ron::ser::PrettyConfig::new()
+#[derive(Debug)]
+pub struct Encoder;
+
+impl AssetEncoder for Encoder {
+    type Input = UserSetting;
+
+    fn encode(val: &Self::Input) -> AppResult<Vec<u8>> {
+        let config = PrettyConfig::new()
             .separate_tuple_members(true)
             .enumerate_arrays(true)
             .struct_names(true);
-
-        Ok( ron::ser::to_string_pretty(self, pretty)
-            .map_err(|e| AssetError::new(
-                AssetErrorKind::from(e), 
-                format!("Failed to parse with RON(rusty object Notation).")
+        
+        Ok(ron::ser::to_string_pretty(val, config)
+            .map_err(|e| panic_msg!(
+                "Asset encoding failed",
+                "Asset encoding failed for the following reasons: {}",
+                e.to_string()
             ))?
             .as_bytes()
             .to_vec())

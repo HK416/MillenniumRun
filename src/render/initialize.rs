@@ -1,61 +1,54 @@
+use std::sync::Arc;
+
+use async_std::task;
 use winit::window::Window;
 
 use crate::{
-    panic_err, 
-    app::{AppResult, PanicErr},
+    panic_msg, 
+    app::abort::{PanicMsg, AppResult},
 };
 
 
 
-/// #### 한국어
-/// `wgpu` 랜더링 컨텍스트를 생성하는 비동기 함수입니다.
+/// #### 한국어 </br>
+/// `wgpu` 랜더링 컨텍스트를 생성하는 비동기 함수입니다. </br>
+/// <b>메모: 이 함수는 반드시 메인 스레드에서만 호출되어야 합니다.</b></br>
 /// 
-/// #### English (Translation)
-/// A asynchronous function that creates a `wgpu` rendering context.
-/// 
-/// <br>
-/// 
-/// # Notes
-/// #### 한국어
-/// 이 함수는 반드시 메인 스레드에서 호출되어야 합니다. 
-/// 그렇지 않을 경우 일부 플랫폼에서 문제가 발생할 수 있습니다.
-/// 
-/// #### English (Translation)
-/// This function must be called from the main thread.
-/// Failure to do so may cause issues on some platforms.
+/// #### English (Translation) </br>
+/// A asynchronous function that creates a `wgpu` rendering context. </br>
+/// <b>Note: This function must be called only from the main thread.</b></br>
 /// 
 /// <br>
 /// 
-/// # Errors
-/// #### 한국어
-/// `wgpu` 랜더링 컨텍스트를 생성하기에 실패할 경우 `PanicErr`를 반환합니다.
+/// # Errors </br>
+/// #### 한국어 </br>
+/// `wgpu` 랜더링 컨텍스트를 생성하기에 실패할 경우 `PanicMsg`를 반환합니다. </br>
 /// 
-/// #### English (Translation)
-/// `PanicErr`is returned if it fails to create a `wgpu` rendering context.
+/// #### English (Translation) </br>
+/// `PanicMsg`is returned if it fails to create a `wgpu` rendering context. </br>
 /// 
-pub async fn create_render_ctx(window: &Window) -> AppResult<(
-    wgpu::Instance,
-    wgpu::Surface,
-    wgpu::Adapter,
-    wgpu::Device,
-    wgpu::Queue,
+pub fn create_render_ctx(window: &Window) -> AppResult<(
+    Arc<wgpu::Instance>,
+    Arc<wgpu::Surface>,
+    Arc<wgpu::Adapter>,
+    Arc<wgpu::Device>,
+    Arc<wgpu::Queue>,
 )> {
     const INIT_ERR_TITLE: &'static str = "Render Context initialization failed";
 
     let instance = create_wgpu_instance();
     let surface = unsafe { instance.create_surface(window) }
-        .map_err(|e| panic_err!(INIT_ERR_TITLE, "{}", e.to_string()))?;
-    let adapter = instance.request_adapter(
+        .map_err(|e| panic_msg!(INIT_ERR_TITLE, "{}", e.to_string()))?;
+    let adapter = task::block_on(instance.request_adapter(
         &wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
             force_fallback_adapter: false,
             compatible_surface: Some(&surface)
         }
-    )
-    .await
-    .ok_or_else(|| panic_err!(INIT_ERR_TITLE, "Failed to get wgpu adapter."))?;
+    ))
+    .ok_or_else(|| panic_msg!(INIT_ERR_TITLE, "Failed to get wgpu adapter."))?;
 
-    let (device, queue) = adapter
+    let (device, queue) = task::block_on(adapter
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("Render Device"),
@@ -64,36 +57,28 @@ pub async fn create_render_ctx(window: &Window) -> AppResult<(
                     .using_resolution(adapter.limits())
             }, 
             None
-        )
-        .await
-        .map_err(|e| panic_err!(INIT_ERR_TITLE, "{}", e.to_string()))?;
+        ))
+        .map_err(|e| panic_msg!(INIT_ERR_TITLE, "{}", e.to_string()))?;
 
-    Ok((instance, surface, adapter, device, queue))
+    Ok((instance.into(), surface.into(), adapter.into(), device.into(), queue.into()))
 }
 
 
 
-/// #### 한국어
-/// 플랫폼마다 지정된 `wgpu` 인스턴스를 생성합니다.
+/// #### 한국어 </br>
+/// 플랫폼마다 지정된 `wgpu` 인스턴스를 생성합니다. </br>
+/// <b>메모: 지원하지 않는 플랫폼인 경우 프로그램 실행을 중단시킵니다.</b></br>
 /// 
 /// #### English (Translation)
 /// Creates a specified `wgpu` instance per platform.
+/// <b>Note: If the platform is not supported, the program will stop running.</b></br>
 /// 
 /// <br>
 /// 
-/// # Panics
-/// #### 한국어
-/// 지원하지 않는 플랫폼인 경우 프로그램 실행을 중단시킵니다.
-/// 
-/// #### English (Translation)
-/// Abort program execution if the platform is not supported.
-/// 
-/// <br>
-/// 
-/// # Supported Platforms
-/// - `Windows: `DirectX 12`
-/// - `linux`: `Vulkan`
-/// - `macOS`: `Metal`
+/// # Supported Platforms </br>
+/// - <b>Windows: DirectX12</b></br>
+/// - <b>linux: Vulkan</b></br>
+/// - <b>macOS: Metal</b></br>
 /// 
 #[inline]
 #[allow(unreachable_code)]

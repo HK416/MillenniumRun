@@ -1,8 +1,8 @@
 [package]
 name = "MillenniumRun"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
-rust-version = "1.71"
+rust-version = "1.72"
 authors = ["HK416 <powerspirit127@gmail.com>", ]
 description = """
     KOR: Nexon Games가 제작한 Blue Archive의 팬 제작 2차 창작 게임.
@@ -21,17 +21,17 @@ bytemuck = "1.13.*" # MIT or Apache-2.0 or Zlib
 async-std = "1.*" # MIT or Apache-2.0 license.
 lazy_static = "1.4.*" # MIT or Apache-2.0 license.
 notify = "6.0.*" # CC0-1.0 or Artistic-2.0 license.
-rust-embed = { version = "6.8.*", features = ["debug-embed", "interpolate-folder-path", "include-exclude"] } # MIT license.
+rust-embed = { version = "8.0.*", features = ["debug-embed", "interpolate-folder-path", "include-exclude"] } # MIT license.
 sha2 = "0.10.*" # MIT or Apache-2.0 license.
 raw-window-handle = "0.5.*" # MIT or Apache-2.0 or Zlib
 crossbeam = "0.8.*" # MIT or Apache-2.0 license.
 
 egui = "0.22.*" # UI crate / MIT or Apache-2.0 license.
-wgpu = "0.17.*" # Graphics crate / MIT or Apache-2.0 license.
+wgpu = { version = "0.17.*", features = ["spirv"] } # Graphics crate / MIT or Apache-2.0 license.
 winit = "0.28.*" # Window crate / Apache-2.0 license.
 rodio = "0.17.*" # Sound crate / MIT or Apache-2.0 license.
 ab_glyph = "0.2.*" # Font crate / Apache-2.0 license.
-glam = { version = "0.24.*", features = ["debug-glam-assert"] } # Math crate / MIT or Apache-2.0 license.
+glam = { version = "0.24.*", features = ["debug-glam-assert", "serde", "bytemuck"] } # Math crate / MIT or Apache-2.0 license.
 native-dialog = "0.6.*" # Window Dialog crate / MIT license.
 
 
