@@ -98,6 +98,7 @@ pub fn game_render_loop(
                 GameRenderEvent::WindowResized => {
                     config.width = window.inner_size().width; 
                     config.height = window.inner_size().height;
+                    instance.poll_all(true);
                     surface.configure(&device, &config);
                 },
             }
@@ -151,6 +152,10 @@ pub fn game_render_loop(
             success(send(result, &sender));
         }
 
+
+        // (한국어) 이전 작업이 끝날 때까지 대기합니다.
+        // (English Translation) Wait until the previous operation is finished.
+        device.poll(wgpu::Maintain::Wait);
 
         // (한국어) 다음 프레임을 가져옵니다.
         // (English Translation) Get the next frame.
