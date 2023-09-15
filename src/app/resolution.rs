@@ -96,13 +96,8 @@ pub fn set_screen_mode(window: &Window, mode: &ScreenMode) {
         }
         #[cfg(not(target_os = "macos"))] {
             use winit::window::Fullscreen;
-            if let Some(monitor) = window.current_monitor() {
-                if let Some(mode) = monitor.video_modes().next() {
-                    window.set_fullscreen(Some(Fullscreen::Exclusive(mode)));
-                    return;
-                }
-            }
-            log::warn!("Window cannot be set to full screen mode!");
+            window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+            return;
         }
     }
     window.set_fullscreen(None);
