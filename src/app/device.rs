@@ -43,7 +43,7 @@ impl MouseButtonStateInner {
     fn on_pressed(&self, button: &MouseButton) {
         match button {
             MouseButton::Left | MouseButton::Right | MouseButton::Middle => {
-                let mut state = self.0.get(button)
+                self.0.get(button)
                     .expect("Invalid mouse button!")
                     .store(true, Ordering::Release);
             },
@@ -60,7 +60,7 @@ impl MouseButtonStateInner {
     fn on_released(&self, button: &MouseButton) {
         match button {
             MouseButton::Left | MouseButton::Right | MouseButton::Middle => {
-                let mut state = self.0.get(button)
+                self.0.get(button)
                     .expect("Invalid mouse button!")
                     .store(false, Ordering::Release);
             },
@@ -325,7 +325,7 @@ impl KeyboardStateInner {
     /// This function is called when a key on the keyboard is pressed. </br>
     /// 
     fn on_pressed(&self, keycode: &VirtualKeyCode) {
-        let mut state = self.0
+        self.0
             .get(keycode)
             .expect("Invalid key code!")
             .store(true, Ordering::Release);
@@ -338,7 +338,7 @@ impl KeyboardStateInner {
     /// This function is called when a key on the keyboard is released. </br>
     /// 
     fn on_released(&self, keycode: &VirtualKeyCode) {
-        let mut state = self.0.get(keycode)
+        self.0.get(keycode)
             .expect("Invalid key code!")
             .store(false, Ordering::Release);
     }

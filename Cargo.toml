@@ -24,7 +24,6 @@ notify = "6.0.*" # CC0-1.0 or Artistic-2.0 license.
 rust-embed = { version = "8.0.*", features = ["debug-embed", "interpolate-folder-path", "include-exclude"] } # MIT license.
 sha2 = "0.10.*" # MIT or Apache-2.0 license.
 raw-window-handle = "0.5.*" # MIT or Apache-2.0 or Zlib
-crossbeam = "0.8.*" # MIT or Apache-2.0 license.
 
 egui = "0.22.*" # UI crate / MIT or Apache-2.0 license.
 wgpu = { version = "0.17.*", features = ["spirv"] } # Graphics crate / MIT or Apache-2.0 license.

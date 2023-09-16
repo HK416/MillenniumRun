@@ -27,7 +27,6 @@ use crate::{
 /// 
 #[derive(Debug)]
 pub struct StaticHandle {
-    file: File,
     bytes: Vec<u8>,
 }
 
@@ -67,7 +66,7 @@ impl StaticHandle {
             ));
         }
 
-        Ok(Self { file, bytes })
+        Ok(Self { bytes })
     }
 }
 
@@ -85,7 +84,7 @@ impl HandleInner for StaticHandle {
     }
 
     #[inline]
-    fn write<T, E: AssetEncoder<Input = T>>(&mut self, val: &E::Input) -> AppResult<()> {
+    fn write<T, E: AssetEncoder<Input = T>>(&mut self, _val: &E::Input) -> AppResult<()> {
         log::info!("Asset files of static type do not perform write functions!");
         Ok(())
     }

@@ -1,17 +1,17 @@
 use std::sync::Arc;
-use std::sync::mpsc::{Receiver, Sender};
-use std::collections::VecDeque;
 
 use winit::window::Window;
 
+use crate::render::message::RenderCommandChannel;
+use crate::render::task::RenderSubmitChannel;
 use crate::{
     panic_msg, 
     app::{
         abort::PanicMsg,
         message::{
-            send,
             success,
             GameRenderEvent,
+            GameRenderEventChannel,
         },
         running_flag::RunningFlag,
     },
@@ -47,8 +47,6 @@ use crate::{
 /// 
 pub fn game_render_loop(
     window: Arc<Window>,
-    event_receiver: Receiver<GameRenderEvent>,
-    render_cmd_receiver: Receiver<(Sender<CommandResult>, RenderCommand)>,
     instance: Arc<wgpu::Instance>,
     surface: Arc<wgpu::Surface>,
     adapter: Arc<wgpu::Adapter>,
@@ -64,10 +62,6 @@ pub fn game_render_loop(
     let mut shader_module_pool = ShaderModulePool::new();
     let mut texture_view_pool = TextureViewPool::new();
     let mut texture_pool = TexturePool::new();
-
-    // (한국어) 렌더 제출 큐를 생성합니다.
-    // (English Translation) Create a render submit queue.
-    let mut submit_queue = VecDeque::new();
 
     // (한국어) wgpu 프레임 버퍼를 설정합니다.
     // (English Translation) Set the wgpu framebuffer.
@@ -85,26 +79,28 @@ pub fn game_render_loop(
     };
     surface.configure(&device, &config);
 
-
     log::info!("Run :: Game render loop.");
     'render_loop: while RunningFlag::is_running() {
         // (한국어) 어플리케이션 이벤트를 처리합니다.
         // (English Translation) Handles application events.
-        while let Ok(event) = event_receiver.try_recv() {
+        while let Some(event) = GameRenderEventChannel::pop() {
             match event {
                 GameRenderEvent::ApplicationTerminate => {
                     break 'render_loop;
                 },
                 GameRenderEvent::WindowResized => {
-                    config.width = window.inner_size().width; 
-                    config.height = window.inner_size().height;
-                    instance.poll_all(true);
-                    surface.configure(&device, &config);
+                    let (width, height): (u32, u32) = window.inner_size().into();
+                    if width > 0 && height > 0 {
+                        config.width = width; 
+                        config.height = height;
+                        instance.poll_all(true);
+                        surface.configure(&device, &config);
+                    }
                 },
             }
         }
 
-        while let Ok((sender, cmd)) = render_cmd_receiver.try_recv() {
+        while let Some((setter, cmd)) = RenderCommandChannel::pop() {
             let result = match cmd {
                 RenderCommand::CreateBindGroupLayout(ci) => {
                     CommandResult::Return(ci.build(&device, &mut bind_group_layout_pool))
@@ -144,12 +140,8 @@ pub fn game_render_loop(
                 RenderCommand::QuerySwapchainFormat => {
                     CommandResult::QueryTextureFormat(swapchain_format)
                 }
-                RenderCommand::Submit(passes) => {
-                    submit_queue.push_back(passes);
-                    CommandResult::Finish
-                },
             };
-            success(send(result, &sender));
+            setter.set(result);
         }
 
 
@@ -176,13 +168,9 @@ pub fn game_render_loop(
         // (English Translation) Creates a command buffer.
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        // (한국어) 맨 마지막 제출만 사용합니다.
-        // (English Translation) Only the very last submission is used.
-        while submit_queue.len() > 1 {
-            submit_queue.pop_front();
-        }
-
-        match submit_queue.front() {
+        // (한국어) 제출된 그리기 명령을 수행합니다. 
+        // (English Translation) Processes submitted drawing command.
+        match RenderSubmitChannel::load() {
             Some(passes) => {
                 for pass in passes {
                     let mut rpass = success(pass.desc.begin(&view, &texture_view_pool, &mut encoder));
@@ -233,6 +221,8 @@ pub fn game_render_loop(
             }
         };
 
+        // (한국어) 큐에 그리기 명령을 제출하고, 프레임 버퍼를 출력합니다.
+        // (English Translation) Submit drawing commands to the queue and output to the frame buffer.
         queue.submit(Some(encoder.finish()));
         frame.present();
     }

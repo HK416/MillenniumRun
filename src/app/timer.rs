@@ -18,8 +18,6 @@ pub struct GameTimer {
     base_timepoint: Instant,
     previous_timepoint: Instant,
     current_time_point: Instant,
-    
-    pause_timepoint: Option<Instant>,
 
     frame_times: [f64; MAX_FRAME_TIMES],
     cnt_frame_times: usize,
@@ -46,7 +44,6 @@ impl GameTimer {
             base_timepoint: timepoint, 
             previous_timepoint: timepoint, 
             current_time_point: timepoint, 
-            pause_timepoint: None,
             frame_times: [0.0; MAX_FRAME_TIMES],
             cnt_frame_times: 0,
             elapsed_time_sec: 0.0,
@@ -113,5 +110,12 @@ impl GameTimer {
     #[inline]
     pub fn frame_rate(&self) -> u64 {
         self.frame_rate
+    }
+
+    #[inline]
+    pub fn total_time_sec(&self) -> f64 {
+        self.current_time_point.saturating_duration_since(
+            self.base_timepoint
+        ).as_secs_f64()
     }
 }

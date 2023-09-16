@@ -1,6 +1,5 @@
 use std::thread;
 use std::sync::Arc;
-use std::sync::mpsc;
 
 use async_std::task;
 use winit::{
@@ -21,11 +20,12 @@ use crate::{
         device::{KeyboardState, MouseButtonState},
         locale::get_wnd_title,
         message::{
-            send,
             AppCommand,
             AppCommandChannel,
             GameLogicEvent,
+            GameLogicEventChannel,
             GameRenderEvent,
+            GameRenderEventChannel,
         },
         resolution::set_screen_mode,
         running_flag::RunningFlag,
@@ -83,31 +83,21 @@ pub fn run() -> ! {
     let (instance, surface, adapter, device, queue) = create_render_ctx(&window)
         .unwrap_or_else(|msg| msg.abort());
 
-    // (한국어) 렌더 커맨드 채널을 생성합니다.
-    // (English Translation) Create a render command channel.
-    let (render_cmd_sender, render_cmd_receiver) = mpsc::channel();
-
     // (한국어) 게임 로직 스레드를 생성합니다.
     // (English Translation) Create a game logic thread.
     let window_cloned = window.clone();
     let asset_bundle_cloned = asset_bundle.clone();
-    let (logic_event_sender, event_receiver) = mpsc::channel();
     thread::spawn(|| game_logic_loop(
         window_cloned, 
         asset_bundle_cloned, 
-        Box::new(InitScene::new()), 
-        event_receiver,
-        render_cmd_sender,
+        Box::new(InitScene::new()),
     ));
 
     // (한국어) 게임 렌더 스레드를 생성합니다.
     // (English Translation) Create a game render thread.
     let window_cloned = window.clone();
-    let (render_event_sender, event_receiver) = mpsc::channel();
     thread::spawn(|| game_render_loop(
         window_cloned, 
-        event_receiver, 
-        render_cmd_receiver, 
         instance, 
         surface, 
         adapter, 
@@ -134,7 +124,7 @@ pub fn run() -> ! {
 
         // (한국어) 전달받은 명령을 처리합니다.
         // (English Translation) Processes the received command.
-        while let Some(cmd) = AppCommandChannel::recv() {
+        while let Some(cmd) = AppCommandChannel::pop() {
             match cmd {
                 AppCommand::Panic(msg) => msg.abort(),
                 AppCommand::Terminate => control_flow.set_exit(),
@@ -146,87 +136,72 @@ pub fn run() -> ! {
         match event {
             Event::NewEvents(_) => {
                 timer.tick(None);
-                send(GameLogicEvent::NextMainEvents(timer.elapsed_time_sec()), &logic_event_sender)
-                    .unwrap_or_else(|msg| msg.abort());
+                GameLogicEventChannel::push(GameLogicEvent::NextMainEvents(timer.elapsed_time_sec()));
             }
             Event::MainEventsCleared => {
-                send(GameLogicEvent::MainEventsCleared, &logic_event_sender)
-                    .unwrap_or_else(|msg| msg.abort());
+                GameLogicEventChannel::push(GameLogicEvent::MainEventsCleared);
             },
             Event::LoopDestroyed => log::info!("❖ Application finish. ❖"),
             Event::WindowEvent { window_id, event } 
             if window.id() == window_id => match event {
                 WindowEvent::Resized(_) => {
-                    send(GameLogicEvent::WindowResized, &logic_event_sender)
-                        .unwrap_or_else(|msg| msg.abort());
-                    send(GameRenderEvent::WindowResized, &render_event_sender)
-                        .unwrap_or_else(|msg| msg.abort());
+                    GameLogicEventChannel::push(GameLogicEvent::WindowResized);
+                    GameRenderEventChannel::push(GameRenderEvent::WindowResized);
                 },
                 WindowEvent::Moved(p) => {
-                    send(GameLogicEvent::WindowMoved { x: p.x , y: p.y }, &logic_event_sender)
-                        .unwrap_or_else(|msg| msg.abort());
+                    GameLogicEventChannel::push(GameLogicEvent::WindowMoved { x: p.x, y: p.y });
                 },
                 WindowEvent::CloseRequested | WindowEvent::Destroyed => {
-                    send(GameLogicEvent::ApplicationTerminate, &logic_event_sender)
-                        .unwrap_or_else(|msg| msg.abort());
-                    send(GameRenderEvent::ApplicationTerminate, &render_event_sender)
-                        .unwrap_or_else(|msg| msg.abort());
+                    GameLogicEventChannel::push(GameLogicEvent::ApplicationTerminate);
+                    GameRenderEventChannel::push(GameRenderEvent::ApplicationTerminate);
                     RunningFlag::set_exit();
                     control_flow.set_exit();
                 },
                 WindowEvent::Focused(focuse) => match focuse {
-                    true => send(GameLogicEvent::ApplicationResumed, &logic_event_sender),
-                    false => send(GameLogicEvent::ApplicationPaused, &logic_event_sender),
-                }.unwrap_or_else(|msg| msg.abort()),
+                    true => GameLogicEventChannel::push(GameLogicEvent::ApplicationResumed),
+                    false => GameLogicEventChannel::push(GameLogicEvent::ApplicationPaused),
+                },
                 WindowEvent::KeyboardInput { input, .. } => 
                 if let Some(keycode) = input.virtual_keycode {
                     match input.state {
                         ElementState::Pressed => {
                             KeyboardState::on_pressed(&keycode);
-                            send(GameLogicEvent::KeyPressed(keycode), &logic_event_sender)
+                            GameLogicEventChannel::push(GameLogicEvent::KeyPressed(keycode));
                         },
                         ElementState::Released => {
                             KeyboardState::on_released(&keycode);
-                            send(GameLogicEvent::KeyReleased(keycode), &logic_event_sender)
+                            GameLogicEventChannel::push(GameLogicEvent::KeyReleased(keycode));
                         }
-                    }.unwrap_or_else(|msg| msg.abort());
+                    };
                 },
                 WindowEvent::CursorMoved { position, .. } => {
-                    send(GameLogicEvent::CursorMoved { x: position.x as f32, y: position.y as f32 }, &logic_event_sender)
-                        .unwrap_or_else(|msg| msg.abort());
+                    GameLogicEventChannel::push(GameLogicEvent::CursorMoved { x: position.x, y: position.y });
                 },
                 WindowEvent::MouseWheel { delta, .. } => 
                 if let MouseScrollDelta::LineDelta(horizontal, vertical) = delta {
-                    send(GameLogicEvent::MouseWheel { horizontal , vertical }, &logic_event_sender)
-                        .unwrap_or_else(|msg| msg.abort());
+                    GameLogicEventChannel::push(GameLogicEvent::MouseWheel { horizontal, vertical });
                 },
                 WindowEvent::MouseInput { state, button, .. } => match state {
                     ElementState::Pressed => {
                         MouseButtonState::on_pressed(&button);
-                        send(GameLogicEvent::MousePressed(button), &logic_event_sender)
-                            .unwrap_or_else(|msg| msg.abort());
+                        GameLogicEventChannel::push(GameLogicEvent::MousePressed(button));
                     }
                     ElementState::Released => {
                         MouseButtonState::on_released(&button);
-                        send(GameLogicEvent::MouseReleased(button), &logic_event_sender)
-                            .unwrap_or_else(|msg| msg.abort());
+                        GameLogicEventChannel::push(GameLogicEvent::MouseReleased(button));
                     }
                 },
                 WindowEvent::ScaleFactorChanged { .. } => {
-                    send(GameLogicEvent::WindowResized, &logic_event_sender)
-                        .unwrap_or_else(|msg| msg.abort());
-                    send(GameRenderEvent::WindowResized, &render_event_sender)
-                        .unwrap_or_else(|msg| msg.abort());
+                    GameLogicEventChannel::push(GameLogicEvent::WindowResized);
+                    GameRenderEventChannel::push(GameRenderEvent::WindowResized);
                 }
                 _ => { }
             },
             Event::Suspended => {
-                send(GameLogicEvent::ApplicationPaused, &logic_event_sender)
-                    .unwrap_or_else(|msg| msg.abort());
+                GameLogicEventChannel::push(GameLogicEvent::ApplicationPaused);
             },
             Event::Resumed => {
-                send(GameLogicEvent::ApplicationResumed, &logic_event_sender)
-                    .unwrap_or_else(|msg| msg.abort());
+                GameLogicEventChannel::push(GameLogicEvent::ApplicationResumed);
             }
             _ => { }
         }

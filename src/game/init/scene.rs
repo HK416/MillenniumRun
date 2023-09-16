@@ -1,5 +1,3 @@
-use std::sync::mpsc;
-
 use async_std::task;
 
 use crate::{
@@ -25,9 +23,8 @@ use crate::{
             RenderPassColorAttachmentDesc,
         },
         identifier::IDHandle,
-        message::RenderCommand,
-        task::{SubmitRenderPass, DrawCommand},
-        types::RenderCmdSenderType,
+        message::{RenderCommand, RenderCommandChannel},
+        task::{SubmitRenderPass, DrawCommand, RenderSubmitChannel}
     },
 };
 
@@ -57,60 +54,33 @@ impl GameScene for InitScene {
             .ok_or_else(|| panic_msg!(
                 "Failed to find resource", "AssetBundle is not registered!"
             ))?;
-        let render_cmd_sender = res.get::<RenderCmdSenderType>()
-            .ok_or_else(|| panic_msg!(
-                "Failed to find resource", "RenderCmdSender is not registered!"
-            ))?;
         
         // (한국어) 테스트 쉐이더 에셋 불러오기.
         let h_shader = asset_bundle.get("test.wgsl");
 
         // (한국어) 쉐이더 모듈 렌더 오브젝트 생성하기.
-        let (sender, receiver) = mpsc::channel();
-        render_cmd_sender.send((
-            sender, 
+        let future = RenderCommandChannel::push(
             RenderCommand::CreateShaderModule(
                 ShaderModuleDesc { 
                     label: Some("test shader".to_string()), 
                     source: ShaderSourceDesc::Wgsl(task::block_on(h_shader)?.read::<String, ShaderDecoder>()?)
                 }
             )
-        ))
-        .map_err(|e| panic_msg!(
-            "Failed to send render command",
-            "Failed to send render command for the following reasons: {}",
-            e.to_string()
-        ))?;
-        let module = receiver.recv().map_err(|e| panic_msg!(
-            "Failed to receive render command result", 
-            "Failed to receive render command results for the following reasons: {}",
-            e.to_string()
-        ))?
-        .return_or_else(|| panic_msg!(
-            "Render object creation failed", "Shader module object creation failed..."
-        ))?;
+        );
+        let module = future.get_wait()
+            .return_or_else(|| panic_msg!(
+                "Render object creation failed", "Shader module object creation failed..."
+            ))?;
 
         // (한국어) 스왑체인 텍스쳐 형식 가져오기.
-        let (sender, receiver) = mpsc::channel();
-        render_cmd_sender.send((sender, RenderCommand::QuerySwapchainFormat))
-        .map_err(|e| panic_msg!(
-            "Failed to send render command",
-            "Failed to send render command for the following reasons: {}",
-            e.to_string()
-        ))?;
-        let swapchain_format = receiver.recv().map_err(|e| panic_msg!(
-            "Failed to receive render command result",
-            "Failed to receive render command results for the following reasons: {}",
-            e.to_string()
-        ))?
-        .texture_format_or_else(|| panic_msg!(
-            "Texture format query failed", "Failed to get swapchain texture format."
-        ))?;
+        let future = RenderCommandChannel::push(RenderCommand::QuerySwapchainFormat);
+        let swapchain_format = future.get_wait()
+            .texture_format_or_else(|| panic_msg!(
+                "Texture format query failed", "Failed to get swapchain texture format."
+            ))?;
 
         // (한국어) 렌더 파이프라인 오브젝트 생성하기.
-        let (sender, receiver) = mpsc::channel();
-        render_cmd_sender.send((
-            sender,
+        let future = RenderCommandChannel::push(
             RenderCommand::CreateRenderPipeline(
                 RenderPipelineDesc { 
                     label: Some("test pipeline".to_string()), 
@@ -135,20 +105,11 @@ impl GameScene for InitScene {
                     multiview: None,
                 }
             )
-        ))
-        .map_err(|e| panic_msg!(
-            "Failed to send render command",
-            "Failed to send render command for the following reasons: {}",
-            e.to_string()
-        ))?;
-        let pipeline = receiver.recv().map_err(|e| panic_msg!(
-            "Failed to receive render command result", 
-            "Failed to receive render command results for the following reasons: {}",
-            e.to_string()
-        ))?
-        .return_or_else(|| panic_msg!(
-            "Render object creation failed", "Render pipeline object creation failed..."
-        ))?;
+        );
+        let pipeline = future.get_wait()
+            .return_or_else(|| panic_msg!(
+                "Render object creation failed", "Render pipeline object creation failed..."
+            ))?;
 
 
         self.test_shader = Some(module);
@@ -170,16 +131,8 @@ impl GameScene for InitScene {
         Ok(())
     }
 
-    fn render_submit(&self, res: &mut Resources) -> AppResult<()> {
-        let render_cmd_sender = res.get::<RenderCmdSenderType>()
-            .ok_or_else(|| panic_msg!(
-                "Failed to find resource", "RenderCmdSender is not registered!"
-            ))?;
-
-        let (sender, receiver) = mpsc::channel();
-        render_cmd_sender.send((
-            sender,
-            RenderCommand::Submit(vec![
+    fn render_submit(&self, _res: &mut Resources) -> AppResult<()> {
+        RenderSubmitChannel::upload(vec![
                 SubmitRenderPass {
                     desc: RenderPassDesc { 
                         label: None, 
@@ -200,22 +153,8 @@ impl GameScene for InitScene {
                         DrawCommand::Draw { vertices: 0..3, instances: 0..1 },
                     ]
                 }
-            ])
-        ))  
-        .map_err(|e| panic_msg!(
-            "Failed to send render command",
-            "Failed to send render command for the following reasons: {}",
-            e.to_string()
-        ))?;
-        
-        receiver.recv().map_err(|e| panic_msg!(
-            "Failed to receive render command result", 
-            "Failed to receive render command results for the following reasons: {}",
-            e.to_string()
-        ))?
-        .finish_or_else(|| panic_msg!(
-            "Failed to submit draw command", "Failed to submit draw command..."
-        ))?;
+            ]
+        );
 
         Ok(())
     }

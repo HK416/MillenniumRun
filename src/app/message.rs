@@ -1,18 +1,16 @@
-use std::sync::mpsc::Sender;
+use std::sync::Mutex;
+use std::collections::VecDeque;
 
-use crossbeam::queue::SegQueue;
 use winit::event::{
     MouseButton, 
     VirtualKeyCode
 };
 
-use crate::{
-    panic_msg, 
-    app::{
-        abort::{PanicMsg, AppResult},
-        running_flag::RunningFlag,
-    }
+use crate::app::{
+    abort::{PanicMsg, AppResult},
+    running_flag::RunningFlag,
 };
+
 
 
 /// #### 한국어 </br>
@@ -21,7 +19,23 @@ use crate::{
 /// #### English (Translation) </br>
 /// This is the command queue that each thread sends to the application event loop (main thread). </br>
 /// 
-static mut CMD_QUEUE: SegQueue<AppCommand> = SegQueue::new();
+static CMD_QUEUE: Mutex<VecDeque<AppCommand>> = Mutex::new(VecDeque::new());
+
+/// #### 한국어 </br>
+/// 어플리케이션 이벤트 루프(메인 스레드)에서 게임 로직 루프로 보내는 이벤트 메시지 대기열 입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is an event message queue sent from the application event loop (main thread) to the game logic loop. </br>
+/// 
+static LOGIC_QUEUE: Mutex<VecDeque<GameLogicEvent>> = Mutex::new(VecDeque::new());
+
+/// #### 한국어 </br>
+/// 어플리케이션 이벤트 루프(메인 스레드)에서 게임 렌더 루프로 보내는 이벤트 메시지 대기열 입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is an event message queue sent from the application event loop (main thread) to the game render loop. </br>
+/// 
+static RENDER_QUEUE: Mutex<VecDeque<GameRenderEvent>> = Mutex::new(VecDeque::new());
 
 
 
@@ -46,8 +60,10 @@ impl AppCommandChannel {
     /// <b>Note: This function must only be called from the event loop.</b></br>
     /// 
     #[inline]
-    pub(super) fn recv() -> Option<AppCommand> {
-        unsafe { CMD_QUEUE.pop() }
+    pub(super) fn pop() -> Option<AppCommand> {
+        CMD_QUEUE.lock()
+            .expect("Failed to access application command queue.") 
+            .pop_front()
     }
 
     /// #### 한국어 </br>
@@ -57,12 +73,12 @@ impl AppCommandChannel {
     /// Add a command to the command queue. </br>
     /// 
     #[inline]
-    pub fn send(command: AppCommand) {
-        unsafe { CMD_QUEUE.push(command) }
+    pub fn push(command: AppCommand) {
+        CMD_QUEUE.lock()
+            .expect("Failed to access application command queue.")
+            .push_back(command)
     }
 }
-
-
 
 /// #### 한국어 </br>
 /// 어플리케이션의 이벤트 루프에게 전달되는 명령의 종류들 입니다. </br>
@@ -90,6 +106,48 @@ pub enum AppCommand {
     Terminate,
 }
 
+
+
+/// #### 한국어 </br>
+/// 어플리케이션 이벤트 루프(메인 스레드)에서 게임 로직 루프로 보내는 이벤트 메시지 채널입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is an event message channel sent from the application event loop (main thread) to the game logic loop. </br>
+/// 
+#[derive(Debug)]
+pub struct GameLogicEventChannel;
+
+impl GameLogicEventChannel {
+    /// #### 한국어 </br>
+    /// 이벤트 메시지 대기열에 있는 오래된 이벤트 메시지를 가져옵니다. </br>
+    /// 만약 이벤트 메시지 대기열이 비어있는 경우 `None`을 반환합니다. </br>
+    /// <b>메모: 이 함수는 게임 로직 루프에서만 호출되어야 합니다.</b></br>
+    /// 
+    /// #### English (Translation) </br>
+    /// Fetch old event message from the event message queue. </br>
+    /// If the event message queue is empty, it returns `None`. </br>
+    /// <b>Note: This function must only be called from the game logic loop.</b></br>
+    /// 
+    #[inline]
+    pub fn pop() -> Option<GameLogicEvent> {
+        LOGIC_QUEUE.lock()
+            .expect("Failed to access game logic event queue.")
+            .pop_front()
+    }
+
+    /// #### 한국어 </br>
+    /// 이벤트 메시지 대기열에 이벤트를 추가합니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// Add a event to the event message queue. </br>
+    /// 
+    #[inline]
+    pub(super) fn push(event: GameLogicEvent) {
+        LOGIC_QUEUE.lock()
+            .expect("Failed to access game logic event queue.")
+            .push_back(event)
+    }
+}
 
 /// #### 한국어
 /// 어플리케이션 이벤트 루프에서 게임 로직 루프에 전달되는 이벤트의 종류들 입니다.
@@ -183,7 +241,7 @@ pub enum GameLogicEvent {
     /// This event notifies that the mouse cursor has moved.
     /// (x,y) coords in pixels relative to the top-left corner of the window. 
     /// 
-    CursorMoved { x: f32, y: f32 },
+    CursorMoved { x: f64, y: f64 },
 
     /// #### 한국어
     /// 마우스 휠이 조작되었음을 알리는 이벤트 입니다.
@@ -210,6 +268,47 @@ pub enum GameLogicEvent {
 }
 
 
+
+/// #### 한국어 </br>
+/// 어플리케이션 이벤트 루프(메인 스레드)에서 게임 렌더 루프로 보내는 이벤트 메시지 채널입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is an event message channel sent from the application event loop (main thread) to the game render loop. </br>
+/// 
+#[derive(Debug)]
+pub struct GameRenderEventChannel;
+
+impl GameRenderEventChannel {
+    /// #### 한국어 </br>
+    /// 이벤트 메시지 대기열에 있는 오래된 이벤트 메시지를 가져옵니다. </br>
+    /// 만약 이벤트 메시지 대기열이 비어있는 경우 `None`을 반환합니다. </br>
+    /// <b>메모: 이 함수는 게임 렌더 루프에서만 호출되어야 합니다.</b></br>
+    /// 
+    /// #### English (Translation) </br>
+    /// Fetch old event message from the event message queue. </br>
+    /// If the event message queue is empty, it returns `None`. </br>
+    /// <b>Note: This function must only be called from the game render loop.</b></br>
+    /// 
+    #[inline]
+    pub fn pop() -> Option<GameRenderEvent> {
+        RENDER_QUEUE.lock()
+            .expect("Failed to access game render event queue.")
+            .pop_front()
+    }
+
+    /// #### 한국어 </br>
+    /// 이벤트 메시지 대기열에 이벤트를 추가합니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// Add a event to the event message queue. </br>
+    /// 
+    #[inline]
+    pub(super) fn push(event: GameRenderEvent) {
+        RENDER_QUEUE.lock()
+            .expect("Failed to access game render event queue.")
+            .push_back(event)
+    }
+}
 
 /// #### 한국어
 /// 어플리케이션 이벤트 루프에서 게임 렌더 루프에 전달되는 이벤트의 종류들 입니다.
@@ -239,27 +338,6 @@ pub enum GameRenderEvent {
 
 
 /// #### 한국어 </br>
-/// 현재 스레드에서 다른 스레드로 메시지를 전달하는 함수 입니다. </br>
-/// 함수를 실행하는 도중 오류가 발생한 경우 `PanicMsg`를 반환합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// This is a function that passes a message from the current thread to anther thread. </br>
-/// If an error occurs while executing the function, it returns `PanicMsg`. </br>
-/// 
-pub fn send<T>(msg: T, sender: &Sender<T>) -> AppResult<()> {
-    if RunningFlag::is_running() {
-        sender.send(msg).map_err(|e| panic_msg!(
-            "Message send failed",
-            "Message send failed for the following reasons: {}",
-            e.to_string()
-        ))?;
-    }
-    Ok(())
-}
-
-
-
-/// #### 한국어 </br>
 /// `AppResult`의 결과를 처리하는 함수입니다. </br>
 /// `PanicMsg`가 발생한 경우 메인 스레드로 `PanicMsg`를 전달하고 현재 스레드를 종료시킵니다. </br>
 /// 
@@ -274,7 +352,7 @@ pub fn success<T>(result: AppResult<T>) -> T {
         Ok(val) => val,
         Err(msg) => {
             RunningFlag::set_exit();
-            AppCommandChannel::send(AppCommand::Panic(msg.clone()));
+            AppCommandChannel::push(AppCommand::Panic(msg.clone()));
             panic!("{}", msg);
         }
     }
