@@ -1,9 +1,9 @@
 # Millennium Run
 
-[한국어](#1-개요) </br>
-[English (Translation)](#1-overview) </br>
+[한국어](#개요) </br>
+[English (Translation)](#overview) </br>
 
-
+# 개요
 Nexon Games에서 제작한 [Blue Archive](https://bluearchive.nexon.com/)의 <b>팬 제작 2차 창작 게임 개발 프로젝트</b> 입니다.
 Blue Archive의 2차 창작 가이드라인을 준수하며, Nexon Games에서 제작 중단 요청이 있을 경우 이 프로젝트는 파기 됩니다.
 
