@@ -6,9 +6,12 @@ use rust_embed::RustEmbed;
 use lazy_static::lazy_static;
 
 use crate::{
-    panic_msg,
-    app::abort::{PanicMsg, AppResult},
+    game_err,
     assets::types::Types,
+    system::error::{
+        AppResult,
+        GameError,
+    },
 };
 
 
@@ -20,7 +23,7 @@ pub(super) struct AssetKeys;
 lazy_static! {
     pub(super) static ref ASSET_LISTS: AppResult<HashMap<PathBuf, Types>> = {
         let txt = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/AssetLists.txt"));
-        parsing_asset_lists_txt(txt).map_err(|e| panic_msg!(
+        parsing_asset_lists_txt(txt).map_err(|e| game_err!(
             "Failed to initialize asset list",
             "Asset list initialization failed for the following reasons: {}", e.as_str()
         ))

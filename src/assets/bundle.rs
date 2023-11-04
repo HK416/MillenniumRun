@@ -20,8 +20,7 @@ use notify::{
 };
 
 use crate::{
-    panic_msg,
-    app::abort::{PanicMsg, AppResult},
+    game_err,
     assets::{
         handle::{
             AssetHandle,
@@ -36,7 +35,12 @@ use crate::{
         path::ROOT_ASSET_PATH,
         types::Types,
     },
+    system::error::{
+        AppResult,
+        GameError,
+    },
 };
+
 
 const ERR_TITLE_VERIFICATION_FAILED: &'static str = "Asset verification failed";
 const ERR_TITLE_WATCHER_INIT_FAILED: &'static str = "Asset file watcher initialize failed";
@@ -71,11 +75,11 @@ impl AssetBundle {
         // (English Translation) Create an asset file watcher.
         let (sender, receiver) = mpsc::channel();
         let mut watcher = RecommendedWatcher::new(sender, Config::default())
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 ERR_TITLE_WATCHER_INIT_FAILED, "{} {}", ERR_WATCHER_INIT_FAILED, e.to_string()
             ))?;
         watcher.watch(&root_path, RecursiveMode::Recursive)
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 ERR_TITLE_WATCHER_INIT_FAILED, "{} {}", ERR_WATCHER_INIT_FAILED, e.to_string()
             ))?;
 
@@ -143,7 +147,7 @@ impl AssetBundle {
             }
         }
 
-        Err(panic_msg!(
+        Err(game_err!(
             "Failed to get asset handle",
             "The asset path given in the asset list does no exist."
         ))
@@ -301,7 +305,7 @@ fn check_assets<P: AsRef<Path>>(
     for (rel_path, types) in asset_list.iter() {
         let abs_path = PathBuf::from_iter([root_path.as_ref(), rel_path]);
         if !types.creatable() && !abs_path.is_file() {
-            return Err(panic_msg!(
+            return Err(game_err!(
                 ERR_TITLE_VERIFICATION_FAILED,
                 "{} {}",
                 ERR_VERIFICATION_FAILED,
@@ -312,7 +316,7 @@ fn check_assets<P: AsRef<Path>>(
         if !types.writable() {
             let key_file = AssetKeys::get(
                 rel_path.to_str().unwrap()
-            ).ok_or_else(|| panic_msg!(
+            ).ok_or_else(|| game_err!(
                 ERR_TITLE_VERIFICATION_FAILED,
                 "{} {}",
                 ERR_VERIFICATION_FAILED,
@@ -323,7 +327,7 @@ fn check_assets<P: AsRef<Path>>(
                 let mut file = OpenOptions::new()
                     .read(true)
                     .open(abs_path)
-                    .map_err(|e| panic_msg!(
+                    .map_err(|e| game_err!(
                         ERR_TITLE_VERIFICATION_FAILED,
                         "{} {}",
                         ERR_VERIFICATION_FAILED,
@@ -331,7 +335,7 @@ fn check_assets<P: AsRef<Path>>(
                     ))?;
                 let mut hasher = Sha256::new();
                 io::copy(&mut file, &mut hasher)
-                    .map_err(|e| panic_msg!(
+                    .map_err(|e| game_err!(
                         ERR_TITLE_VERIFICATION_FAILED,
                         "{} {}",
                         ERR_VERIFICATION_FAILED,
@@ -341,7 +345,7 @@ fn check_assets<P: AsRef<Path>>(
             };
 
             if key_file.data.as_ref().ne(hash.as_slice()) {
-                return Err(panic_msg!(
+                return Err(game_err!(
                     ERR_TITLE_VERIFICATION_FAILED,
                     "{} {}",
                     ERR_VERIFICATION_FAILED,

@@ -4,9 +4,13 @@ use std::path::{Path, PathBuf};
 use lazy_static::lazy_static;
 
 use crate::{
-    panic_msg,
-    app::abort::{PanicMsg, AppResult},
+    game_err,
+    system::error::{
+        AppResult,
+        GameError,
+    },
 };
+
 
 
 const ERR_TITLE: &'static str = "Failed to get asset directory path";
@@ -29,17 +33,17 @@ lazy_static! {
         let result = {
             let asset_dir = PathBuf::from_iter([
                 env::current_exe()
-                    .map_err(|e| panic_msg!(ERR_TITLE, "{} {}", ERR_MESSAGE, e.to_string()))?
+                    .map_err(|e| game_err!(ERR_TITLE, "{} {}", ERR_MESSAGE, e.to_string()))?
                     .parent()
-                    .ok_or_else(|| panic_msg!(ERR_TITLE, "{} {}", ERR_MESSAGE, ERR_NOT_FOUND))?,
+                    .ok_or_else(|| game_err!(ERR_TITLE, "{} {}", ERR_MESSAGE, ERR_NOT_FOUND))?,
                 Path::new(ASSETS_REL_PATH_STR),
             ])
             .canonicalize()
-            .map_err(|e| panic_msg!(ERR_TITLE, "{} {}", ERR_MESSAGE, e.to_string()))?;
+            .map_err(|e| game_err!(ERR_TITLE, "{} {}", ERR_MESSAGE, e.to_string()))?;
 
             match asset_dir.is_dir() {
                 true => Ok(asset_dir),
-                false => Err(panic_msg!(ERR_TITLE, "{} {}", ERR_MESSAGE, ERR_NOT_DIRECTORY))
+                false => Err(game_err!(ERR_TITLE, "{} {}", ERR_MESSAGE, ERR_NOT_DIRECTORY))
             }
         };
 

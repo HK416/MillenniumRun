@@ -5,8 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::sync::{Arc, Weak, RwLock};
 
 use crate::{
-    panic_msg,
-    app::abort::{PanicMsg, AppResult},
+    game_err,
     assets::{
         interface::{
             HandleInner,
@@ -14,6 +13,10 @@ use crate::{
             AssetEncoder,
         },
         types::Types,
+    },
+    system::error::{
+        AppResult,
+        GameError,
     },
 };
 
@@ -46,7 +49,7 @@ impl StaticHandle {
         let mut file = OpenOptions::new()
             .read(true)
             .open(abs_path)
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 "Asset load failed",
                 "Opening the asset file failed for the following reasons: {}",
                 e.to_string()
@@ -54,13 +57,13 @@ impl StaticHandle {
 
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 "Asset load failed",
                 "Reading the asset file failed for the following reasons: {}",
                 e.to_string()
             ))?;
         if bytes.is_empty() {
-            return Err(panic_msg!(
+            return Err(game_err!(
                 "Asset load failed",
                 "The content of the asset file is empty!"
             ));
@@ -121,7 +124,7 @@ impl DynamicHandle {
             .read(true)
             .write(true)
             .open(path)
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 "Asset load failed",
                 "Opening the asset file failed for the following reasons: {}",
                 e.to_string()
@@ -129,13 +132,13 @@ impl DynamicHandle {
 
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 "Asset load failed",
                 "Reading the asset file failed for the following reasons: {}",
                 e.to_string()
             ))?;
         if bytes.is_empty() {
-            return Err(panic_msg!(
+            return Err(game_err!(
                 "Asset load failed",
                 "The content of the asset file is empty!"
             ));
@@ -162,7 +165,7 @@ impl HandleInner for DynamicHandle {
     where E: AssetEncoder<Input = T> {
         mem::swap(&mut self.bytes, &mut E::encode(val)?);
         self.file.write_all(&self.bytes)
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 "Writing the asset file failed",
                 "Writing the asset file failed for the following reasons: {}",
                 e.to_string()
@@ -202,7 +205,7 @@ impl OptionalHandle {
             .write(true)
             .create(true)
             .open(path)
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 "Asset load failed",
                 "Opening the asset file failed for the following reasons: {}",
                 e.to_string()
@@ -210,7 +213,7 @@ impl OptionalHandle {
 
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 "Asset load failed",
                 "Reading the asset file failed for the following reasons: {}",
                 e.to_string()
@@ -243,7 +246,7 @@ impl HandleInner for OptionalHandle {
     where E: AssetEncoder<Input = T> {
         mem::swap(&mut self.bytes, &mut E::encode(val)?);
         self.file.write_all(&self.bytes)
-            .map_err(|e| panic_msg!(
+            .map_err(|e| game_err!(
                 "Writing the asset file failed",
                 "Writing the asset file failed for the following reasons: {}",
                 e.to_string()
