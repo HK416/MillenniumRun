@@ -120,7 +120,7 @@ impl AssetBundle {
     /// Gets the handle to the asset file. </br>
     /// Returns `PanicMsg` if an error occurred while retrieving the handle. </br>
     /// 
-    pub async fn get<P: AsRef<Path>>(&self, rel_path: P) -> AppResult<AssetHandle> {
+    pub fn get<P: AsRef<Path>>(&self, rel_path: P) -> AppResult<AssetHandle> {
         {
             let loaded_assets = self.loaded_assets
                 .read()
@@ -186,30 +186,6 @@ fn watcher_main(
         };
 
         match &event.kind {
-            // (한국어) 파일이 삭제됬다는 이벤트를 수신한 경우.
-            // (English Translation) If an event that file has been removed is received.
-            EventKind::Remove(_) => {
-                // (한국어) 
-                // 해당 파일이 에셋 리스트에 포함되어 있는지 확인합니다.
-                // 
-                // (English Translation) 
-                // Checks if the file is included in the asset list.
-                // 
-                for path in event.paths.iter() {
-                    let path = match get_subpath(&path, &root_path) {
-                        Ok(path) => path,
-                        Err(e) => {
-                            log::error!("Asset file watcher has stopped for the following reasones: {}", e.to_string());
-                            return;
-                        }
-                    };
-
-                    if asset_list.contains_key(path) {
-                        log::error!("The data in the asset file is corrupted! (file:{})", path.display());
-                        return;
-                    }
-                }
-            },
             EventKind::Modify(kind) => match kind {
                 // (한국어) 파일 데이터가 수정됬다는 이벤트를 수신한 경우.
                 // (English Trnaslation) If an event that file data has been modified is received.
@@ -233,33 +209,9 @@ fn watcher_main(
 
                         if let Some(types) = asset_list.get(path) {
                             if !types.writable() {
-                                log::error!("The data in the asset file is corrupted! (file:{})", path.display());
+                                log::error!("[MODIFY] The data in the asset file is corrupted! (file:{})", path.display());
                                 return;
                             }
-                        }
-                    }
-                },
-                // (한국어) 파일 이름이 수정됬다는 이벤트를 수신한 경우.
-                // (English Trnaslation) If an event that file name has been modified is received.
-                ModifyKind::Name(_) => {
-                    // (한국어) 
-                    // 해당 파일이 에셋 리스트에 포함되어 있는지 확인합니다.
-                    // 
-                    // (English Translation) 
-                    // Checks if the file is included in the asset list.
-                    // 
-                    for path in event.paths.iter() {
-                        let path = match get_subpath(&path, &root_path) {
-                            Ok(path) => path,
-                            Err(e) => {
-                                log::error!("Asset file watcher has stopped for the following reasones: {}", e.to_string());
-                                return;
-                            }
-                        };
-                        
-                        if asset_list.contains_key(path) {
-                            log::error!("The data in the asset file is corrupted! (file:{})", path.display());
-                            return;
                         }
                     }
                 },

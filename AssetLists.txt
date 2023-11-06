@@ -20,5 +20,5 @@
 # 3>> temp/c.txt Optional
 #
 
-user.setting Optional
+user.settings Optional
 test.wgsl Static 

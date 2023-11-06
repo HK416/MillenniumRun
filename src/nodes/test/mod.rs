@@ -63,18 +63,14 @@ impl SceneNode for TestScene {
 
         // (한국어) 쉐이더 파일 불러오기.
         // (English Translation) Load shader file.
-        let handle = asset_bundle.get("test.wgsl");
+        let handle = asset_bundle.get("test.wgsl")?;
 
         // (한국어) 쉐이더 모듈 생성하기.
         // (English Translation) Create shader module.
         log::info!("Create shader module.");
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("test.wgsl"),
-            source: wgpu::ShaderSource::Wgsl(
-                pollster::block_on(handle)?
-                    .read::<String, ShaderDecoder>()?
-                    .into()
-            )
+            source: wgpu::ShaderSource::Wgsl(handle.read::<String, ShaderDecoder>()?.into())
         });
 
         // (한국어) 렌더링 파이프라인 생성하기.

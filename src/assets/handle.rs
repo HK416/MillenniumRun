@@ -1,6 +1,6 @@
 use std::mem;
 use std::path::Path;
-use std::io::{Read, Write};
+use std::io::{Read, Write, Seek, SeekFrom};
 use std::fs::{File, OpenOptions};
 use std::sync::{Arc, Weak, RwLock};
 
@@ -37,12 +37,12 @@ impl StaticHandle {
     /// #### 한국어 </br>
     /// 새로운 에셋 핸들의 내부 데이터를 생성합니다. </br>
     /// 이 함수에서 파일을 열고 내부 바이트 배열을 읽어옵니다. </br>
-    /// 함수를 실행하는 도중 오류가 발생한 경우 `PanicMsg`를 반환합니다. </br>
+    /// 함수를 실행하는 도중 오류가 발생한 경우 `GameError`를 반환합니다. </br>
     /// 
     /// #### English (Translation) </br>
     /// Creates internal data for a new asset handle. </br>
     /// In this function, Developer open a file and read its internal byte array. </br>
-    /// If an error occurs while executing the function, it returns `PanicMsg`. </br>
+    /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
     pub(super) fn new<P: AsRef<Path>>(abs_path: P) -> AppResult<Self> {
         log::info!("load static asset :: <Path:{}>", abs_path.as_ref().display());
@@ -111,12 +111,12 @@ impl DynamicHandle {
     /// #### 한국어 </br>
     /// 새로운 에셋 핸들의 내부 데이터를 생성합니다. </br>
     /// 이 함수에서 파일을 열고 내부 바이트 배열을 읽어옵니다. </br>
-    /// 함수를 실행하는 도중 오류가 발생한 경우 `PanicMsg`를 반환합니다. </br>
+    /// 함수를 실행하는 도중 오류가 발생한 경우 `GameError`를 반환합니다. </br>
     /// 
     /// #### English (Translation) </br>
     /// Creates internal data for a new asset handle. </br>
     /// In this function, Developer open a file and read its internal byte array. </br>
-    /// If an error occurs while executing the function, it returns `PanicMsg`. </br>
+    /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
     pub(super) fn new<P: AsRef<Path>>(path: P) -> AppResult<Self> {
         log::info!("load dynamic asset :: <Path:{}>", path.as_ref().display());
@@ -164,6 +164,19 @@ impl HandleInner for DynamicHandle {
     fn write<T, E>(&mut self, val: &E::Input) -> AppResult<()> 
     where E: AssetEncoder<Input = T> {
         mem::swap(&mut self.bytes, &mut E::encode(val)?);
+
+        self.file.set_len(self.bytes.len() as u64)
+            .map_err(|e| game_err!(
+                "Writing the asset file failed",
+                "Writing the asset file failed for the following reasons: {}",
+                e.to_string()
+            ))?;
+        self.file.seek(SeekFrom::Start(0))
+            .map_err(|e| game_err!(
+                "Writing the asset file failed",
+                "Writing the asset file failed for the following reasons: {}",
+                e.to_string()
+            ))?;
         self.file.write_all(&self.bytes)
             .map_err(|e| game_err!(
                 "Writing the asset file failed",
@@ -191,12 +204,12 @@ impl OptionalHandle {
     /// #### 한국어 </br>
     /// 새로운 에셋 핸들의 내부 데이터를 생성합니다. </br>
     /// 이 함수에서 파일을 열고 내부 바이트 배열을 읽어옵니다. </br>
-    /// 함수를 실행하는 도중 오류가 발생한 경우 `PanicMsg`를 반환합니다. </br>
+    /// 함수를 실행하는 도중 오류가 발생한 경우 `GameError`를 반환합니다. </br>
     /// 
     /// #### English (Translation) </br>
     /// Creates internal data for a new asset handle. </br>
     /// In this function, Developer open a file and read its internal byte array. </br>
-    /// If an error occurs while executing the function, it returns `PanicMsg`. </br>
+    /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
     pub(super) fn new<P: AsRef<Path>>(path: P) -> AppResult<Self> {
         log::info!("load dynamic asset :: <Path:{}>", path.as_ref().display());
@@ -204,13 +217,12 @@ impl OptionalHandle {
             .read(true)
             .write(true)
             .create(true)
-            .open(path)
+            .open(path.as_ref())
             .map_err(|e| game_err!(
                 "Asset load failed",
                 "Opening the asset file failed for the following reasons: {}",
                 e.to_string()
             ))?;
-
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)
             .map_err(|e| game_err!(
@@ -244,7 +256,20 @@ impl HandleInner for OptionalHandle {
 
     fn write<T, E>(&mut self, val: &E::Input) -> AppResult<()> 
     where E: AssetEncoder<Input = T> {
-        mem::swap(&mut self.bytes, &mut E::encode(val)?);
+        self.bytes = E::encode(val)?;
+
+        self.file.set_len(self.bytes.len() as u64)
+            .map_err(|e| game_err!(
+                "Writing the asset file failed",
+                "Writing the asset file failed for the following reasons: {}",
+                e.to_string()
+            ))?;
+        self.file.seek(SeekFrom::Start(0))
+            .map_err(|e| game_err!(
+                "Writing the asset file failed",
+                "Writing the asset file failed for the following reasons: {}",
+                e.to_string()
+            ))?;
         self.file.write_all(&self.bytes)
             .map_err(|e| game_err!(
                 "Writing the asset file failed",
@@ -295,11 +320,11 @@ impl AssetHandle {
 
     /// #### 한국어 </br>
     /// 에셋의 바이트 배열을 주어진 디코더로 디코딩하여 결과를 반환합니다. </br>
-    /// 함수를 실행하는 도중 오류가 발생한 경우 `PanicMsg`를 반환합니다. </br>
+    /// 함수를 실행하는 도중 오류가 발생한 경우 `GameError`를 반환합니다. </br>
     /// 
     /// #### English (Translation) </br>
     /// Decode a byte array of assets with the given decoder and returns the result. </br>
-    /// If an error occurs while executing the function, it returns `PanicMsg`. </br>
+    /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
     pub fn read<T, D>(&self) -> AppResult<D::Output>
     where D: AssetDecoder<Output = T> {
@@ -326,13 +351,13 @@ impl AssetHandle {
     /// 에셋의 바이트 배열을 주어진 디코더로 디코딩하여 결과를 반환합니다. </br>
     /// 선택적 유형인 경우 에셋 파일의 바이트 배열이 비어있을 때 
     /// 주어진 기본 값을 에셋 파일에 쓴 뒤 반환합니다. </br>
-    /// 함수를 실행하는 도중 오류가 발생한 경우 `PanicMsg`를 반환합니다. </br>
+    /// 함수를 실행하는 도중 오류가 발생한 경우 `GameError`를 반환합니다. </br>
     /// 
     /// #### English (Translation) </br>
     /// Decode a byte array of assets with the given decoder and returns the result. </br>
     /// If this is an optional type, if the byte array in the asset file is empty,
     /// the given default value will be written to the asset and returned. </br>
-    /// If an error occurs while executing the function, it returns `PanicMsg`. </br>
+    /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
     pub fn read_or_default<T, D, E>(&self) -> AppResult<D::Output> 
     where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
@@ -358,12 +383,12 @@ impl AssetHandle {
     /// #### 한국어 </br>
     /// 에셋의 바이트 배열을 주어진 데이터로 채우고 에셋 파일에 덮어 씁니다. </br>
     /// 정적 유형의 에셋 파일의 경우 아무것도 수행하지 않습니다. </br>
-    /// 함수를 실행하는 도중 오류가 발생한 경우 `PanicMsg`를 반환합니다. </br>
+    /// 함수를 실행하는 도중 오류가 발생한 경우 `GameError`를 반환합니다. </br>
     /// 
     /// #### English (Translation) </br>
     /// Fill the asset's byte array with the given data and overwrites its in the asset file. </br>
     /// For asset files of static type, it does nothing. </br>
-    /// If an error occurs while executing the function, it returns `PanicMsg`. </br>
+    /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
     pub fn write<T, E>(&self, val: &E::Input) -> AppResult<()> 
     where E: AssetEncoder<Input = T> {

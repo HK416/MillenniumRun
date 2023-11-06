@@ -1,4 +1,5 @@
 mod assets;
+mod components;
 mod nodes;
 mod render;
 mod scene;
@@ -28,11 +29,12 @@ use winit::{
         Window,
         WindowBuilder,
     },
+    dpi::PhysicalPosition,
 };
 
 use crate::{
     assets::bundle::AssetBundle,
-    nodes::test::TestScene,
+    nodes::setup::SetupScene,
     scene::{
         node::SceneNode,
         state::SceneState,
@@ -127,7 +129,7 @@ fn game_loop(
 
     // (한국어) 게임 장면을 생성하고 진입합니다.
     // (English Translation) Create and enter the game scene.
-    let mut entry_scene: Box<dyn SceneNode> = Box::new(TestScene::default());
+    let mut entry_scene: Box<dyn SceneNode> = Box::new(SetupScene::default());
     entry_scene.enter(&mut shared)
         .unwrap_or_else(|err| 
             send_panic_msg_and_abort(&event_loop_proxy, err)
