@@ -1,3 +1,9 @@
+pub mod depth;
+pub mod shader;
+pub mod texture;
+
+
+
 use std::sync::Arc;
 
 use winit::window::Window;
@@ -26,13 +32,15 @@ pub fn setup_render_ctx(window: &Window) -> AppResult<(
     Arc<wgpu::Surface>,
     Arc<wgpu::Adapter>,
     Arc<wgpu::Device>,
-    Arc<wgpu::Queue>
+    Arc<wgpu::Queue>,
+    Arc<depth::DepthBuffer>
 )> {
     let instance = create_render_instance();
     let surface = create_render_surface(&instance, window)?;
     let adapter = create_render_adapter(&instance, &surface)?;
     let (device, queue) = create_render_device_and_queue(&adapter)?;
-    Ok((instance, surface, adapter, device, queue))
+    let depth_buffer = create_depth_buffer(window, &device);
+    Ok((instance, surface, adapter, device, queue, depth_buffer))
 }
 
 
@@ -119,7 +127,7 @@ fn create_render_device_and_queue(
         adapter.request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("Rendering device"),
-                features: wgpu::Features::empty(),
+                features: wgpu::Features::TEXTURE_COMPRESSION_BC,
                 limits: wgpu::Limits::downlevel_defaults()
                     .using_resolution(adapter.limits())
             }, 
@@ -132,4 +140,16 @@ fn create_render_device_and_queue(
         "Creating a rendering context failed for the following reasons: {}",
         err.to_string()
     ))
+}
+
+
+/// #### 한국어 </br>
+/// 깊이 테스트에 사용되는 깊이 버퍼를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates a depth buffer used for the depth testing. </br>
+/// 
+#[inline]
+fn create_depth_buffer(window: &Window, device: &wgpu::Device,) -> Arc<depth::DepthBuffer>  {
+    Arc::new(depth::DepthBuffer::new(window, device))
 }

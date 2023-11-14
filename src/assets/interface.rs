@@ -17,7 +17,8 @@ pub trait HandleInner : Sized {
     /// Decode a byte array of assets with the given decoder and returns the result. </br>
     /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
-    fn read<T, D: AssetDecoder<Output = T>>(&self) -> AppResult<D::Output>;
+    fn read<T, D>(&self, decoder: &D) -> AppResult<D::Output> 
+    where D: AssetDecoder<Output = T>;
 
     /// #### 한국어 </br>
     /// 에셋의 바이트 배열을 주어진 디코더로 디코딩하여 결과를 반환합니다. </br>
@@ -31,7 +32,8 @@ pub trait HandleInner : Sized {
     /// the given default value will be written to the asset and returned. </br>
     /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
-    fn read_or_default<T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T>>(&mut self) -> AppResult<D::Output>;
+    fn read_or_default<T, D, E>(&mut self, encoder: &E, decoder: &D) -> AppResult<D::Output>
+    where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T>;
 
     /// #### 한국어 </br>
     /// 에셋의 바이트 배열을 주어진 데이터로 채우고 에셋 파일에 덮어 씁니다. </br>
@@ -43,7 +45,8 @@ pub trait HandleInner : Sized {
     /// For asset files of static type, it does nothing. </br>
     /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
-    fn write<T, E: AssetEncoder<Input = T>>(&mut self, val: &E::Input) -> AppResult<()>;
+    fn write<T, E>(&mut self, encoder: &E, value: &E::Input) -> AppResult<()>
+    where E: AssetEncoder<Input = T>;
 }
 
 
@@ -65,7 +68,7 @@ pub trait AssetDecoder {
     /// Decodes the byte array of the given asset into `Output`. </br>
     /// If an error occurs while executing the function, `GameError` is returned. </br>
     /// 
-    fn decode(buf: &[u8]) -> AppResult<Self::Output>;
+    fn decode(&self, buf: &[u8]) -> AppResult<Self::Output>;
 }
 
 
@@ -87,5 +90,5 @@ pub trait AssetEncoder {
     /// Encodes the given `Input` into a byte array. </br>
     /// If an error occurs while executing the function, `GameError` is returned. </br>
     /// 
-    fn encode(val: &Self::Input) -> AppResult<Vec<u8>>;
+    fn encode(&self, val: &Self::Input) -> AppResult<Vec<u8>>;
 }

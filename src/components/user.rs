@@ -27,6 +27,7 @@ use crate::{
 };
 
 
+
 /// #### 한국어 </br>
 /// 애플리케이션 언어 목록 입니다. </br>
 /// 
@@ -136,7 +137,7 @@ impl AssetDecoder for SettingsDecoder {
     type Output = Settings;
 
     #[inline]
-    fn decode(buf: &[u8]) -> AppResult<Self::Output> {
+    fn decode(&self, buf: &[u8]) -> AppResult<Self::Output> {
         Ok(ron::de::from_bytes(buf)
             .map_err(|err| game_err!(
                 "Failed to load asset file",
@@ -162,7 +163,7 @@ impl AssetEncoder for SettingsEncoder {
     type Input = Settings;
 
     #[inline]
-    fn encode(val: &Self::Input) -> AppResult<Vec<u8>> {
+    fn encode(&self, val: &Self::Input) -> AppResult<Vec<u8>> {
         use ron::ser::PrettyConfig;
         
         let config = PrettyConfig::new()

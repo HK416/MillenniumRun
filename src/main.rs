@@ -35,6 +35,7 @@ use winit::{
 use crate::{
     assets::bundle::AssetBundle,
     nodes::setup::SetupScene,
+    render::depth::DepthBuffer,
     scene::{
         node::SceneNode,
         state::SceneState,
@@ -83,6 +84,7 @@ fn game_loop(
     adapter: Arc<wgpu::Adapter>,
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
+    depth_buffer: Arc<DepthBuffer>
 ) {
     use crate::system::error::send_panic_msg_and_abort;
 
@@ -117,7 +119,9 @@ fn game_loop(
     shared.push(adapter);
     shared.push(device);
     shared.push(queue);
+    shared.push(depth_buffer);
     shared.push(config);
+    shared.push(PhysicalPosition::new(0.0, 0.0));
 
     // (한국어) 장면 상태를 공유 객체로 등록합니다.
     // (English Translation) Register the scene state as a shared object.
@@ -166,10 +170,11 @@ fn game_loop(
                     let height = window.inner_size().height;
                     
                     if width > 0 && height > 0 {
+                        instance.poll_all(true);
                         config.width = width;
                         config.height = height;
-                        instance.poll_all(true);
                         surface.configure(&device, config);
+                        shared.push(Arc::new(DepthBuffer::new(&window, &device)));
                     }
 
                     continue;
@@ -187,9 +192,12 @@ fn game_loop(
                         config.height = height;
                         instance.poll_all(true);
                         surface.configure(&device, config);
+                        shared.push(Arc::new(DepthBuffer::new(&window, &device)));
                     }
 
                     continue;
+                } else if let WindowEvent::CursorMoved { position, .. } = event {
+                    *shared.get_mut::<PhysicalPosition<f64>>().unwrap() = position;
                 }
             }
 
@@ -339,7 +347,7 @@ fn main() {
         .unwrap_or_else(|err| popup_err_msg_and_abort(err));
     let window = Arc::new(
         WindowBuilder::new()
-            // .with_visible(false)
+            .with_visible(false)
             .with_resizable(false)
             .with_window_icon(None)
             .with_title("Application Initialize...")
@@ -359,7 +367,8 @@ fn main() {
         surface,
         adapter,
         device,
-        queue
+        queue,
+        depth_buffer,
     ) = setup_render_ctx(&window)
         .unwrap_or_else(|err| popup_err_msg_and_abort(err));
 
@@ -377,8 +386,9 @@ fn main() {
         surface, 
         adapter, 
         device, 
-        queue)
-    );
+        queue,
+        depth_buffer
+    ));
 
     // (한국어) 윈도우 메시지 루프를 실행합니다.
     // (English Translation) Executes the window message loop.

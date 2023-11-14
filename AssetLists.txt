@@ -21,4 +21,18 @@
 #
 
 user.settings Optional
-test.wgsl Static 
+
+fonts/pretendard.ttf Static
+
+shaders/font.wgsl Static
+shaders/test.wgsl Static
+shaders/ui.wgsl Static
+
+sounds/click_sound.wav Static
+sounds/yuzu_title.wav Static
+sounds/aris_title.wav Static
+sounds/momoi_title.wav Static
+sounds/midori_title.wav Static
+
+textures/button.dds Static
+textures/logo.dds Static

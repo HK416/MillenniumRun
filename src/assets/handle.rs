@@ -75,20 +75,21 @@ impl StaticHandle {
 
 impl HandleInner for StaticHandle {
     #[inline]
-    fn read<T, D>(&self) -> AppResult<D::Output> 
-    where D: AssetDecoder<Output = T> {
-        D::decode(&self.bytes)
+    fn read<T, D>(&self, decoder: &D) -> AppResult<D::Output> 
+        where D: AssetDecoder<Output = T> {
+        decoder.decode(&self.bytes)
     }
 
     #[inline]
-    fn read_or_default<T, D, E>(&mut self) -> AppResult<D::Output> 
-    where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
-        D::decode(&self.bytes)
+    fn read_or_default<T, D, E>(&mut self, encoder: &E, decoder: &D) -> AppResult<D::Output>
+        where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
+        decoder.decode(&self.bytes)
     }
 
     #[inline]
-    fn write<T, E: AssetEncoder<Input = T>>(&mut self, _val: &E::Input) -> AppResult<()> {
-        log::info!("Asset files of static type do not perform write functions!");
+    fn write<T, E>(&mut self, encoder: &E, value: &E::Input) -> AppResult<()>
+        where E: AssetEncoder<Input = T> {
+        log::warn!("Asset files of static type do not perform write functions!");
         Ok(())
     }
 }
@@ -150,21 +151,21 @@ impl DynamicHandle {
 
 impl HandleInner for DynamicHandle {
     #[inline]
-    fn read<T, D>(&self) -> AppResult<D::Output> 
-    where D: AssetDecoder<Output = T> {
-        D::decode(&self.bytes)
+    fn read<T, D>(&self, decoder: &D) -> AppResult<D::Output> 
+        where D: AssetDecoder<Output = T> {
+        decoder.decode(&self.bytes)
     }
 
     #[inline]
-    fn read_or_default<T, D, E>(&mut self) -> AppResult<D::Output> 
-    where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
-        D::decode(&self.bytes)
+    fn read_or_default<T, D, E>(&mut self, encoder: &E, decoder: &D) -> AppResult<D::Output>
+        where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
+        decoder.decode(&self.bytes)
     }
 
-    fn write<T, E>(&mut self, val: &E::Input) -> AppResult<()> 
-    where E: AssetEncoder<Input = T> {
-        mem::swap(&mut self.bytes, &mut E::encode(val)?);
-
+    #[inline]
+    fn write<T, E>(&mut self, encoder: &E, value: &E::Input) -> AppResult<()>
+        where E: AssetEncoder<Input = T> {
+        self.bytes = encoder.encode(value)?;
         self.file.set_len(self.bytes.len() as u64)
             .map_err(|e| game_err!(
                 "Writing the asset file failed",
@@ -237,27 +238,27 @@ impl OptionalHandle {
 
 impl HandleInner for OptionalHandle {
     #[inline]
-    fn read<T, D>(&self) -> AppResult<D::Output> 
-    where D: AssetDecoder<Output = T> {
-        D::decode(&self.bytes)
+    fn read<T, D>(&self, decoder: &D) -> AppResult<D::Output> 
+        where D: AssetDecoder<Output = T> {
+        decoder.decode(&self.bytes)
     }
 
-    fn read_or_default<T, D, E>(&mut self) -> AppResult<D::Output> 
-    where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
-        match self.bytes.is_empty() {
-            true => {
-                let def = T::default();
-                self.write::<T, E>(&def)?;
-                Ok(def)
-            },
-            false => D::decode(&self.bytes)
+    #[inline]
+    fn read_or_default<T, D, E>(&mut self, encoder: &E, decoder: &D) -> AppResult<D::Output>
+        where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
+        if self.bytes.is_empty() {
+            let value = T::default();
+            self.write(encoder, &value)?;
+            Ok(value)
+        } else {
+            decoder.decode(&self.bytes)
         }
     }
 
-    fn write<T, E>(&mut self, val: &E::Input) -> AppResult<()> 
-    where E: AssetEncoder<Input = T> {
-        self.bytes = E::encode(val)?;
-
+    #[inline]
+    fn write<T, E>(&mut self, encoder: &E, value: &E::Input) -> AppResult<()>
+        where E: AssetEncoder<Input = T> {
+        self.bytes = encoder.encode(value)?;
         self.file.set_len(self.bytes.len() as u64)
             .map_err(|e| game_err!(
                 "Writing the asset file failed",
@@ -326,23 +327,23 @@ impl AssetHandle {
     /// Decode a byte array of assets with the given decoder and returns the result. </br>
     /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
-    pub fn read<T, D>(&self) -> AppResult<D::Output>
+    pub fn read<T, D>(&self, decoder: &D) -> AppResult<D::Output>
     where D: AssetDecoder<Output = T> {
         match self {
             AssetHandle::Static(handle) => {
                 handle.read()
                     .expect(Self::ERR_ACCESS_FAILED)
-                    .read::<T, D>()
+                    .read(decoder)
             },
             AssetHandle::Dynamic(handle) => {
                 handle.read()
                     .expect(Self::ERR_ACCESS_FAILED)
-                    .read::<T, D>()
+                    .read(decoder)
             },
             AssetHandle::Optional(handle) => {
                 handle.read()
                 .expect(Self::ERR_ACCESS_FAILED)
-                .read::<T, D>()
+                .read(decoder)
             }
         }
     }
@@ -359,23 +360,23 @@ impl AssetHandle {
     /// the given default value will be written to the asset and returned. </br>
     /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
-    pub fn read_or_default<T, D, E>(&self) -> AppResult<D::Output> 
+    pub fn read_or_default<T, D, E>(&self, encoder: &E, decoder: &D) -> AppResult<D::Output> 
     where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
         match self {
             AssetHandle::Static(handle) => {
                 handle.write()
                     .expect(Self::ERR_ACCESS_FAILED)
-                    .read_or_default::<T, D, E>()
+                    .read_or_default(encoder, decoder)
             },
             AssetHandle::Dynamic(handle) => {
                 handle.write()
                     .expect(Self::ERR_ACCESS_FAILED)
-                    .read_or_default::<T, D, E>()
+                    .read_or_default(encoder, decoder)
             },
             AssetHandle::Optional(handle) => {
                 handle.write()
                 .expect(Self::ERR_ACCESS_FAILED)
-                .read_or_default::<T, D, E>()
+                .read_or_default(encoder, decoder)
             }
         }
     }
@@ -390,23 +391,23 @@ impl AssetHandle {
     /// For asset files of static type, it does nothing. </br>
     /// If an error occurs while executing the function, it returns `GameError`. </br>
     /// 
-    pub fn write<T, E>(&self, val: &E::Input) -> AppResult<()> 
+    pub fn write<T, E>(&self, encoder: &E, value: &E::Input) -> AppResult<()> 
     where E: AssetEncoder<Input = T> {
         match self {
             AssetHandle::Static(handle) => {
                 handle.write()
                     .expect(Self::ERR_ACCESS_FAILED)
-                    .write::<T, E>(val)
+                    .write(encoder, value)
             },
             AssetHandle::Dynamic(handle) => {
                 handle.write()
                     .expect(Self::ERR_ACCESS_FAILED)
-                    .write::<T, E>(val)
+                    .write(encoder, value)
             },
             AssetHandle::Optional(handle) => {
                 handle.write()
                 .expect(Self::ERR_ACCESS_FAILED)
-                .write::<T, E>(val)
+                .write(encoder, value)
             }
         }
     }

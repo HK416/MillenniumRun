@@ -152,6 +152,20 @@ impl AssetBundle {
             "The asset path given in the asset list does no exist."
         ))
     }
+
+    
+    /// #### 한국어 </br>
+    /// 로드된 에셋 목록에서 주어진 경로의 에셋을 제거합니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// Removes the asset at the given path from the list of loaded assets. </br>
+    /// 
+    pub fn release<P: AsRef<Path>>(&self, rel_path: P) {
+        self.loaded_assets
+            .write()
+            .expect("Failed to access loaded assets.")
+            .remove(rel_path.as_ref());
+    }
 }
 
 
