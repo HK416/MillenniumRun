@@ -149,17 +149,16 @@ fn game_loop(
     let mut timer = GameTimer::new();
     let mut elapsed_time_sec = 0.0;
     while RUNNING_FLAG.load(MemOrdering::Acquire) {
+        // (한국어) 타이머를 갱신합니다.
+        // (English Translation) Update the timer.
+        timer.tick(None);
+        elapsed_time_sec += timer.elapsed_time_sec();
+
         // (한국어) 윈도우 이벤트를 처리합니다.
         // (English Translation) Handles window events.
         while let Some(event) = EVENT_QUEUE.pop() {
             let event_cloned = event.clone();
-            if let Event::NewEvents(_) = event_cloned {
-                // (한국어) 타이머를 갱신합니다.
-                // (English Translation) Update the timer.
-                timer.tick(None);
-                elapsed_time_sec += timer.elapsed_time_sec();
-                continue;
-            } else if let Event::WindowEvent { event, .. } = event_cloned {
+            if let Event::WindowEvent { event, .. } = event_cloned {
                 if let WindowEvent::Resized(_) = event {
                     let instance = shared.get::<Arc<wgpu::Instance>>().unwrap().clone();
                     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap().clone();
@@ -393,7 +392,7 @@ fn main() {
     // (한국어) 윈도우 메시지 루프를 실행합니다.
     // (English Translation) Executes the window message loop.
     log::info!("Run window message loop.");
-    event_loop.set_control_flow(ControlFlow::Poll);
+    event_loop.set_control_flow(ControlFlow::Wait);
     event_loop.run(move |event, elwt| {
         // (한국어) 애플리케이션 에셋 파일의 무결성을 검사합니다.
         // (English Translation) Check the integrity of application asset files.
@@ -408,7 +407,11 @@ fn main() {
         // (한국어) 윈도우 이벤트를 처리합니다.
         // (English Translation) Handles window events.
         let event_cloned = event.clone();
-        if let Event::WindowEvent { window_id, event } = event_cloned {
+        if let Event::NewEvents(_) = event_cloned {
+            return;
+        } else if let Event::AboutToWait = event_cloned {
+            return;
+        } else if let Event::WindowEvent { window_id, event } = event_cloned {
             if window_id == window.id() && (event == WindowEvent::CloseRequested || event == WindowEvent::Destroyed) {
                 RUNNING_FLAG.store(false, MemOrdering::Release);
                 elwt.exit();

@@ -259,16 +259,15 @@ pub fn set_window_size(window: &Window, resolution: Resolution) -> AppResult<Res
 /// 
 #[inline]
 pub fn set_screen_mode(window: &Window, screen_mode: ScreenMode) {
-    #[cfg(target_os = "macos")]
-    use winit::platform::macos::WindowExtMacOS;
-
     match screen_mode {
         ScreenMode::Windowed => window.set_fullscreen(None),
         ScreenMode::FullScreen => {
-            if cfg!(target_os = "macos") {
+            #[cfg(target_os = "macos")] {
+                use winit::platform::macos::WindowExtMacOS;
                 window.set_simple_fullscreen(true);
-            } else {
-                window.set_fullscreen(Some(Fullscreen::Borderless(None)))
+            }
+            #[cfg(not(target_os = "macos"))] {
+                window.set_fullscreen(Some(Fullscreen::Borderless(None)));
             }
         },
     }

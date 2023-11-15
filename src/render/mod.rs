@@ -52,11 +52,30 @@ pub fn setup_render_ctx(window: &Window) -> AppResult<(
 /// 
 #[inline]
 fn create_render_instance() -> Arc<wgpu::Instance> {
-    wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::PRIMARY,
-        dx12_shader_compiler: wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default(),
-        ..Default::default()
-    }).into()
+    let instance_desc = if cfg!(target_os = "windows") {
+        wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::DX12,
+            dx12_shader_compiler: wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default(),
+            ..Default::default()
+        }
+    } else if cfg!(target_os = "linux") {
+        wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::VULKAN,
+            ..Default::default()
+        }
+    } else if cfg!(target_os = "macos") {
+        wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::METAL,
+            ..Default::default()
+        }
+    } else {
+        wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::PRIMARY,
+            ..Default::default()
+        }
+    };
+
+    wgpu::Instance::new(instance_desc).into()
 }
 
 
