@@ -1,0 +1,11 @@
+Script({
+    NotifyTitle : "알 림",
+    NotifyText : "이 게임은 Blue Archive의 팬 제작 게임입니다.",
+    StartMenu : "게임 시작",
+    SettingMenu : "설정",
+    ExitMenu : "종료",
+    Okay : "네",
+    Cancel : "아니오",
+    ExitMessage : "게임을 종료하시겠습니까?",
+    EnterStage : "찾으러 가기",
+})

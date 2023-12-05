@@ -6,8 +6,8 @@ use std::thread::{self, JoinHandle};
 
 use winit::event::Event;
 
+
 use crate::{
-    game_err,
     assets::bundle::AssetBundle,
     components::{
         text::{
@@ -19,13 +19,13 @@ use crate::{
             anchor::Anchor,
             objects::{UiObject, UiObjectBuilder},
         },
-        user::{Settings, Language},
+        script::{Script, ScriptTags},
     },
     nodes::{path, title},
     render::texture::ImageDecoder,
     scene::node::SceneNode,
     system::{
-        error::{AppResult, GameError},
+        error::AppResult,
         event::AppEvent,
         shared::Shared,
     },
@@ -93,22 +93,18 @@ impl Default for IntroScene {
 fn setup_notify_texts(this: &mut IntroScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let text_brush = shared.get::<TextBrush>().unwrap();
-    let font_set = shared.get::<FontSet>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let text_brush = shared.get::<TextBrush>().unwrap();
+    let font_set = shared.get::<FontSet>().unwrap();
+    let script = shared.get::<Script>().unwrap();
 
     // (한국어) 알림 텍스트 생성하기.
     // (English Translation) Create notification text.
-    let text = match settings.language {
-        Language::Unknown => Err(game_err!("Game Logic Error!", "Unknown locale!")),
-        Language::Korean => Ok("알 림"),
-    }?;
     this.notify_texts.push(
         Section2dBuilder::new(
             Some("Notify Title"),
-            text,
+            script.get(ScriptTags::NotifyTitle)?,
             font_set.get(path::FONT_BLOD_PATH).unwrap(), 
             text_brush.ref_texture_sampler(),
             text_brush.ref_buffer_layout(),
@@ -123,14 +119,10 @@ fn setup_notify_texts(this: &mut IntroScene, shared: &mut Shared) -> AppResult<(
         .build(&device, &queue)
     );
 
-    let text = match settings.language {
-        Language::Unknown => Err(game_err!("Game Logic Error!", "Unknown locale!")),
-        Language::Korean => Ok("이 게임은 Blue Archive의 팬 제작 게임입니다."),
-    }?;
     this.notify_texts.push(
         Section2dBuilder::new(
             Some("Notify contents"),
-            text,
+            script.get(ScriptTags::NotifyText)?,
             font_set.get(path::FONT_MEDIUM_PATH).unwrap(),
             text_brush.ref_texture_sampler(),
             text_brush.ref_buffer_layout(),

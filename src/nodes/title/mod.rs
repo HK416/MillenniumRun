@@ -20,8 +20,9 @@ use crate::{
         ui::brush::UiBrush,
         camera::GameCamera, 
         sound::SoundDecoder,
+        script::{Script, ScriptTags},
         transform::{Projection, Orthographic},
-        user::Settings,
+        user::Settings, 
     },
     nodes::{path, consts},
     render::texture::ImageDecoder,
@@ -165,6 +166,7 @@ impl EnterTitleScene {
         let sprite_brush = shared.get::<SpriteBrush>().unwrap();
         let asset_bundle = shared.get::<AssetBundle>().unwrap();
         let font_set = shared.get::<FontSet>().unwrap();
+        let script = shared.get::<Script>().unwrap();
 
         // (한국어) `Title` 게임 장면에 사용되는 요소들을 생성합니다.
         // (English Translation) Creates elements used in `Title` game scene.
@@ -183,7 +185,8 @@ impl EnterTitleScene {
             text_brush, 
             sprite_brush, 
             asset_bundle, 
-            font_set
+            font_set,
+            script
         )?;
 
         self.exit_window = Some(exit_window);
@@ -397,6 +400,7 @@ fn create_title_scene_elements(
     sprite_brush: &SpriteBrush,
     asset_bundle: &AssetBundle,
     font_set: &FontSet,
+    script: &Script,
 ) -> AppResult<(
     ty::ExitWindow, 
     ty::StageWindow, 
@@ -492,15 +496,15 @@ fn create_title_scene_elements(
     let exit_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
     let menu_desc = vec![
         ty::MenuButtonDescriptor {
-            text: "게임 시작",
+            text: script.get(ScriptTags::StartMenu)?,
             texture_view: &start_texture_view,
         },
         ty::MenuButtonDescriptor {
-            text: "설정",
+            text: script.get(ScriptTags::SettingMenu)?,
             texture_view: &setting_texture_view,
         },
         ty::MenuButtonDescriptor {
-            text: "게임 종료",
+            text: script.get(ScriptTags::ExitMenu)?,
             texture_view: &exit_texture_view,
         }
     ];
@@ -523,15 +527,15 @@ fn create_title_scene_elements(
     let blue_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
     let exit_window_desc = vec![
         ty::ExitWindowDescriptor {
-            text: "게임을 종료하시겠습니까?",
+            text: script.get(ScriptTags::ExitMessage)?,
             texture_view: &window_texture_view,
         },
         ty::ExitWindowDescriptor {
-            text: "네",
+            text: script.get(ScriptTags::Okay)?,
             texture_view: &red_texture_view,
         },
         ty::ExitWindowDescriptor {
-            text: "아니요",
+            text: script.get(ScriptTags::Cancel)?,
             texture_view: &blue_texture_view,
         },
     ];
@@ -541,7 +545,7 @@ fn create_title_scene_elements(
             texture_view: &window_texture_view,
         },
         ty::StageWindowDescriptor {
-            text: Some("시작"),
+            text: Some(script.get(ScriptTags::EnterStage)?),
             texture_view: &blue_texture_view
         },
     ];

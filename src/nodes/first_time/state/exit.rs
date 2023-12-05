@@ -74,11 +74,21 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
         text.update_buffer(queue);
     }
 
-    // (한국어) 지속 시간보다 클 경우 다음 게임 장면으로 변경합니다.
-    // (English Translation) Changes to the next game scene if it is greater than the duration. 
-    if this.elapsed_time >= TOTAL_DURATION {
+    // (한국어) 
+    // 지속 시간보다 크고, 선택한 언어의 스크립트가 로드되었을 경우 
+    // 다음 게임 장면으로 변경합니다.
+    //
+    // (English Translation)
+    // Changes to the next game scene 
+    // if it is greater than the duration 
+    // and the script for the selected language has been loaded.
+    //
+    if this.elapsed_time >= TOTAL_DURATION 
+    && this.loading.as_ref().unwrap().is_finished() {
+        let script = this.loading.take().unwrap().join().unwrap()?;
+        shared.push(script);
+
         *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(IntroScene::default()));
-        this.elapsed_time = 0.0;
         return Ok(());
     }
 

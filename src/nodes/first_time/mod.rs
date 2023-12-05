@@ -2,6 +2,7 @@ mod state;
 pub mod res;
 
 use std::sync::Arc;
+use std::thread::JoinHandle;
 use std::collections::HashMap;
 
 use ab_glyph::Font;
@@ -22,6 +23,7 @@ use crate::{
             anchor::Anchor,
             objects::{UiObject, UiObjectBuilder},
         },
+        script::Script,
         user::{Language, Settings, SettingsEncoder}, 
     },
     nodes::path,
@@ -54,8 +56,9 @@ const MAX_BUTTON_SCALE: Vec3 = Vec3::new(1.25, 1.25, 1.0);
 pub struct FirstTimeSetupScene { 
     state: state::FirstTimeSetupSceneState,
     elapsed_time: f64,
-    language: Language,
+    loading: Option<JoinHandle<AppResult<Script>>>,
     buttons: HashMap<Language, (UiObject, Section2d)>,
+    language: Language,
 }
 
 impl SceneNode for FirstTimeSetupScene {
@@ -140,8 +143,9 @@ impl Default for FirstTimeSetupScene {
         Self { 
             state: state::FirstTimeSetupSceneState::default(),
             elapsed_time: 0.0,
-            language: Language::Unknown,
+            loading: None,
             buttons: HashMap::new(),
+            language: Language::Unknown,
         }
     }
 }

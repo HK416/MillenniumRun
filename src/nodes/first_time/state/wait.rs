@@ -24,6 +24,7 @@ use crate::{
         text::{Section, section::d2::Section2d, brush::TextBrush}, 
         ui::{UserInterface, objects::UiObject, brush::UiBrush},
         sound::{self, SoundDecoder}, 
+        script::ScriptDecoder,
         camera::GameCamera,
         user::{Language, Settings}, 
     },
@@ -51,6 +52,7 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let asset_bundle = shared.get::<AssetBundle>().unwrap();
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
     let camera = shared.get::<GameCamera>().unwrap();
 
@@ -113,8 +115,25 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
                     // (한국어) 선택된 마우스 버튼이 이전에 선택된 버튼과 일치할 경우:
                     // (English Translation) If the selected mouse button matches a previously selected button:
                     if select.is_some_and(|select| select == language) {
-                        this.language = language;
+                        // (한국어) 
+                        // 선택된 언어의 스크립트를 로드하고, `Exit` 상태로 변경한다.
+                        // 
+                        // (English Translation) 
+                        // Loads the script of the selected language 
+                        // and change to `Exit` state.
+                        //
+                        let language_cloned = language.clone();
+                        let asset_bundle_cloned = asset_bundle.clone();
+                        this.loading = Some(thread::spawn(move || {
+                            let rel_path = match language_cloned {
+                                Language::Korean => Ok(path::sys::SCRIPT_KOR_PATH),
+                                Language::Unknown => Err(game_err!("Game Logic Error", "Unknown locale!"))
+                            }?;
+
+                            asset_bundle_cloned.get(rel_path)?.read(&ScriptDecoder)
+                        }));
                         this.state = FirstTimeSetupSceneState::Exit;
+                        this.language = language;
                         this.elapsed_time = 0.0;
                     }
                 }
@@ -265,3 +284,4 @@ fn update_text_color(text: &mut Section2d, queue: &wgpu::Queue, color: Vec3) {
     text.data.color.z = color.z;
     text.update_buffer(queue);
 }
+ 

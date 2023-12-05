@@ -1,6 +1,6 @@
 [package]
 name = "MillenniumRun"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 rust-version = "1.73"
 authors = ["HK416 <powerspirit127@gmail.com>", ]

@@ -43,6 +43,8 @@ shaders/sprite.wgsl Static
 shaders/text_2d.wgsl Static
 shaders/text_3d.wgsl Static
 
+scripts/kor.ron Static
+
 
 # Intro Scene
 textures/intro/logo.png Static

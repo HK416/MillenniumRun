@@ -31,6 +31,8 @@ pub mod path {
 
         pub const CLICK_SOUND_PATH: &'static str = "sounds/sys/click.ogg";
         pub const CANCEL_SOUND_PATH: &'static str = "sounds/sys/cancel.ogg";
+
+        pub const SCRIPT_KOR_PATH: &'static str = "scripts/kor.ron";
     }
 
     pub mod intro {

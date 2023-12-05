@@ -4,6 +4,7 @@ pub mod text;
 pub mod ui;
 
 pub mod camera;
+pub mod script;
 pub mod sound;
 pub mod transform;
 pub mod user;
