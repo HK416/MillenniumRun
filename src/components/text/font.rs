@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ab_glyph::FontArc;
 
 use crate::{
@@ -8,6 +10,8 @@ use crate::{
         GameError,
     },
 };
+
+pub type FontSet = HashMap<String, FontArc>;
 
 
 

@@ -1,4 +1,3 @@
-use std::mem;
 use std::path::Path;
 use std::io::{Read, Write, Seek, SeekFrom};
 use std::fs::{File, OpenOptions};
@@ -81,13 +80,13 @@ impl HandleInner for StaticHandle {
     }
 
     #[inline]
-    fn read_or_default<T, D, E>(&mut self, encoder: &E, decoder: &D) -> AppResult<D::Output>
+    fn read_or_default<T, D, E>(&mut self, _: &E, decoder: &D) -> AppResult<D::Output>
         where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
         decoder.decode(&self.bytes)
     }
 
     #[inline]
-    fn write<T, E>(&mut self, encoder: &E, value: &E::Input) -> AppResult<()>
+    fn write<T, E>(&mut self, _: &E, _: &E::Input) -> AppResult<()>
         where E: AssetEncoder<Input = T> {
         log::warn!("Asset files of static type do not perform write functions!");
         Ok(())

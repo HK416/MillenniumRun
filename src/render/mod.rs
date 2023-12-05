@@ -146,7 +146,7 @@ fn create_render_device_and_queue(
         adapter.request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("Rendering device"),
-                features: wgpu::Features::TEXTURE_COMPRESSION_BC,
+                features: wgpu::Features::default(),
                 limits: wgpu::Limits::downlevel_defaults()
                     .using_resolution(adapter.limits())
             }, 

@@ -7,33 +7,20 @@ mod system;
 
 use std::thread;
 use std::sync::Arc;
-use std::sync::atomic::{
-    AtomicBool, 
-    Ordering as MemOrdering
-};
+use std::sync::atomic::{AtomicBool, Ordering as MemOrdering};
 use std::collections::VecDeque;
 
 use crossbeam_queue::SegQueue;
 use winit::{
-    event::{
-        Event,
-        WindowEvent,
-    },
-    event_loop::{
-        EventLoop,
-        EventLoopProxy,
-        EventLoopBuilder,
-        ControlFlow,
-    },
-    window::{
-        Window,
-        WindowBuilder,
-    },
+    event::{Event, WindowEvent},
+    event_loop::{EventLoop, EventLoopProxy, EventLoopBuilder, ControlFlow},
+    window::{Window, WindowBuilder},
     dpi::PhysicalPosition,
 };
 
 use crate::{
     assets::bundle::AssetBundle,
+    components::camera::GameCamera,
     nodes::setup::SetupScene,
     render::depth::DepthBuffer,
     scene::{
@@ -158,47 +145,42 @@ fn game_loop(
         // (English Translation) Handles window events.
         while let Some(event) = EVENT_QUEUE.pop() {
             let event_cloned = event.clone();
-            if let Event::WindowEvent { event, .. } = event_cloned {
-                if let WindowEvent::Resized(_) = event {
-                    let instance = shared.get::<Arc<wgpu::Instance>>().unwrap().clone();
-                    let surface = shared.get::<Arc<wgpu::Surface>>().unwrap().clone();
-                    let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
-                    let config = shared.get_mut::<wgpu::SurfaceConfiguration>().unwrap();
-
-                    let width = window.inner_size().width;
-                    let height = window.inner_size().height;
-                    
-                    if width > 0 && height > 0 {
-                        instance.poll_all(true);
-                        config.width = width;
-                        config.height = height;
-                        surface.configure(&device, config);
-                        shared.push(Arc::new(DepthBuffer::new(&window, &device)));
-                    }
-
-                    continue;
-                } else if let WindowEvent::ScaleFactorChanged { .. } = event {
-                    let instance = shared.get::<Arc<wgpu::Instance>>().unwrap().clone();
-                    let surface = shared.get::<Arc<wgpu::Surface>>().unwrap().clone();
-                    let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
-                    let config = shared.get_mut::<wgpu::SurfaceConfiguration>().unwrap();
-
-                    let width = window.inner_size().width;
-                    let height = window.inner_size().height;
-                    
-                    if width > 0 && height > 0 {
-                        config.width = width;
-                        config.height = height;
-                        instance.poll_all(true);
-                        surface.configure(&device, config);
-                        shared.push(Arc::new(DepthBuffer::new(&window, &device)));
-                    }
-
-                    continue;
-                } else if let WindowEvent::CursorMoved { position, .. } = event {
-                    *shared.get_mut::<PhysicalPosition<f64>>().unwrap() = position;
-                }
-            }
+            match event_cloned {
+                Event::WindowEvent { event, .. } => match event {
+                    WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
+                        let instance = shared.get::<Arc<wgpu::Instance>>().unwrap().clone();
+                        let surface = shared.get::<Arc<wgpu::Surface>>().unwrap().clone();
+                        let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
+                        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap().clone();
+                        let config = shared.get_mut::<wgpu::SurfaceConfiguration>().unwrap();
+    
+                        let width = window.inner_size().width;
+                        let height = window.inner_size().height;
+    
+                        if width > 0 && height > 0 {
+                            instance.poll_all(true);
+                            config.width = width;
+                            config.height = height;
+                            surface.configure(&device, config);
+                            shared.push(Arc::new(DepthBuffer::new(&window, &device)));
+                            if let Some(camera) = shared.get_mut::<GameCamera>() {
+                                camera.viewport.width = width as f32;
+                                camera.viewport.height = height as f32;
+                                camera.scale_factor = window.current_monitor().map_or(1.0, |monitor| monitor.scale_factor() as f32);
+                                camera.update_buffer(&queue);
+                            }
+                        }
+                    },
+                    WindowEvent::CursorMoved { position, .. } => {
+                        let height = shared.get::<Arc<Window>>().unwrap().inner_size().height as f64;
+                        let cursor = shared.get_mut::<PhysicalPosition<f64>>().unwrap();
+                        cursor.x = position.x;
+                        cursor.y = height - position.y;
+                    },
+                    _ => { /* empty */ }
+                },
+                _ => { /* empty */ }
+            };
 
             // (한국어) 게임 장면에 이벤트를 전달합니다.
             // (English Translation) Passes events to the game scene.
@@ -347,7 +329,7 @@ fn main() {
     let window = Arc::new(
         WindowBuilder::new()
             .with_visible(false)
-            .with_resizable(false)
+            // .with_resizable(false)
             .with_window_icon(None)
             .with_title("Application Initialize...")
             .build(&event_loop)

@@ -1,8 +1,8 @@
 [package]
 name = "MillenniumRun"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
-rust-version = "1.72"
+rust-version = "1.73"
 authors = ["HK416 <powerspirit127@gmail.com>", ]
 description = """
     KOR: Nexon Games가 제작한 Blue Archive의 팬 제작 2차 창작 게임.
@@ -26,7 +26,7 @@ notify = "6.0.*" # CC0-1.0 or Artistic-2.0 license.
 rust-embed = { version = "8.0.*", features = ["debug-embed", "interpolate-folder-path", "include-exclude"] } # MIT license.
 sha2 = "0.10.*" # MIT or Apache-2.0 license.
 
-ddsfile = "0.5.*" # MIT license.
+image = "0.24.*" # MIT license.
 wgpu = { version = "0.18.*", features = ["spirv"] } # Graphics crate / MIT or Apache-2.0 license.
 winit = { version = "0.29.*", features = ["rwh_05"] } # Window crate / Apache-2.0 license.
 rodio = "0.17.*" # Sound crate / MIT or Apache-2.0 license.

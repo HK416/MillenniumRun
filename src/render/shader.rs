@@ -5,20 +5,15 @@ use crate::{
 
 
 /// #### 한국어 </br>
-#[derive(Debug)]
+/// `wgsl` 쉐이더 파일로부터 쉐이더 모듈을 만드는 디코더 입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a decoder that creates shader modules from `wgsl` shader files. </br>
+/// 
+#[derive(Debug, Clone, Copy)]
 pub struct WgslDecoder<'a> {
-    label: Option<&'a str>,
-    device: &'a wgpu::Device,
-}
-
-impl<'a> WgslDecoder<'a> {
-    #[inline]
-    pub const fn new(
-        label: Option<&'a str>, 
-        device: &'a wgpu::Device
-    ) -> Self {
-        Self { label, device }
-    }
+    pub name: Option<&'a str>,
+    pub device: &'a wgpu::Device,
 }
 
 impl<'a> AssetDecoder for WgslDecoder<'a> {
@@ -26,13 +21,17 @@ impl<'a> AssetDecoder for WgslDecoder<'a> {
 
     #[inline]
     fn decode(&self, buf: &[u8]) -> AppResult<Self::Output> {
-        Ok(
-            self.device.create_shader_module(wgpu::ShaderModuleDescriptor { 
-                label: self.label, 
+        // (한국어) 쉐이더 모듈을 생성합니다.
+        // (English Translation) Create a shader module.
+        Ok(self.device.create_shader_module(wgpu::ShaderModuleDescriptor { 
+                label: Some(&format!("ShaderModule({})", match self.name {
+                    Some(name) => name,
+                    None => "Unknown",
+                })),
                 source: wgpu::ShaderSource::Wgsl(
                     String::from_utf8_lossy(buf)
                 )
-            })
-        )
+            }
+        ))
     }
 }

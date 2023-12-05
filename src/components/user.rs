@@ -1,31 +1,30 @@
+use serde::{Serialize, Deserialize};
 use winit::{
-    window::{
-        Window,
-        Fullscreen,
-    },
-    dpi::{
-        PhysicalPosition,
-        PhysicalSize, 
-        LogicalSize,
-    },
-};
-use serde::{
-    Serialize,
-    Deserialize,
+    window::Window,
+    dpi::{PhysicalPosition, PhysicalSize, LogicalSize},
 };
 
 use crate::{
     game_err,
-    assets::interface::{
-        AssetDecoder,
-        AssetEncoder,
-    },
-    system::error::{
-        AppResult,
-        GameError,
-    },
+    assets::interface::{AssetDecoder, AssetEncoder},
+    system::error::{AppResult, GameError},
 };
 
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Volume(u8);
+
+impl Volume {
+    #[inline]
+    pub fn set(&mut self, val: u8) {
+        self.0 = val;
+    }
+
+    #[inline]
+    pub fn get_norm(&self) -> f32 {
+        self.0.clamp(0, 100) as f32 / 100.0
+    }
+}
 
 
 /// #### 한국어 </br>
@@ -69,7 +68,6 @@ pub enum ScreenMode {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Resolution {
-    W640H360,
     W854H480,
     W960H540,
     #[default]
@@ -82,8 +80,7 @@ impl Resolution {
     #[inline]
     pub fn downgrade(self) -> Option<Self> {
         match self {
-            Resolution::W640H360 => None,
-            Resolution::W854H480 => Some(Resolution::W640H360),
+            Resolution::W854H480 => None,
             Resolution::W960H540 => Some(Resolution::W854H480),
             Resolution::W1280H720 => Some(Resolution::W960H540),
             Resolution::W1600H900 => Some(Resolution::W1280H720),
@@ -96,7 +93,6 @@ impl Into<LogicalSize<u32>> for Resolution {
     #[inline]
     fn into(self) -> LogicalSize<u32> {
         match self {
-            Resolution::W640H360 => (640, 360),
             Resolution::W854H480 => (854, 480),
             Resolution::W960H540 => (960, 540),
             Resolution::W1280H720 => (1280, 720),
@@ -115,11 +111,30 @@ impl Into<LogicalSize<u32>> for Resolution {
 /// Contains application settings. </br>
 /// 
 #[repr(C)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Settings {
+    pub beginner: bool,
     pub language: Language,
     pub screen_mode: ScreenMode,
     pub resolution: Resolution,
+    pub background_volume: Volume,
+    pub effect_volume: Volume,
+    pub voice_volume: Volume,
+}
+
+impl Default for Settings {
+    #[inline]
+    fn default() -> Self {
+        Self { 
+            beginner: true, 
+            language: Language::Unknown, 
+            screen_mode: ScreenMode::Windowed, 
+            resolution: Resolution::W1280H720,
+            background_volume: Volume(80),
+            effect_volume: Volume(100),
+            voice_volume: Volume(85),
+        }
+    }
 }
 
 
@@ -183,21 +198,6 @@ impl AssetEncoder for SettingsEncoder {
     }
 }
 
-
-
-/// #### 한국어 </br>
-/// 애플리케이션 윈도우 제목을 설정합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Sets the application window title. </br>
-/// 
-#[inline]
-pub fn set_window_title(window: &Window, language: Language) {
-    window.set_title(match language {
-        Language::Unknown => "Select a language",
-        Language::Korean => "밀레니엄 런",
-    });
-}
 
 
 /// #### 한국어 </br>
@@ -267,6 +267,7 @@ pub fn set_screen_mode(window: &Window, screen_mode: ScreenMode) {
                 window.set_simple_fullscreen(true);
             }
             #[cfg(not(target_os = "macos"))] {
+                use winit::window::Fullscreen;
                 window.set_fullscreen(Some(Fullscreen::Borderless(None)));
             }
         },

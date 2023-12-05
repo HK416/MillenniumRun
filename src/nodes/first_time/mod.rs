@@ -1,74 +1,47 @@
-mod ui;
+mod state;
+pub mod res;
 
 use std::sync::Arc;
+use std::collections::HashMap;
 
-use glam::Vec3;
-use rodio::Sink;
-use ab_glyph::FontArc;
-use winit::{
-    event::{
-        Event, 
-        WindowEvent, 
-        MouseButton
-    }, 
-    window::Window, 
-    dpi::PhysicalPosition
-};
+use ab_glyph::Font;
+use glam::{Vec3, Vec4};
+use winit::{event::Event, window::Window};
 
 use crate::{
     game_err,
     assets::bundle::AssetBundle,
     components::{
         text::{
-            section::{
-                Align,
-                Section,
-                SectionBuilder,
-            }, 
-            brush::TextBrush,
+            font::FontSet,
+            brush::TextBrush, 
+            section::d2::{Section2d, Section2dBuilder}, 
         },
         ui::{
-            brush::UiBrush, 
-            objects::{
-                UiObject, 
-                UiButtonObject,
-            },
-        }, 
-        margin::Margin, 
-        anchor::Anchor, 
-        sound::SoundDecoder,
-        user::{
-            Language, 
-            Settings, 
-            SettingsEncoder, 
-        }, 
-    },
-    nodes::{
-        consts,
-        path,
-        entry::EntryScene,
-    },
-    render::{
-        depth::DepthBuffer,
-        texture::DdsImageDecoder,
-    }, 
-    scene::{
-        node::SceneNode,
-        state::SceneState,
-    },
-    system::{
-        error::{
-            AppResult,
-            GameError,
+            brush::UiBrush,
+            anchor::Anchor,
+            objects::{UiObject, UiObjectBuilder},
         },
+        user::{Language, Settings, SettingsEncoder}, 
+    },
+    nodes::path,
+    render::texture::ImageDecoder, 
+    scene::node::SceneNode,
+    system::{
+        error::{AppResult, GameError},
         event::AppEvent,
         shared::Shared,
     }, 
 };
 
-const ANIMATION_TIME: f64 = 0.5;
-const DEF_BTN_SCALE: Vec3 = Vec3 { x: 1.0, y: 1.0, z: 1.0 };
-const MAX_BTN_SCALE: Vec3 = Vec3 { x: 1.25, y: 1.25, z: 1.0 };
+const UI_COLOR: Vec4 = Vec4::new(1.0, 1.0, 1.0, 1.0);
+const UI_TRANSLATION: Vec3 = Vec3::new(0.0, 0.0, 0.2);
+const TEXT_COLOR: Vec4 = Vec4::new(0.0, 0.0, 0.0, 1.0);
+const TEXT_TRANSLATION: Vec3 = Vec3::new(0.0, 0.0, 0.1);
+
+const INIT_BUTTON_SCALE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
+const MAX_BUTTON_SCALE: Vec3 = Vec3::new(1.25, 1.25, 1.0);
+
 
 
 /// #### 한국어 </br>
@@ -79,254 +52,85 @@ const MAX_BTN_SCALE: Vec3 = Vec3 { x: 1.25, y: 1.25, z: 1.0 };
 /// 
 #[derive(Debug)]
 pub struct FirstTimeSetupScene { 
-    btn_kor: Option<ui::UiButton>,
-    btn_kor_text: Option<Section>,
-    select_language: Language,
-    run_animation: bool,
-    animation_time: f64,
+    state: state::FirstTimeSetupSceneState,
+    elapsed_time: f64,
+    language: Language,
+    buttons: HashMap<Language, (UiObject, Section2d)>,
 }
 
 impl SceneNode for FirstTimeSetupScene {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 사용할 공유 객체 가져오기.
         // (English Translation) Get shared object to use.
-        let font = shared.get::<FontArc>().unwrap();
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        let tex_sampler = shared.get::<Arc<wgpu::Sampler>>().unwrap();
         let ui_brush = shared.get::<UiBrush>().unwrap();
-
-        // (한국어) 버튼의 텍스처, 텍스처 뷰, 텍스처 샘플러를 생성합니다.
-        // (English Translation) Create a texture, texture view, and texture sampler for the button.
-        let btn_texture = asset_bundle.get(path::BUTTON_TEXTURE_PATH)?
-            .read(&DdsImageDecoder::new(
-                Some("Button - Texture"),
-                &device,
-                &queue
-            ))?;
-        let btn_texture_view = btn_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let btn_tex_sampler = device.create_sampler(
-            &wgpu::SamplerDescriptor {
-                label: Some("Button - Sampler"),
-                address_mode_u: wgpu::AddressMode::ClampToEdge,
-                address_mode_v: wgpu::AddressMode::ClampToEdge,
-                address_mode_w: wgpu::AddressMode::ClampToEdge,
-                min_filter: wgpu::FilterMode::Linear,
-                mag_filter: wgpu::FilterMode::Linear,
-                mipmap_filter: wgpu::FilterMode::Linear,
-                ..Default::default()
-            }
-        );
+        let text_brush = shared.get::<TextBrush>().unwrap();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let font_set = shared.get::<FontSet>().unwrap();
 
         // (한국어) 한국어 선택 버튼을 생성합니다.
-        // (English Translation) Create Korean selection button.
-        let btn_kor = ui::UiButtonBuilder::new(
-            Some("Korean Button"), 
-            &btn_tex_sampler, 
-            &btn_texture_view, 
-            ui_brush.ref_bind_group_layout()
-        )
-        .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
-        .with_margin(Margin::new(30, -120, -30, 120))
-        .with_depth(-1.0)
-        .build(device);
-
-        // (한국어) 한국어 선택 버튼의 텍스트를 생성합니다.
-        // (English Translation) Create text for the Korean selection button.
-        let btn_kor_text = SectionBuilder::new(
-            font,
-            48.0,
-            "한국어"
-        )
-        .with_align(Align::Center((0.0, 0.0).into()))
-        .build(device);
-
-
-        self.btn_kor = Some(btn_kor);
-        self.btn_kor_text = Some(btn_kor_text);
+        // (English Translation) Create a Korean selection button.
+        let texture = asset_bundle.get(path::sys::BUTTON_BASE_TEXTURE_PATH)?
+            .read(&ImageDecoder::new(Some("Button(Base)"), device, queue))?;
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        self.buttons.insert(
+            Language::Korean, 
+            setup_korean_button(
+                font_set.get(path::FONT_MEDIUM_PATH).unwrap(), 
+                device, 
+                queue, 
+                tex_sampler, 
+                &texture_view, 
+                ui_brush, 
+                text_brush
+            )?
+        );
 
         Ok(())
     }
 
     fn exit(&mut self, shared: &mut Shared) -> AppResult<()> {
-        use crate::components::user::set_window_title;
-
         // (한국어) 사용할 공유 객체 가져오기.
         // (English Translation) Get shared object to use.
         let mut settings = shared.pop::<Settings>().unwrap();
         let asset_bundle = shared.get::<AssetBundle>().unwrap();
         let window = shared.get::<Arc<Window>>().unwrap();
+        window.set_title("Millennium Run");
+
+        // (한국어) 선택된 언어를 확인합니다.
+        // (English Translation) Confirm the selected language.
+        if Language::Unknown == self.language {
+            return Err(game_err!("Game Logic Error", "Unknown locale!"));
+        }
 
         // (한국어) 설정의 내용을 갱신합니다.
         // (English Translation) Update the contents of the settings.
-        settings.language = self.select_language;
+        settings.language = self.language;
         asset_bundle.get(path::SETTINGS_PATH)?
             .write(&SettingsEncoder, &settings)?;
 
-        // (한국어) 윈도우 제목을 설정합니다.
-        // (English Translation) Set the window title.
-        set_window_title(window, self.select_language);
-
+        // (한국어) 사용을 완료한 공유 객체를 반환합니다.
+        // (English Translation) Returns a shared object that has been used.
         shared.push(settings);
 
         Ok(())
     }
 
+    #[inline]
     fn handle_events(&mut self, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
-        // (한국어) 사용할 공유 객체 가져오기.
-        // (English Translation) Get shared object to use.
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
-        let sink = shared.get::<Arc<Sink>>().unwrap();
-        let window = shared.get::<Arc<Window>>().unwrap();
-        let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
-        let buttons = [
-            (self.btn_kor.as_ref().unwrap(), Language::Korean)
-        ];
-
-        if !self.run_animation {
-            match event {
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::MouseInput { state, button, .. } => {
-                        if MouseButton::Left == button && state.is_pressed() {
-                            for (button, language) in buttons {
-                                if button.mouse_pressed(
-                                    cursor_pos.x as f32 / window.inner_size().width as f32, 
-                                    cursor_pos.y as f32 / window.inner_size().height as f32, 
-                                    &consts::VIEW_ORTHO
-                                ) {
-                                    // (한국어) 버튼 클릭 소리를 재생합니다.
-                                    // (English Translation) Play a button click sound.
-                                    let sound = asset_bundle.get(path::CLICK_SOUND_PATH)?
-                                        .read(&SoundDecoder)?;
-                                    sink.append(sound);
-
-                                    // (한국어) 선택한 언어를 설정한 후 버튼 애니메이션을 재생합니다.
-                                    // (English Translation) After setting the selected language, play the button animation.
-                                    self.select_language = language;
-                                    self.run_animation = true;
-                                    break;
-                                }
-                            }
-                        }
-                    },
-                    _ => { }
-                },
-                _ => { }
-            };
-        };
-
-        Ok(())
+        state::HANDLE_EVENTS[self.state as usize](self, shared, event)
     }
 
-    fn update(&mut self, shared: &mut Shared, _: f64, elapsed_time: f64) -> AppResult<()> {
-        const MAX_ANIMATION_TIME: f64 = 1.0;
-        if self.run_animation {
-            self.animation_time += elapsed_time;
-            if self.animation_time >= MAX_ANIMATION_TIME {
-                *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(EntryScene::default()));
-                return Ok(());
-            }
-
-            let buttons = [
-                (self.btn_kor.as_mut().unwrap(), Language::Korean),
-            ];
-            let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-            let delta_time = (self.animation_time.min(ANIMATION_TIME) / ANIMATION_TIME) as f32;
-            let scale = DEF_BTN_SCALE + (MAX_BTN_SCALE - DEF_BTN_SCALE) * delta_time;
-            let alpha = 1.0 - 1.0 * delta_time;
-            for (button, language) in buttons {
-                if language == self.select_language {
-                    button.data.scale = scale;
-                }
-                button.data.color.w = alpha;
-                button.update_buffer(queue);
-            }
-        }
-
-        Ok(())
+    #[inline]
+    fn update(&mut self, shared: &mut Shared, total_time: f64, elapsed_time: f64) -> AppResult<()> {
+        state::UPDATES[self.state as usize](self, shared, total_time, elapsed_time)
     }
 
+    #[inline]
     fn draw(&self, shared: &mut Shared) -> AppResult<()> {
-        // (한국어) 사용할 공유 객체 가져오기.
-        // (English Translation) Get shared object to use.
-        let mut text_brush = shared.pop::<TextBrush>().unwrap();
-        let ui_brush = shared.pop::<UiBrush>().unwrap();
-        let font = shared.get::<FontArc>().unwrap();
-        let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
-        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
-        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
-        let sections = [
-            self.btn_kor_text.as_ref().unwrap()
-        ];
-        let ui_objects: [&dyn UiObject; 1] = [
-            self.btn_kor.as_ref().unwrap()
-        ];
-
-        // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
-        // (English Translation) Wait until the previous operation is finished.
-        device.poll(wgpu::Maintain::Wait);
-
-        // (한국어) 다음 프레임을 가져옵니다.
-        // (English Translation) Get the next frame.
-        let frame = surface.get_current_texture()
-            .map_err(|err| game_err!(
-                "Failed to get next frame",
-                "Failed to get next frame for the following reasons: {}",
-                err.to_string()
-            ))?;
-
-        // (한국어) 프레임 버퍼의 텍스쳐 뷰를 생성합니다.
-        // (English Translation) Creates a texture view of the framebuffer.
-        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        // (한국어) 커맨드 버퍼를 생성합니다.
-        // (English Translation) Creates a command buffer.
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
-        {
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Interface Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment { 
-                    view: &view, 
-                    resolve_target: None, 
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    }
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: depth.view(),
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            // (한국어) 유저 인터페이스 오브젝트 그리기.
-            // (English Translation) Drawing user interface objects.
-            ui_brush.draw(&ui_objects, &mut rpass);
-
-            // (한국어) 텍스트 그리기.
-            // (English Translation) Drawing texts.
-            text_brush.update_texture(font, device, queue, &sections);
-            text_brush.draw(&sections, &mut rpass);
-        }
-
-        // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
-        // (English Translation) Submit command buffers to the queue and output to the framebuffer.
-        queue.submit(Some(encoder.finish()));
-        frame.present();
-
-
-        shared.push(ui_brush);
-        shared.push(text_brush);
-
-        Ok(())
+        state::DRAWS[self.state as usize](self, shared)
     }
 }
 
@@ -334,11 +138,61 @@ impl Default for FirstTimeSetupScene {
     #[inline]
     fn default() -> Self {
         Self { 
-            btn_kor: None,
-            btn_kor_text: None,
-            select_language: Language::Unknown,
-            run_animation: false,
-            animation_time: 0.0,
+            state: state::FirstTimeSetupSceneState::default(),
+            elapsed_time: 0.0,
+            language: Language::Unknown,
+            buttons: HashMap::new(),
         }
     }
+}
+
+
+/// #### 한국어 </br>
+/// 한국어 선택 버튼의 사용자 인터페이스를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a user interface for the Korean selection button. </br>
+/// 
+fn setup_korean_button<F: Font>(
+    font: &F,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    tex_sampler: &wgpu::Sampler,
+    texture_view: &wgpu::TextureView,
+    ui_brush: &UiBrush,
+    text_brush: &TextBrush,
+) -> AppResult<(UiObject, Section2d)> {
+    let anchor = Anchor::new(
+        0.5 + 0.05, 
+        0.5 - 0.2, 
+        0.5 - 0.05, 
+        0.5 + 0.2
+    );
+
+    let ui = UiObjectBuilder::new(
+        Some("Button(Korean)"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush.ref_texture_layout()
+    )
+    .with_anchor(anchor)
+    .with_color(UI_COLOR)
+    .with_scale(INIT_BUTTON_SCALE)
+    .with_translation(UI_TRANSLATION)
+    .build(device);
+    let text = Section2dBuilder::new(
+        Some("Text(Korean)"),
+        "한국어",
+        font,
+        text_brush.ref_texture_sampler(),
+        text_brush.ref_buffer_layout(),
+        text_brush.ref_texture_layout()
+    )
+    .with_anchor(anchor)
+    .with_color(TEXT_COLOR)
+    .with_scale(INIT_BUTTON_SCALE)
+    .with_translation(TEXT_TRANSLATION)
+    .build(device, queue);
+
+    Ok((ui, text))
 }

@@ -1,9 +1,9 @@
-pub mod collision2d;
+pub mod collider2d;
+pub mod sprite;
 pub mod text;
 pub mod ui;
 
-pub mod anchor;
-pub mod margin;
-pub mod object;
+pub mod camera;
 pub mod sound;
+pub mod transform;
 pub mod user;
