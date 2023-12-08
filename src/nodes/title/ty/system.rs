@@ -75,7 +75,7 @@ impl SystemButtons {
             )
             .with_anchor(anchor)
             .with_margin(margin)
-            .with_color((1.0, 1.0, 1.0, 1.0).into())
+            .with_color((1.0, 1.0, 1.0, 0.0).into())
             .with_translation((0.0, 0.0, 0.5).into())
             .build(device)),
             vec![],

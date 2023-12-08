@@ -352,7 +352,7 @@ fn create_render_pipeline_2d(
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 5,
-                                format: wgpu::VertexFormat::Float32x4,
+                                format: wgpu::VertexFormat::Float32x2,
                                 offset: offset_of!(CharacterData, size) as wgpu::BufferAddress,
                             },
                         ]
@@ -452,7 +452,7 @@ fn create_render_pipeline_3d(
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 5,
-                                format: wgpu::VertexFormat::Float32x4,
+                                format: wgpu::VertexFormat::Float32x2,
                                 offset: offset_of!(CharacterData, size) as wgpu::BufferAddress,
                             },
                         ]

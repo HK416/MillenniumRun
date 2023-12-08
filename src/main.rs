@@ -329,7 +329,7 @@ fn main() {
     let window = Arc::new(
         WindowBuilder::new()
             .with_visible(false)
-            // .with_resizable(false)
+            .with_resizable(false)
             .with_window_icon(None)
             .with_title("Application Initialize...")
             .build(&event_loop)
