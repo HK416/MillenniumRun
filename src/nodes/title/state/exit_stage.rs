@@ -7,15 +7,14 @@ use crate::{
     game_err,
     components::{
         sprite::brush::SpriteBrush,
-        text::{Section, brush::TextBrush},
-        ui::{UserInterface, brush::UiBrush},
+        text::{brush::TextBrush, section::d2::Section2d},
+        ui::{brush::UiBrush, objects::UiObject},
         camera::GameCamera, 
     },
     nodes::title::{
         MENU_CAMERA_POS, 
         STAGE_CAMERA_POS,
-        TitleScene,
-        ty, state::TitleState,
+        TitleScene, state::TitleState,
     },
     render::depth::DepthBuffer,
     system::{
@@ -179,17 +178,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 시스템 버튼 그리기.
         // (English Translation) Drawing system buttons.
-        ui_brush.draw(
-            &mut rpass, 
-            this.system.iter()
-            .map(|it| &it.inner as &dyn UserInterface));
-        text_brush.draw_2d(
-            &mut rpass, 
-            this.system.iter()
-            .map(|it| &it.texts)
-            .flatten()
-            .map(|it| it as &dyn Section)
-        );
+        this.system.draw(ui_brush, text_brush, &mut rpass);
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -226,13 +215,15 @@ fn update_camera_pos(
 /// Updates the alpha value of the user interface object. </br>
 /// 
 fn update_button_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
-where Iter: Iterator<Item = &'a mut ty::UiComponent> {
-    for ui in iter {
-        ui.inner.data.color.w = alpha;
-        ui.inner.update_buffer(queue);
-        for text in ui.texts.iter_mut() {
-            text.data.color.w = alpha;
-            text.update_buffer(queue);
+where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
+    for (ui, texts) in iter {
+        ui.update_buffer(queue, |data| {
+            data.color.w = alpha;
+        });
+        for text in texts.iter_mut() {
+            text.update_section(queue, |data| {
+                data.color.w = alpha;
+            });
         }
     }
 }

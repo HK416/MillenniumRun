@@ -19,15 +19,16 @@ pub mod path {
     pub const SPRITE_SHADER_PATH: &'static str = "shaders/sprite.wgsl";
 
     pub mod sys {
-        pub const BUTTON_BASE_TEXTURE_PATH: &'static str = "textures/sys/button_base.png";
-        pub const BUTTON_BLUE_TEXTURE_PATH: &'static str = "textures/sys/button_blue.png";
-        pub const BUTTON_RED_TEXTURE_PATH: &'static str = "textures/sys/button_red.png";
+        pub const WINDOW_TEXTURE_PATH: &'static str = "textures/sys/window.png";
+
+        pub const BUTTON_SMALL_TEXTURE_PATH: &'static str = "textures/sys/button_small.png";
+        pub const BUTTON_SMALL_EX_TEXTURE_PATH: &'static str = "textures/sys/button_small_ex.png";
+        pub const BUTTON_WIDE_TEXTURE_PATH: &'static str = "textures/sys/button_wide.png";
         pub const BUTTON_START_TEXTURE_PATH: &'static str = "textures/sys/button_start.png";
         pub const BUTTON_SETTING_TEXTURE_PATH: &'static str = "textures/sys/button_setting.png";
         pub const BUTTON_EXIT_TEXTURE_PATH: &'static str = "textures/sys/button_exit.png";
+        pub const BUTTON_ENTER_TEXTURE_PATH: &'static str = "textures/sys/button_enter.png";
         pub const BUTTON_RETURN_TEXTURE_PATH: &'static str = "textures/sys/button_return.png";
-
-        pub const WINDOW_TEXTURE_PATH: &'static str = "textures/sys/window.png";
 
         pub const CLICK_SOUND_PATH: &'static str = "sounds/sys/click.ogg";
         pub const CANCEL_SOUND_PATH: &'static str = "sounds/sys/cancel.ogg";

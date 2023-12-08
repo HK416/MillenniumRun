@@ -3,11 +3,7 @@ use std::sync::Arc;
 use crate::{
     game_err,
     components::{
-        text::{
-            Section,
-            brush::TextBrush, 
-            character::Character, 
-        }, 
+        text::{Section, brush::TextBrush}, 
         camera::GameCamera,
     },
     nodes::intro::{IntroScene, state::IntroState}, 
@@ -48,12 +44,9 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elap
     let delta_time = (this.elapsed_time / DURATION).min(1.0) as f32;
     let alpha = 1.0 - 1.0 * delta_time;
     for section in this.notify_texts.iter_mut() {
-        for ch in section.chars_mut() {
-            if let Character::Char (_, data, buffer) = ch {
-                data.color.w = alpha;
-                queue.write_buffer(&buffer, 0, bytemuck::bytes_of(data));
-            }
-        }
+        section.update_section(queue, |data| {
+            data.color.w = alpha;
+        })
     }
     
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.

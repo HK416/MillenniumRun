@@ -4,8 +4,10 @@ Script({
     StartMenu : "게임 시작",
     SettingMenu : "설정",
     ExitMenu : "종료",
-    Okay : "네",
-    Cancel : "아니오",
+    Exit : "네",
+    NoExit : "아니오",
+    Store: "저장",
+    NoStore: "나가기",
     ExitMessage : "게임을 종료하시겠습니까?",
-    EnterStage : "찾으러 가기",
+    EnterStage : "탐색 시작",
 })

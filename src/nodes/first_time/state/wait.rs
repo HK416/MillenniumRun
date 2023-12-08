@@ -9,7 +9,7 @@
 use std::thread;
 use std::sync::Arc;
 
-use glam::{Vec3, Vec4Swizzles};
+use glam::{Vec4, Vec3, Vec4Swizzles};
 use rodio::OutputStreamHandle;
 use winit::{
     dpi::PhysicalPosition,
@@ -21,8 +21,8 @@ use crate::{
     assets::bundle::AssetBundle, 
     components::{
         collider2d::Collider2d,
-        text::{Section, section::d2::Section2d, brush::TextBrush}, 
-        ui::{UserInterface, objects::UiObject, brush::UiBrush},
+        text::{Section, brush::TextBrush}, 
+        ui::{UserInterface, brush::UiBrush},
         sound::{self, SoundDecoder}, 
         script::ScriptDecoder,
         camera::GameCamera,
@@ -82,14 +82,18 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
                 //
                 if let Some((language, (ui, text))) = select {
                     // <1>
-                    let ui_color = ui.data.color.xyz();
-                    let text_color = text.data.color.xyz();
+                    let ui_color = ui.data.lock().expect("Failed to access variable.").color.xyz();
+                    let text_color = text.data.lock().expect("Failed to access variable").color.xyz();
                     let mut guard = FOCUSED.lock().expect("Failed to access variable.");
                     *guard = Some((*language, ui_color, text_color));
 
                     // <2>
-                    update_ui_color(ui, queue, ui_color * 0.5);
-                    update_text_color(text, queue, text_color * 0.5);
+                    ui.update_buffer(queue, |data| {
+                        data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
+                    });
+                    text.update_section(queue, |data| {
+                        data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
+                    });
 
                     // <3>
                     play_click_sound(this, shared)?;
@@ -100,8 +104,12 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
                     // (한국어) 버튼을 원래 색상으로 되돌립니다.
                     // (English Translation) Returns the button to its origin color.
                     if let Some((ui, text)) = this.buttons.get_mut(&language) {
-                        update_ui_color(ui, queue, ui_color);
-                        update_text_color(text, queue, text_color);
+                        ui.update_buffer(queue, |data| {
+                            data.color = (ui_color, 1.0).into();
+                        });
+                        text.update_section(queue, |data| {
+                            data.color = (text_color, 1.0).into();
+                        });
                     }
 
                     // (한국어) 마우스 커서가 버튼 영역 안에 있는지 확인합니다.
@@ -250,38 +258,8 @@ fn play_click_sound(_this: &mut FirstTimeSetupScene, shared: &mut Shared) -> App
     thread::spawn(move || {
         sink.append(source);
         sink.sleep_until_end();
+        sink.detach()
     });
 
     Ok(())
 }
-
-
-/// #### 한국어 </br>
-/// 사용자 인터페이스 색상을 갱신합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Updates the color of the user interface. </br>
-/// 
-#[inline]
-fn update_ui_color(ui: &mut UiObject, queue: &wgpu::Queue, color: Vec3) {
-    ui.data.color.x = color.x;
-    ui.data.color.y = color.y;
-    ui.data.color.z = color.z;
-    ui.update_buffer(queue);
-}
-
-
-/// #### 한국어 </br>
-/// 텍스트의 색상을 갱신합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Updates the color of the text. </br>
-/// 
-#[inline]
-fn update_text_color(text: &mut Section2d, queue: &wgpu::Queue, color: Vec3) {
-    text.data.color.x = color.x;
-    text.data.color.y = color.y;
-    text.data.color.z = color.z;
-    text.update_buffer(queue);
-}
- 

@@ -17,6 +17,7 @@ use crate::{
         ui::{
             brush::UiBrush,
             anchor::Anchor,
+            margin::Margin,
             objects::{UiObject, UiObjectBuilder},
         },
         script::{Script, ScriptTags},
@@ -171,12 +172,8 @@ fn setup_logo_images(this: &mut IntroScene, shared: &mut Shared) -> AppResult<()
             &texture_view,
             ui_brush.ref_texture_layout(),
         )
-        .with_anchor(Anchor::new(
-            0.5 + 0.267, 
-            0.5 - 0.15, 
-            0.5 - 0.267, 
-            0.5 + 0.15
-        ))
+        .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+        .with_margin(Margin::new(206, -206, -206, 206))
         .with_color((1.0, 1.0, 1.0, 0.0).into())
         .build(device)
     );

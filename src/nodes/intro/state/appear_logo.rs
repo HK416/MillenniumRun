@@ -40,9 +40,10 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elap
     // (English Translation) Updates the alpha value of the logo image over time.
     let delta_time = (this.elapsed_time / DURATION).min(1.0) as f32;
     let alpha = 1.0 * delta_time;
-    for image in this.logo_images.iter_mut() {
-        image.data.color.w = alpha;
-        image.update_buffer(queue);
+    for ui in this.logo_images.iter_mut() {
+        ui.update_buffer(queue, |data| {
+            data.color.w = alpha;
+        });
     }
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.

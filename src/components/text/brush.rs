@@ -8,7 +8,7 @@ use crate::{
     components::text::{
         Section,
         section::{ d2::Section2d, d3::Section3d},
-        character::{Character, GlyphData},
+        character::{Character, CharacterData},
     },
     nodes::path::{TEXT2D_SHADER_PATH, TEXT3D_SHADER_PATH},
     render::shader::WgslDecoder,
@@ -322,38 +322,38 @@ fn create_render_pipeline_2d(
                 entry_point: "vs_main",
                 buffers: &[
                     wgpu::VertexBufferLayout {
-                        array_stride: size_of::<GlyphData>() as wgpu::BufferAddress,
+                        array_stride: size_of::<CharacterData>() as wgpu::BufferAddress,
                         step_mode: wgpu::VertexStepMode::Instance,
                         attributes: &[
                             wgpu::VertexAttribute {
                                 shader_location: 0,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(GlyphData, transform) + offset_of!(Mat4, x_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(CharacterData, transform) + offset_of!(Mat4, x_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 1,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(GlyphData, transform) + offset_of!(Mat4, y_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(CharacterData, transform) + offset_of!(Mat4, y_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 2,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(GlyphData, transform) + offset_of!(Mat4, z_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(CharacterData, transform) + offset_of!(Mat4, z_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 3,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(GlyphData, transform) + offset_of!(Mat4, w_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(CharacterData, transform) + offset_of!(Mat4, w_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 4,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: offset_of!(GlyphData, color) as wgpu::BufferAddress,
+                                offset: offset_of!(CharacterData, color) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 5,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: offset_of!(GlyphData, size) as wgpu::BufferAddress,
+                                offset: offset_of!(CharacterData, size) as wgpu::BufferAddress,
                             },
                         ]
                     }
@@ -422,38 +422,38 @@ fn create_render_pipeline_3d(
                 entry_point: "vs_main",
                 buffers: &[
                     wgpu::VertexBufferLayout {
-                        array_stride: size_of::<GlyphData>() as wgpu::BufferAddress,
+                        array_stride: size_of::<CharacterData>() as wgpu::BufferAddress,
                         step_mode: wgpu::VertexStepMode::Instance,
                         attributes: &[
                             wgpu::VertexAttribute {
                                 shader_location: 0,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(GlyphData, transform) + offset_of!(Mat4, x_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(CharacterData, transform) + offset_of!(Mat4, x_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 1,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(GlyphData, transform) + offset_of!(Mat4, y_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(CharacterData, transform) + offset_of!(Mat4, y_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 2,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(GlyphData, transform) + offset_of!(Mat4, z_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(CharacterData, transform) + offset_of!(Mat4, z_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 3,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(GlyphData, transform) + offset_of!(Mat4, w_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(CharacterData, transform) + offset_of!(Mat4, w_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 4,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: offset_of!(GlyphData, color) as wgpu::BufferAddress,
+                                offset: offset_of!(CharacterData, color) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 5,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: offset_of!(GlyphData, size) as wgpu::BufferAddress,
+                                offset: offset_of!(CharacterData, size) as wgpu::BufferAddress,
                             },
                         ]
                     }

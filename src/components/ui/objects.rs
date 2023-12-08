@@ -1,6 +1,7 @@
+use std::sync::{Mutex, MutexGuard};
+
 use glam::{Vec4, Vec3, Mat4, Quat};
 use bytemuck::{Pod, Zeroable};
-
 use winit::dpi::PhysicalPosition;
 
 use crate::components::{
@@ -155,7 +156,7 @@ impl<'a> UiObjectBuilder<'a> {
 /// 
 #[derive(Debug)]
 pub struct UiObject {
-    pub data: UiData,
+    pub data: Mutex<UiData>,
     buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
 }
@@ -201,7 +202,7 @@ impl UiObject {
         );
 
         Self { 
-            data, 
+            data: data.into(), 
             buffer, 
             bind_group,
         }
@@ -216,8 +217,11 @@ impl UiObject {
     /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
     /// 
     #[inline]
-    pub fn update_buffer(&self, queue: &wgpu::Queue) {
-        queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&self.data))
+    pub fn update_buffer<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
+    where F: Fn(&mut MutexGuard<'_, UiData>) {
+        let mut guard = self.data.lock().expect("Failed to access variable.");
+        mapping_func(&mut guard);
+        queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&*guard));
     }
 }
 
@@ -237,11 +241,12 @@ impl UserInterface for UiObject {
 
 impl Collider2d<(&PhysicalPosition<f64>, &GameCamera)> for UiObject {
     fn test(&self, other: &(&PhysicalPosition<f64>, &GameCamera)) -> bool {
+        let guard = self.data.lock().expect("Failed to access variable.");
         let pos = other.0;
         let view = other.1.viewport;
         let scale = other.1.scale_factor;
-        let anchor = self.data.anchor;
-        let margin = self.data.margin;
+        let anchor = guard.anchor;
+        let margin = guard.margin;
 
         let top = view.y + anchor.top() * view.height + margin.top() as f32 * scale;
         let left = view.x + anchor.left() * view.width + margin.left() as f32 * scale;

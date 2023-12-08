@@ -1,3 +1,5 @@
+use std::sync::{Mutex, MutexGuard};
+
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec4, Vec2, Vec3, Quat};
 
@@ -177,8 +179,8 @@ impl<'a> SpriteBuilder<'a> {
 /// 
 #[derive(Debug)]
 pub struct SpriteObject {
-    pub data: SpriteData,
-    pub transform: Transform,
+    pub data: Mutex<SpriteData>,
+    pub transform: Mutex<Transform>,
     instance_buffer: wgpu::Buffer,
     sprite_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
@@ -243,8 +245,8 @@ impl SpriteObject {
         );
 
         Self { 
-            data,
-            transform, 
+            data: data.into(),
+            transform: transform.into(), 
             instance_buffer, 
             sprite_buffer, 
             bind_group, 
@@ -259,13 +261,11 @@ impl SpriteObject {
     /// Updates the instance data buffer. </br>
     /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
     /// 
-    #[inline]
-    pub fn update_instance(&self, queue: &wgpu::Queue) {
-        queue.write_buffer(
-            &self.instance_buffer, 
-            0, 
-            bytemuck::bytes_of(&InstanceData { transform: self.transform.into() }
-        ))
+    pub fn update_instance<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
+    where F: Fn(&mut MutexGuard<'_, Transform>) {
+        let mut guard = self.transform.lock().expect("Failed to access variable.");
+        mapping_func(&mut guard);
+        queue.write_buffer(&self.instance_buffer, 0, bytemuck::bytes_of(&InstanceData { transform: (*guard).into() }));
     }
 
     /// #### 한국어 </br>
@@ -276,9 +276,11 @@ impl SpriteObject {
     /// Updates the sprite data buffer. </br>
     /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
     /// 
-    #[inline]
-    pub fn update_sprite(&self, queue: &wgpu::Queue) {
-        queue.write_buffer(&self.sprite_buffer, 0, bytemuck::bytes_of(&self.data))
+    pub fn update_sprite<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
+    where F: Fn(&mut MutexGuard<'_, SpriteData>) {
+        let mut guard = self.data.lock().expect("Failed to access variable.");
+        mapping_func(&mut guard);
+        queue.write_buffer(&self.sprite_buffer, 0, bytemuck::bytes_of(&*guard));
     }
 }
 

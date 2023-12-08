@@ -7,16 +7,18 @@
 
 use crate::nodes::path;
 
-pub const ASSETS: [&'static str; 17] = [
-    path::sys::BUTTON_RETURN_TEXTURE_PATH,
+pub const ASSETS: [&'static str; 19] = [
+    path::sys::BUTTON_SMALL_TEXTURE_PATH,
+    path::sys::BUTTON_SMALL_EX_TEXTURE_PATH,
+    path::sys::BUTTON_WIDE_TEXTURE_PATH,
     path::sys::BUTTON_START_TEXTURE_PATH,
     path::sys::BUTTON_SETTING_TEXTURE_PATH,
     path::sys::BUTTON_EXIT_TEXTURE_PATH,
-    path::sys::BUTTON_BLUE_TEXTURE_PATH,
-    path::sys::BUTTON_RED_TEXTURE_PATH,
+    path::sys::BUTTON_RETURN_TEXTURE_PATH,
+    path::sys::BUTTON_ENTER_TEXTURE_PATH,
+    path::sys::WINDOW_TEXTURE_PATH,
     path::sys::CLICK_SOUND_PATH,
     path::sys::CANCEL_SOUND_PATH,
-    path::sys::WINDOW_TEXTURE_PATH,
     path::title::BACKGROUND_PATH,
     path::title::CABINET_TEXTURE_PATH,
     path::title::SOFA_TEXTURE_PATH,

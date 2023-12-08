@@ -6,12 +6,11 @@ use crate::{
     game_err,
     components::{
         sprite::brush::SpriteBrush,
-        text::brush::TextBrush,
-        ui::brush::UiBrush,
+        text::{brush::TextBrush, section::d2::Section2d},
+        ui::{brush::UiBrush, objects::UiObject},
         camera::GameCamera,
     },
     nodes::title::{
-        ty,
         TitleScene,
         state::TitleState,
     }, 
@@ -212,18 +211,19 @@ fn smooth_step(elapsed_time: f64, duration: f64) -> f32 {
 /// Updates the scale value of the user interface object.
 /// 
 fn update_ui_scale<'a, Iter>(iter: Iter, queue: &wgpu::Queue, scale: f32) 
-where Iter: Iterator<Item = &'a mut ty::UiComponent> {
-    for ui in iter {
-        ui.inner.data.transform.x_axis.x = scale;
-        ui.inner.data.transform.y_axis.y = scale;
-        ui.inner.data.transform.z_axis.z = scale;
-        ui.inner.update_buffer(queue);
-
-        for text in ui.texts.iter_mut() {
-            text.data.transform.x_axis.x = scale;
-            text.data.transform.y_axis.y = scale;
-            text.data.transform.z_axis.z = scale;
-            text.update_buffer(queue);
+where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
+    for (ui, texts) in iter {
+        ui.update_buffer(queue, |data| {
+            data.transform.x_axis.x = scale;
+            data.transform.y_axis.y = scale;
+            data.transform.z_axis.z = scale;
+        });
+        for text in texts.iter_mut() {
+            text.update_section(queue, |data| {
+                data.transform.x_axis.x = scale;
+                data.transform.y_axis.y = scale;
+                data.transform.z_axis.z = scale;
+            });
         }
     }
 }
@@ -235,14 +235,15 @@ where Iter: Iterator<Item = &'a mut ty::UiComponent> {
 /// Updates the alpha value of the user interface object.
 /// 
 fn update_ui_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
-where Iter: Iterator<Item = &'a mut ty::UiComponent> {
-    for ui in iter {
-        ui.inner.data.color.w = alpha;
-        ui.inner.update_buffer(queue);
-
-        for text in ui.texts.iter_mut() {
-            text.data.color.w = alpha;
-            text.update_buffer(queue);
+where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
+    for (ui, texts) in iter {
+        ui.update_buffer(queue, |data| {
+            data.color.w = alpha;
+        });
+        for text in texts.iter_mut() {
+            text.update_section(queue, |data| {
+                data.color.w = alpha
+            });
         }
     }
 }

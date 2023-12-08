@@ -5,13 +5,16 @@ mod entry;
 mod enter_msgbox;
 mod enter_stage;
 mod enter_selected;
+mod enter_setting;
 mod exit_msgbox;
 mod exit_stage;
 mod exit_selected;
+mod exit_setting;
 mod menu;
 mod msgbox;
 mod stage;
 mod selected;
+mod setting;
 
 use std::thread;
 
@@ -41,6 +44,9 @@ pub enum TitleState {
     #[default]
     Entry,
     Menu,
+    EnterSetting,
+    ExitSetting,
+    Setting,
     EnterMsgBox,
     ExitMsgBox,
     MsgBox,
@@ -65,6 +71,9 @@ pub const HANDLE_EVENTS: [&'static HandleEventsFn; TitleState::NumStatus as usiz
     
     &entry::handle_events,
     &menu::handle_events,
+    &enter_setting::handle_events,
+    &exit_setting::handle_events,
+    &setting::handle_events,
     &enter_msgbox::handle_events,
     &exit_msgbox::handle_events,
     &msgbox::handle_events,
@@ -82,6 +91,9 @@ pub const UPDATES: [&'static UpdateFn; TitleState::NumStatus as usize] = [
 
     &entry::update,
     &menu::update,
+    &enter_setting::update,
+    &exit_setting::update,
+    &setting::update,
     &enter_msgbox::update,
     &exit_msgbox::update,
     &msgbox::update,
@@ -99,6 +111,9 @@ pub const DRAWS: [&'static DrawFn; TitleState::NumStatus as usize] = [
 
     &entry::draw,
     &menu::draw,
+    &enter_setting::draw,
+    &exit_setting::draw,
+    &setting::draw,
     &enter_msgbox::draw,
     &exit_msgbox::draw,
     &msgbox::draw,
@@ -135,6 +150,7 @@ fn play_click_sound(_this: &mut TitleScene, shared: &mut Shared) -> AppResult<()
     thread::spawn(move || {
         sink.append(source);
         sink.sleep_until_end();
+        sink.detach();
     });
 
     Ok(())
@@ -164,6 +180,7 @@ fn play_cancel_sound(_this: &mut TitleScene, shared: &mut Shared) -> AppResult<(
     thread::spawn(move || {
         sink.append(source);
         sink.sleep_until_end();
+        sink.detach()
     });
 
     Ok(())

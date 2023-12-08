@@ -7,15 +7,14 @@ use crate::{
     game_err,
     components::{
         sprite::brush::SpriteBrush,
-        text::brush::TextBrush,
-        ui::brush::UiBrush,
+        text::{brush::TextBrush, section::d2::Section2d},
+        ui::{brush::UiBrush, objects::UiObject},
         camera::GameCamera, 
     },
     nodes::title::{
         MENU_CAMERA_POS, 
         STAGE_CAMERA_POS,
-        TitleScene,
-        ty, state::TitleState, 
+        TitleScene, state::TitleState, 
     },
     render::depth::DepthBuffer,
     system::{
@@ -216,13 +215,15 @@ fn update_camera_pos(camera: &mut GameCamera, position: Vec3, queue: &wgpu::Queu
 /// Updates the alpha value of the user interface object. </br>
 /// 
 fn update_button_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
-where Iter: Iterator<Item = &'a mut ty::UiComponent> {
-    for ui in iter {
-        ui.inner.data.color.w = alpha;
-        ui.inner.update_buffer(queue);
-        for text in ui.texts.iter_mut() {
-            text.data.color.w = alpha;
-            text.update_buffer(queue);
+where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
+    for (ui, texts) in iter {
+        ui.update_buffer(queue, |data| {
+            data.color.w = alpha;
+        });
+        for text in texts.iter_mut() {
+            text.update_section(queue, |data| {
+                data.color.w = alpha;
+            });
         }
     }
 }

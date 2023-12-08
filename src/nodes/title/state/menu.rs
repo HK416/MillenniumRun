@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glam::{Vec3, Vec4Swizzles};
+use glam::{Vec4, Vec3, Vec4Swizzles};
 use winit::{
     event::{Event, WindowEvent, MouseButton},
     keyboard::{PhysicalKey, KeyCode},
@@ -12,8 +12,8 @@ use crate::{
     components::{
         collider2d::Collider2d,
         sprite::brush::SpriteBrush,
-        text::{brush::TextBrush, section::d2::Section2d},
-        ui::{brush::UiBrush, objects::UiObject},
+        text::brush::TextBrush,
+        ui::brush::UiBrush,
         camera::GameCamera,
     },
     nodes::title::{
@@ -31,9 +31,8 @@ use crate::{
 
 
 pub fn handle_events(this: &mut TitleScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
-    #[cfg(debug_assertions)]
-    check_develop_mode(this, shared, &event)?;
-    check_menu_button_pressed(this, shared, &event)?;
+    handle_keyboard_input(this, shared, &event)?;
+    handle_mouse_input(this, shared, &event)?;
     Ok(())
 }
 
@@ -143,44 +142,39 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 }
 
 
-/// #### 한국어 </br>
-/// 개발자 모드 버튼이 눌렸는지 확인합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Check the develop mode button is pressed. </br>
-/// 
-#[cfg(debug_assertions)]
-fn check_develop_mode(this: &mut TitleScene, _shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
+fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
     match event {
         Event::WindowEvent { event, .. } => match event {
-            WindowEvent::KeyboardInput { event, .. } => if let PhysicalKey::Code(code) = event.physical_key {
-                if !event.repeat && event.state.is_pressed() && code == KeyCode::F4 {
+            WindowEvent::KeyboardInput { event, .. }
+            => if let PhysicalKey::Code(code) = event.physical_key {
+                if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
+                    super::play_cancel_sound(this, shared)?;
+
+                    // (한국어) 다음 게임 장면 상태로 변경합니다.
+                    // (English Translation) Change to the next game scene state.
+                    this.state = TitleState::ExitSetting;
                     this.elapsed_time = 0.0;
-                    this.state = TitleState::Dev;
-                    return Ok(());
-                }
+                } else if KeyCode::F4 == code && !event.repeat && event.state.is_pressed() {
+                    #[cfg(debug_assertions)] {
+                        // (한국어) 다음 게임 장면 상태로 변경합니다.
+                        // (English Translation) Change to the next game scene state.
+                        this.state = TitleState::Dev;
+                        this.elapsed_time = 0.0;
+                    }
+                };
             },
-            _ => { }
+            _ => { /* empty */ }
         },
-        _ => { }
-    }
+        _ => { /* empty */ }
+    };
+
     Ok(())
 }
 
 
-/// #### 한국어 </br>
-/// 메뉴 버튼이 눌렸는지 확인합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Check the menu button is pressed. </br>
-/// 
-fn check_menu_button_pressed(
-    this: &mut TitleScene, 
-    shared: &mut Shared, 
-    event: &Event<AppEvent>
-) ->AppResult<()> {
+fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) ->AppResult<()> {
     use std::sync::Mutex;
-    static FOCUSED: Mutex<Option<(usize, Vec3, Vec<Vec3>)>> = Mutex::new(None);
+    static FOCUSED: Mutex<Option<(ty::MenuButtonTags, Vec3, Vec<Vec3>)>> = Mutex::new(None);
 
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
@@ -190,82 +184,92 @@ fn check_menu_button_pressed(
 
     match event {
         Event::WindowEvent { event, .. } => match event {
-            WindowEvent::KeyboardInput { event, .. } => if let PhysicalKey::Code(code) = event.physical_key {
-                if !event.repeat && event.state.is_pressed() && code == KeyCode::Escape {
-                    super::play_click_sound(this, shared)?;
-
-                    // (한국어) 다음 게임 장면 상태로 변경합니다.
-                    // (English Translation) Change to the next game scene state.
-                    this.elapsed_time = 0.0;
-                    this.state = TitleState::EnterMsgBox;
-                };
-            },
             WindowEvent::MouseInput { state, button, .. } => {
                 if MouseButton::Left == *button && state.is_pressed() {
-                    // (한국어) 마우스 커서가 버튼 영역 안에 있는지 확인합니다.
-                    // (English Translation) Make sure the mouse cursor is inside the button area.
-                    let select = this.menu
-                        .iter_mut()
-                        .enumerate()
-                        .find(|(_, it)| it.inner.test(&(cursor_pos, camera)));
+                    // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
+                    // (English Translation) Make sure the mouse cursor is inside the ui area.
+                    let pickable = this.menu.pickable();
+                    let select = pickable.into_iter()
+                        .find(|(_, (ui, _))| ui.test(&(cursor_pos, camera)));
 
-                    // (한국어) 
-                    // 마우스 커서가 버튼 영역 안에 있는 경우:
-                    // 1. `FOCUSED`에 해당 버튼의 인덱스와 버튼의 색상, 텍스트의 색상을 저장합니다.
-                    // 2. 해당 버튼의 색상과 텍스트의 색상을 변경합니다.
-                    // 3. `click` 소리를 재생 합니다.
+                    // (한국어)
+                    // 마우스 커서가 ui 영역 안에 있는 경우:
+                    // 1. `FOCUSED`에 해당 ui의 태그, 색상, 텍스트 색상을 저장합니다.
+                    // 2. 해당 ui의 색상과 텍스트 색상을 변경합니다.
+                    // 3. ui 눌림 함수를 호출합니다.
                     //
                     // (English Translation)
-                    // If the mouse cursor is inside the button area:
-                    // 1. Store the index of the button, button color, and text color in `FOCUSED`.
-                    // 2. Change the color of the button and the color of the text.
-                    // 3. Play the `click` sound.
+                    // If the mouse cursor is inside the ui area:
+                    // 1. Store the tag of the ui, ui color, and text color in `FOCUSED`.
+                    // 2. Change the color of the ui and the color of the text.
+                    // 3. Calls the ui pressed function.
                     //
-                    if let Some((idx, ui)) = select {
+                    if let Some((tag, (ui, texts))) = select {
                         // <1>
-                        let ui_color = ui.inner.data.color.xyz();
-                        let text_color = ui.texts.iter().map(|it| it.data.color.xyz()).collect();
+                        let ui_color = ui.data.lock().expect("Failed to access variable.").color.xyz();
+                        let text_colors = texts.iter().map(|it| {
+                            it.data.lock().expect("Failed to access variable.").color.xyz()
+                        }).collect();
                         let mut gaurd = FOCUSED.lock().expect("Failed to access variable.");
-                        *gaurd = Some((idx, ui_color, text_color));
+                        *gaurd = Some((tag, ui_color, text_colors));
 
                         // <2>
-                        update_ui_color(&mut ui.inner, queue, ui_color * 0.5);
-                        for text in ui.texts.iter_mut() {
-                            update_text_color(text, queue, text.data.color.xyz() * 0.5);
+                        ui.update_buffer(queue, |data| {
+                            data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
+                        });
+                        for text in texts.iter() {
+                            text.update_section(queue, |data| {
+                                data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
+                            });
                         }
 
                         // <3>
-                        play_menu_button_sound(idx, this, shared)?;
+                        ui_pressed(tag, this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
                     let mut guard = FOCUSED.lock().expect("Failed to access variable.");
-                    if let Some((focused_idx, ui_color, text_color)) = guard.take() {
-                        // (한국어) 버튼을 원래 색상으로 되돌립니다.
-                        // (English Translation) Returns the button to its origin color.
-                        if let Some(ui) = this.menu.get_mut(focused_idx) {
-                            update_ui_color(&mut ui.inner, queue, ui_color);
-                            for (i, text) in ui.texts.iter_mut().enumerate() {
-                                update_text_color(text, queue, text_color[i]);
+                    if let Some((tag, ui_color, text_colors)) = guard.take() {
+                        // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
+                        // (English Translation) Returns the color of the selected ui to its original color.
+                        if let Some((ui, texts)) = this.menu.get_mut(tag as usize) {
+                            ui.update_buffer(queue, |data| {
+                                data.color = (ui_color, data.color.w).into();
+                            });
+                            for (text_color, text) in text_colors.into_iter().zip(texts.iter()) {
+                                text.update_section(queue, |data| {
+                                    data.color = (text_color, data.color.w).into();
+                                });
                             }
                         };
                         
-                        // (한국어) 마우스 커서가 버튼 영역 안에 있는지 확인합니다.
-                        // (English Translation) Make sure the mouse cursor is inside the button area.
-                        let select = this.menu
-                            .iter_mut()
-                            .enumerate()
-                            .find_map(|(idx, it)| {
-                                it.inner.test(&(cursor_pos, camera)).then_some(idx)
+                        // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
+                        // (English Translation) Make sure the mouse cursor is inside the ui area.
+                        let pickable = this.menu.pickable();
+                        let select = pickable.into_iter()
+                            .find_map(|(tag, (ui, _))| {
+                                ui.test(&(cursor_pos, camera)).then_some(tag)
                             });
 
-                        // (한국어) 선택된 마우스 버튼이 이전에 선택된 버튼과 일치할 경우:
-                        // (English Translation) If the selected mouse button matches a previously selected button:
-                        if select.is_some_and(|idx| focused_idx == idx) {
-                            handles_button(focused_idx, this);
+                        // (한국어) 선택된 ui가 이전에 선택된 ui와 일치하는 경우:
+                        // (English Translation) If the selected ui matches a previously selected ui:
+                        if select.is_some_and(|select| tag == select) {
+                            // (한국어) ui 떼어짐 함수를 호출합니다.
+                            // (English Translation) Calls the ui released function.
+                            ui_released(tag, this, shared)?;
                         }
                     }
                 }
-            }
+            },
+            WindowEvent::CursorMoved { .. } => {
+                // (한국어) 선택된 ui가 있는 경우:
+                // (English Translation) If there is a selected ui:
+                let guard = FOCUSED.lock().expect("Failed to access variable.");
+                if let Some((tag, _, _)) = guard.as_ref() {
+                    // (한국어) ui 끌림 함수를 호출합니다.
+                    // (English Translation) Calls the ui dragged function.
+                    ui_dragged(*tag, this, shared)?;
+                }
+            },
             _ => { /* empty */ } 
         },
         _ => { /* empty */ }
@@ -275,67 +279,52 @@ fn check_menu_button_pressed(
 }
 
 
-/// #### 한국어 </br>
-/// 메뉴 버튼이 눌렸을 때 소리를 재생합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Plays a sound when the menu button is pressed. </br>
-/// 
-#[inline]
-fn play_menu_button_sound(button_idx: usize, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    if button_idx == ty::MenuButtonTags::Start as usize {
-        super::play_click_sound(this, shared)
-    } else if button_idx == ty::MenuButtonTags::Exit as usize {
-        super::play_click_sound(this, shared)
-    } else {
-        Ok(())
+#[allow(unused_variables)]
+#[allow(unreachable_patterns)]
+fn ui_pressed(tag: ty::MenuButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match tag {
+        ty::MenuButtonTags::StartButton => {
+            super::play_click_sound(this, shared)
+        },
+        ty::MenuButtonTags::SettingButton => {
+            super::play_click_sound(this, shared)
+        },
+        ty::MenuButtonTags::ExitButton => {
+            super::play_click_sound(this, shared)
+        },
+        _ => Ok(())
     }
 }
 
 
-/// #### 한국어 </br>
-/// 주어진 버튼 인덱스에 따라 다음 상태로 변경합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Changes to the next state based on the given button index. </br>
-/// 
-#[inline]
-fn handles_button(button_idx: usize, this: &mut TitleScene) {
-    if button_idx == ty::MenuButtonTags::Start as usize {
-        this.elapsed_time = 0.0;
-        this.state = TitleState::EnterStage;
-    } else if button_idx == ty::MenuButtonTags::Exit as usize {
-        this.elapsed_time = 0.0;
-        this.state = TitleState::EnterMsgBox;
+#[allow(unused_variables)]
+#[allow(unreachable_patterns)]
+fn ui_released(tag: ty::MenuButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match tag {
+        ty::MenuButtonTags::StartButton => {
+            this.state = TitleState::EnterStage;
+            this.elapsed_time = 0.0;
+            Ok(())
+        },
+        ty::MenuButtonTags::SettingButton => {
+            this.state = TitleState::EnterSetting;
+            this.elapsed_time = 0.0;
+            Ok(())
+        },
+        ty::MenuButtonTags::ExitButton => {
+            this.state = TitleState::EnterMsgBox;
+            this.elapsed_time = 0.0;
+            Ok(())
+        },
+        _ => Ok(())
     }
 }
 
 
-/// #### 한국어 </br>
-/// 사용자 인터페이스의 색상을 갱신합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Updates the color of the user interface. </br>
-/// 
-#[inline]
-fn update_ui_color(ui: &mut UiObject, queue: &wgpu::Queue, color: Vec3) {
-    ui.data.color.x = color.x;
-    ui.data.color.y = color.y;
-    ui.data.color.z = color.z;
-    ui.update_buffer(queue);
-}
-
-
-/// #### 한국어 </br>
-/// 텍스트의 색상을 갱신합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Updates the color of the text. </br>
-/// 
-#[inline]
-fn update_text_color(text: &mut Section2d, queue: &wgpu::Queue, color: Vec3) {
-    text.data.color.x = color.x;
-    text.data.color.y = color.y;
-    text.data.color.z = color.z;
-    text.update_buffer(queue);
+#[allow(unused_variables)]
+#[allow(unreachable_patterns)]
+fn ui_dragged(tag: ty::MenuButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match tag {
+        _ => Ok(())
+    }
 }

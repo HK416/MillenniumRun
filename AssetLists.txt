@@ -20,20 +20,20 @@
 # 3>> temp/c.txt Optional
 #
 
+# Global
 user.settings Optional
 fonts/nexon_lv2_gothic_medium.ttf Static
 fonts/nexon_lv2_gothic_bold.ttf Static
 
-
-# Global
-textures/sys/window.png Static
-textures/sys/button_base.png Static
-textures/sys/button_red.png Static
-textures/sys/button_blue.png Static
-textures/sys/button_return.png Static
+textures/sys/button_small.png Static
+textures/sys/button_small_ex.png Static
+textures/sys/button_wide.png Static
 textures/sys/button_start.png Static
 textures/sys/button_setting.png Static
 textures/sys/button_exit.png Static
+textures/sys/button_return.png Static
+textures/sys/button_enter.png Static
+textures/sys/window.png Static
 
 sounds/sys/click.ogg Static
 sounds/sys/cancel.ogg Static

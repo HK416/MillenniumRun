@@ -102,7 +102,8 @@ pub const STAGE_CAMERA_POS: Vec3 = Vec3::new(0.0 * consts::PIXEL_PER_METER, 3.5 
 pub struct EnterTitleScene {
     exit_window: Option<ty::ExitWindow>,
     stage_window: Option<ty::StageWindow>,
-    background: Option<ty::BackgroundSprites>,
+    setting_window: Option<ty::SettingWindow>,
+    background: Option<ty::Backgrounds>,
     system: Option<ty::SystemButtons>,
     sprite: Option<ty::SpriteButtons>,
     menu: Option<ty::MenuButtons>,
@@ -112,8 +113,9 @@ impl Default for EnterTitleScene {
     #[inline]
     fn default() -> Self {
         Self { 
-            exit_window: None, 
+            exit_window: None,
             stage_window: None, 
+            setting_window: None,
             background: None, 
             system: None, 
             sprite: None, 
@@ -173,6 +175,7 @@ impl EnterTitleScene {
         let (
             exit_window, 
             stage_window,
+            setting_window,
             background,
             system,
             sprite,
@@ -191,6 +194,7 @@ impl EnterTitleScene {
 
         self.exit_window = Some(exit_window);
         self.stage_window = Some(stage_window);
+        self.setting_window = Some(setting_window);
         self.background = Some(background);
         self.system = Some(system);
         self.sprite = Some(sprite);
@@ -219,6 +223,7 @@ impl SceneNode for EnterTitleScene {
                     elapsed_time: 0.0,
                     exit_window: self.exit_window.take().unwrap(),
                     stage_window: self.stage_window.take().unwrap(),
+                    setting_window: self.setting_window.take().unwrap(),
                     background: self.background.take().unwrap(),
                     system: self.system.take().unwrap(),
                     sprite: self.sprite.take().unwrap(),
@@ -302,7 +307,8 @@ pub struct TitleScene {
     elapsed_time: f64,
     exit_window: ty::ExitWindow,
     stage_window: ty::StageWindow,
-    background: ty::BackgroundSprites,
+    setting_window: ty::SettingWindow,
+    background: ty::Backgrounds,
     system: ty::SystemButtons,
     sprite: ty::SpriteButtons,
     menu: ty::MenuButtons,
@@ -381,7 +387,7 @@ fn play_background_sound(shared: &mut Shared) -> AppResult<()> {
 /// 
 #[inline]
 fn clear_background_sound(shared: &mut Shared) -> AppResult<()> {
-    Ok(shared.pop::<Sink>().unwrap().stop())
+    Ok(shared.pop::<Sink>().unwrap().detach())
 }
 
 
@@ -402,9 +408,10 @@ fn create_title_scene_elements(
     font_set: &FontSet,
     script: &Script,
 ) -> AppResult<(
-    ty::ExitWindow, 
+    ty::ExitWindow,
     ty::StageWindow, 
-    ty::BackgroundSprites, 
+    ty::SettingWindow,
+    ty::Backgrounds, 
     ty::SystemButtons, 
     ty::SpriteButtons, 
     ty::MenuButtons
@@ -420,17 +427,11 @@ fn create_title_scene_elements(
     let texture = asset_bundle.get(path::title::SOFA_TEXTURE_PATH)?
         .read(&ImageDecoder::new(Some("Sofa"), device, queue))?;
     let sofa_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let background_desc = vec![
-        ty::BackgroundSpriteDescriptor {
-            texture_view: &background_texture_view
-        },
-        ty::BackgroundSpriteDescriptor {
-            texture_view: &cabinet_texture_view
-        },
-        ty::BackgroundSpriteDescriptor {
-            texture_view: &sofa_texture_view
-        },
-    ];
+    let background_descs = [
+        (ty::BackgroundTags::Background, ty::BackgroundDesc { texture_view: &background_texture_view }),
+        (ty::BackgroundTags::Cabinet, ty::BackgroundDesc { texture_view: &cabinet_texture_view }),
+        (ty::BackgroundTags::Sofa, ty::BackgroundDesc { texture_view: &sofa_texture_view }),
+    ].into_iter().collect();
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
@@ -451,20 +452,12 @@ fn create_title_scene_elements(
     let texture = asset_bundle.get(path::title::MIDORI_TEXTURE_PATH)?
         .read(&ImageDecoder::new(Some("Midori"), device, queue))?;
     let midori_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let sprite_desc = vec![
-        ty::SpriteButtonDescriptor {
-            texture_view: &yuzu_texture_view,
-        },
-        ty::SpriteButtonDescriptor {
-            texture_view: &aris_texture_view,
-        },
-        ty::SpriteButtonDescriptor {
-            texture_view: &momoi_texture_view,
-        },
-        ty::SpriteButtonDescriptor {
-            texture_view: &midori_texture_view,
-        }
-    ];
+    let sprite_descs = [
+        (ty::SpriteButtonTags::Yuzu, ty::SpriteButtonDesc { texture_view: &yuzu_texture_view }),
+        (ty::SpriteButtonTags::Aris, ty::SpriteButtonDesc { texture_view: &aris_texture_view }),
+        (ty::SpriteButtonTags::Momoi, ty::SpriteButtonDesc { texture_view: &momoi_texture_view }),
+        (ty::SpriteButtonTags::Midori, ty::SpriteButtonDesc { texture_view: &midori_texture_view })
+    ].into_iter().collect();
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
@@ -474,121 +467,146 @@ fn create_title_scene_elements(
     asset_bundle.release(path::title::MIDORI_TEXTURE_PATH);
 
 
-    let texture = asset_bundle.get(path::sys::BUTTON_RETURN_TEXTURE_PATH)?
-        .read(&ImageDecoder::new(Some("Button(Return)"), device, queue))?;
-    let return_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let system_desc = vec![
-        ty::SystemButtonDescriptor {
-            text: None,
-            texture_view: &return_texture_view,
-        },
-    ];
-
-
-    let texture = asset_bundle.get(path::sys::BUTTON_START_TEXTURE_PATH)?
-        .read(&ImageDecoder::new(Some("Button(Start)"), device, queue))?;
-    let start_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let texture = asset_bundle.get(path::sys::BUTTON_SETTING_TEXTURE_PATH)?
-        .read(&ImageDecoder::new(Some("Button(Setting)"), device, queue))?;
-    let setting_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let texture = asset_bundle.get(path::sys::BUTTON_EXIT_TEXTURE_PATH)?
-        .read(&ImageDecoder::new(Some("Button(Exit)"), device, queue))?;
-    let exit_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let menu_desc = vec![
-        ty::MenuButtonDescriptor {
-            text: script.get(ScriptTags::StartMenu)?,
-            texture_view: &start_texture_view,
-        },
-        ty::MenuButtonDescriptor {
-            text: script.get(ScriptTags::SettingMenu)?,
-            texture_view: &setting_texture_view,
-        },
-        ty::MenuButtonDescriptor {
-            text: script.get(ScriptTags::ExitMenu)?,
-            texture_view: &exit_texture_view,
-        }
-    ];
-
-    // (한국어) 사용을 완료한 에셋을 정리합니다.
-    // (English Translation) Release assets that have been used.
-    asset_bundle.release(path::sys::BUTTON_START_TEXTURE_PATH);
-    asset_bundle.release(path::sys::BUTTON_SETTING_TEXTURE_PATH);
-    asset_bundle.release(path::sys::BUTTON_EXIT_TEXTURE_PATH);
-
 
     let texture = asset_bundle.get(path::sys::WINDOW_TEXTURE_PATH)?
-        .read(&ImageDecoder::new(Some("Window"), device, queue))?;
+        .read(&ImageDecoder::new(Some("Window(Big)"), device, queue))?;
     let window_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let texture = asset_bundle.get(path::sys::BUTTON_RED_TEXTURE_PATH)?
-        .read(&ImageDecoder::new(Some("Button(Red)"), device, queue))?;
-    let red_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let texture = asset_bundle.get(path::sys::BUTTON_BLUE_TEXTURE_PATH)?
-        .read(&ImageDecoder::new(Some("Button(Blue)"), device, queue))?;
-    let blue_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let exit_window_desc = vec![
-        ty::ExitWindowDescriptor {
-            text: script.get(ScriptTags::ExitMessage)?,
+    let texture = asset_bundle.get(path::sys::BUTTON_SMALL_TEXTURE_PATH)?
+        .read(&ImageDecoder::new(Some("Button(Small)"), device, queue))?;
+    let btn_small_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let texture = asset_bundle.get(path::sys::BUTTON_SMALL_EX_TEXTURE_PATH)?
+        .read(&ImageDecoder::new(Some("Button(SmallEx)"), device, queue))?;
+    let btn_small_ex_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let texture = asset_bundle.get(path::sys::BUTTON_START_TEXTURE_PATH)?
+        .read(&ImageDecoder::new(Some("Button(Start)"), device, queue))?;
+    let btn_start_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let texture = asset_bundle.get(path::sys::BUTTON_SETTING_TEXTURE_PATH)?
+        .read(&ImageDecoder::new(Some("Button(Setting)"), device, queue))?;
+    let btn_setting_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let texture = asset_bundle.get(path::sys::BUTTON_EXIT_TEXTURE_PATH)?
+        .read(&ImageDecoder::new(Some("Button(Exit)"), device, queue))?;
+    let btn_exit_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let texture = asset_bundle.get(path::sys::BUTTON_RETURN_TEXTURE_PATH)?
+        .read(&ImageDecoder::new(Some("Button(Return)"), device, queue))?;
+    let btn_return_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let texture = asset_bundle.get(path::sys::BUTTON_ENTER_TEXTURE_PATH)?
+        .read(&ImageDecoder::new(Some("Button(Enter)"), device, queue))?;
+    let btn_enter_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+    let system_descs = [
+        (ty::SystemButtonTags::ReturnButton, ty::SystemButtonDesc {
+            text: vec![],
+            texture_view: &btn_return_texture_view,
+        }),
+    ].into_iter().collect();
+    let menu_descs = [
+        (ty::MenuButtonTags::StartButton, ty::MenuButtonDesc {
+            text: vec![script.get(ScriptTags::StartMenu)?],
+            texture_view: &btn_start_texture_view,
+        }),
+        (ty::MenuButtonTags::SettingButton, ty::MenuButtonDesc {
+            text: vec![script.get(ScriptTags::SettingMenu)?],
+            texture_view: &btn_setting_texture_view,
+        }),
+        (ty::MenuButtonTags::ExitButton, ty::MenuButtonDesc {
+            text: vec![script.get(ScriptTags::ExitMenu)?],
+            texture_view: &btn_exit_texture_view,
+        }),
+    ].into_iter().collect();
+    let exit_window_descs_bg = [
+        (ty::ExitWindowTags::Window, ty::ExitWindowDesc {
+            text: vec![script.get(ScriptTags::ExitMessage)?],
+            texture_view:&window_texture_view,
+        }),
+        (ty::ExitWindowTags::Okay, ty::ExitWindowDesc {
+            text: vec![script.get(ScriptTags::Exit)?],
+            texture_view: &btn_small_ex_texture_view,
+        }),
+        (ty::ExitWindowTags::Cancel, ty::ExitWindowDesc {
+            text: vec![script.get(ScriptTags::NoExit)?],
+            texture_view: &btn_small_texture_view,
+        }),
+    ].into_iter().collect();
+    let stage_window_descs = [
+        (ty::StageWindowTags::Window, ty::StageWindowDesc {
+            text: vec![],
             texture_view: &window_texture_view,
-        },
-        ty::ExitWindowDescriptor {
-            text: script.get(ScriptTags::Okay)?,
-            texture_view: &red_texture_view,
-        },
-        ty::ExitWindowDescriptor {
-            text: script.get(ScriptTags::Cancel)?,
-            texture_view: &blue_texture_view,
-        },
-    ];
-    let stage_window_desc = vec![
-        ty::StageWindowDescriptor {
-            text: None,
+        }),
+        (ty::StageWindowTags::Enter, ty::StageWindowDesc {
+            text: vec![script.get(ScriptTags::EnterStage)?],
+            texture_view: &btn_enter_texture_view
+        }),
+    ].into_iter().collect();
+    let setting_window_descs = [
+        (ty::SettingWindowTags::Window, ty::SettingWindowDesc {
+            texts: vec![],
             texture_view: &window_texture_view,
-        },
-        ty::StageWindowDescriptor {
-            text: Some(script.get(ScriptTags::EnterStage)?),
-            texture_view: &blue_texture_view
-        },
-    ];
+        }),
+        (ty::SettingWindowTags::SaveButton, ty::SettingWindowDesc {
+            texts: vec![script.get(ScriptTags::Store)?],
+            texture_view: &btn_small_ex_texture_view,
+        }),
+        (ty::SettingWindowTags::ExitButton, ty::SettingWindowDesc {
+            texts: vec![script.get(ScriptTags::NoStore)?],
+            texture_view: &btn_small_texture_view,
+        })
+    ].into_iter().collect();
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
     asset_bundle.release(path::sys::WINDOW_TEXTURE_PATH);
-    asset_bundle.release(path::sys::BUTTON_RED_TEXTURE_PATH);
-    asset_bundle.release(path::sys::BUTTON_BLUE_TEXTURE_PATH);
-
+    asset_bundle.release(path::sys::BUTTON_SMALL_TEXTURE_PATH);
+    asset_bundle.release(path::sys::BUTTON_SMALL_EX_TEXTURE_PATH);
+    asset_bundle.release(path::sys::BUTTON_START_TEXTURE_PATH);
+    asset_bundle.release(path::sys::BUTTON_SETTING_TEXTURE_PATH);
+    asset_bundle.release(path::sys::BUTTON_EXIT_TEXTURE_PATH);
+    asset_bundle.release(path::sys::BUTTON_RETURN_TEXTURE_PATH);
+    asset_bundle.release(path::sys::BUTTON_ENTER_TEXTURE_PATH);
 
     // (한국어) 종료 윈도우를 생성합니다.
-    // (English Translation) Create exit window.
+    // (English Translation) Create a exit window.
     let exit_window = ty::ExitWindow::new(
-        font_set.get(path::FONT_BLOD_PATH).unwrap(),
+        font_set.get(path::FONT_MEDIUM_PATH).unwrap(),
         device,
         queue,
         tex_sampler,
         ui_brush,
         text_brush,
-        &exit_window_desc
-    )?;
+        exit_window_descs_bg
+    );
 
     // (한국어) 스테이지 윈도우를 생성합니다.
     // (English Translation) Create stage window.
     let stage_window = ty::StageWindow::new(
-        font_set.get(path::FONT_BLOD_PATH).unwrap(),
+        font_set.get(path::FONT_MEDIUM_PATH).unwrap(),
         device,
         queue,
         tex_sampler,
         ui_brush,
         text_brush,
-        &stage_window_desc
-    )?;
+        stage_window_descs
+    );
+
+    // (한국어) 설정 윈도우 배경을 생성합니다.
+    // (English Translation) Create setting window background.
+    let setting_window = ty::SettingWindow::new(
+        font_set.get(path::FONT_MEDIUM_PATH).unwrap(), 
+        device, 
+        queue, 
+        tex_sampler, 
+        ui_brush, 
+        text_brush, 
+        setting_window_descs
+    );
 
     // (한국어) 배경 스프라이트들을 생성합니다.
     // (English Translation) Create background sprites.
-    let background = ty::BackgroundSprites::new(
+    let background = ty::Backgrounds::new(
         device, 
         tex_sampler, 
         sprite_brush, 
-        &background_desc
-    )?;
+        background_descs
+    );
 
     // (한국어) 시스템 버튼들을 생성합니다. 
     // (English Translation) Create system buttons.
@@ -599,8 +617,8 @@ fn create_title_scene_elements(
         tex_sampler,
         ui_brush,
         text_brush,
-        &system_desc
-    )?;
+        system_descs
+    );
 
     // (한국어) 스프라이트 버튼들을 생성합니다.
     // (English Translation) Create sprite buttons. 
@@ -608,8 +626,8 @@ fn create_title_scene_elements(
         device,
         tex_sampler,
         sprite_brush,
-        &sprite_desc
-    )?;
+        sprite_descs
+    );
 
     // (한국어) 메뉴 버튼들을 생성합니다.
     // (English Translation) Create menu buttons.
@@ -620,13 +638,14 @@ fn create_title_scene_elements(
         tex_sampler,
         ui_brush,
         text_brush,
-        &menu_desc
-    )?;
+        menu_descs
+    );
 
 
     Ok((
-        exit_window, 
+        exit_window,
         stage_window,
+        setting_window,
         background,
         system,
         sprite,

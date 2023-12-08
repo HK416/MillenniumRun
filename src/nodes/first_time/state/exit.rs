@@ -12,8 +12,8 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        ui::{objects::UiObject, brush::UiBrush, UserInterface}, 
-        text::{section::d2::Section2d, brush::TextBrush, Section}, 
+        ui::{UserInterface, brush::UiBrush}, 
+        text::{brush::TextBrush, Section}, 
         camera::GameCamera,
     },
     nodes::{
@@ -55,23 +55,28 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
     // (English Translation) Updates the alpha value of the button 
     let alpha = 1.0 - 1.0 * delta;
     for (ui, text) in this.buttons.values_mut() {
-        update_ui_alpha(ui, queue, alpha);
-        update_text_alpha(text, queue, alpha);
+        ui.update_buffer(queue, |data| {
+            data.color.w = alpha;
+        });
+        text.update_section(queue, |data| {
+            data.color.w = alpha;
+        });
     }
 
     // (한국어) 버튼의 크기를 갱신합니다.
     // (English Translation) Updates the scale value of the button.
     let scale = INIT_BUTTON_SCALE + (MAX_BUTTON_SCALE - INIT_BUTTON_SCALE) * delta;
     if let Some((ui, text)) = this.buttons.get_mut(&this.language) {
-        ui.data.transform.x_axis.x = scale.x;
-        ui.data.transform.y_axis.y = scale.y;
-        ui.data.transform.z_axis.z = scale.z;
-        ui.update_buffer(queue);
-        
-        text.data.transform.x_axis.x = scale.x;
-        text.data.transform.y_axis.y = scale.y;
-        text.data.transform.z_axis.z = scale.z;
-        text.update_buffer(queue);
+        ui.update_buffer(queue, |data| {
+            data.transform.x_axis.x = scale.x;
+            data.transform.y_axis.y = scale.y;
+            data.transform.z_axis.z = scale.z;
+        });
+        text.update_section(queue, |data| {
+            data.transform.x_axis.x = scale.x;
+            data.transform.y_axis.y = scale.y;
+            data.transform.z_axis.z = scale.z;
+        });
     }
 
     // (한국어) 
@@ -177,30 +182,4 @@ pub fn draw(this: &FirstTimeSetupScene, shared: &mut Shared) -> AppResult<()> {
 fn smooth_step(elapsed_time: f64, duration: f64) -> f32 {
     let t = (elapsed_time / duration).clamp(0.0, 1.0) as f32;
     return 3.0 * t * t - 2.0 * t * t * t;
-}
-
-
-/// #### 한국어 </br>
-/// 사용자 인터페이스 색상을 갱신합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Updates the color of the user interface. </br>
-/// 
-#[inline]
-fn update_ui_alpha(ui: &mut UiObject, queue: &wgpu::Queue, alpha: f32) {
-    ui.data.color.w = alpha;
-    ui.update_buffer(queue);
-}
-
-
-/// #### 한국어 </br>
-/// 텍스트의 색상을 갱신합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Updates the color of the text. </br>
-/// 
-#[inline]
-fn update_text_alpha(text: &mut Section2d, queue: &wgpu::Queue, alpha: f32) {
-    text.data.color.w = alpha;
-    text.update_buffer(queue);
 }

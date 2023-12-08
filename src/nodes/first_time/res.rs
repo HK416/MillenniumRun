@@ -9,5 +9,5 @@ use crate::nodes::path;
 
 pub const ASSETS: [&'static str; 2] = [
     path::sys::CLICK_SOUND_PATH,
-    path::sys::BUTTON_BASE_TEXTURE_PATH,
+    path::sys::BUTTON_WIDE_TEXTURE_PATH,
 ];

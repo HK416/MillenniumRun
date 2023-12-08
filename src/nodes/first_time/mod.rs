@@ -21,6 +21,7 @@ use crate::{
         ui::{
             brush::UiBrush,
             anchor::Anchor,
+            margin::Margin,
             objects::{UiObject, UiObjectBuilder},
         },
         script::Script,
@@ -36,10 +37,16 @@ use crate::{
     }, 
 };
 
-const UI_COLOR: Vec4 = Vec4::new(1.0, 1.0, 1.0, 1.0);
-const UI_TRANSLATION: Vec3 = Vec3::new(0.0, 0.0, 0.2);
-const TEXT_COLOR: Vec4 = Vec4::new(0.0, 0.0, 0.0, 1.0);
-const TEXT_TRANSLATION: Vec3 = Vec3::new(0.0, 0.0, 0.1);
+const ANCHOR_TOP: f32 = 0.5;
+const ANCHOR_LEFT: f32 = 0.5;
+const ANCHOR_BOTTOM: f32 = 0.5;
+const ANCHOR_RIGHT: f32 = 0.5;
+
+const BTN_TOP: i32 = 32;
+const BTN_LEFT: i32 = -128;
+const BTN_BOTTOM: i32 = -32;
+const BTN_RIGHT: i32 = 128;
+const BTN_GAP: i32 = 74;
 
 const INIT_BUTTON_SCALE: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 const MAX_BUTTON_SCALE: Vec3 = Vec3::new(1.25, 1.25, 1.0);
@@ -75,7 +82,7 @@ impl SceneNode for FirstTimeSetupScene {
 
         // (한국어) 한국어 선택 버튼을 생성합니다.
         // (English Translation) Create a Korean selection button.
-        let texture = asset_bundle.get(path::sys::BUTTON_BASE_TEXTURE_PATH)?
+        let texture = asset_bundle.get(path::sys::BUTTON_WIDE_TEXTURE_PATH)?
             .read(&ImageDecoder::new(Some("Button(Base)"), device, queue))?;
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         self.buttons.insert(
@@ -166,13 +173,8 @@ fn setup_korean_button<F: Font>(
     ui_brush: &UiBrush,
     text_brush: &TextBrush,
 ) -> AppResult<(UiObject, Section2d)> {
-    let anchor = Anchor::new(
-        0.5 + 0.05, 
-        0.5 - 0.2, 
-        0.5 - 0.05, 
-        0.5 + 0.2
-    );
-
+    let anchor = Anchor::new(ANCHOR_TOP, ANCHOR_LEFT, ANCHOR_BOTTOM, ANCHOR_RIGHT);
+    let margin = Margin::new(BTN_TOP + 0 * BTN_GAP, BTN_LEFT, BTN_BOTTOM + 0 * BTN_GAP, BTN_RIGHT);
     let ui = UiObjectBuilder::new(
         Some("Button(Korean)"), 
         tex_sampler, 
@@ -180,9 +182,10 @@ fn setup_korean_button<F: Font>(
         ui_brush.ref_texture_layout()
     )
     .with_anchor(anchor)
-    .with_color(UI_COLOR)
+    .with_margin(margin)
+    .with_color((1.0, 1.0, 1.0, 1.0).into())
     .with_scale(INIT_BUTTON_SCALE)
-    .with_translation(UI_TRANSLATION)
+    .with_translation((0.0, 0.0, 0.5).into())
     .build(device);
     let text = Section2dBuilder::new(
         Some("Text(Korean)"),
@@ -193,9 +196,10 @@ fn setup_korean_button<F: Font>(
         text_brush.ref_texture_layout()
     )
     .with_anchor(anchor)
-    .with_color(TEXT_COLOR)
+    .with_margin(margin)
+    .with_color((0.0, 0.0, 0.0, 1.0).into())
     .with_scale(INIT_BUTTON_SCALE)
-    .with_translation(TEXT_TRANSLATION)
+    .with_translation((0.0, 0.0, 0.25).into())
     .build(device, queue);
 
     Ok((ui, text))

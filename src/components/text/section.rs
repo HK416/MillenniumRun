@@ -1,6 +1,7 @@
 pub const FONT_SCALE: f32 = 128.0;
 
 pub mod d2 {
+    use std::sync::{Mutex, MutexGuard};
     use std::collections::HashMap;
 
     use ab_glyph::Font;
@@ -172,7 +173,7 @@ pub mod d2 {
         texture_bind_groups: HashMap<char, wgpu::BindGroup>, 
         buffer_bind_group: wgpu::BindGroup, 
         buffer: wgpu::Buffer, 
-        pub data: Section2dData,
+        pub data: Mutex<Section2dData>,
     }
 
     impl Section2d {
@@ -215,7 +216,7 @@ pub mod d2 {
                 texture_bind_groups, 
                 buffer_bind_group, 
                 buffer, 
-                data 
+                data: data.into(),
             }
         }
 
@@ -242,28 +243,18 @@ pub mod d2 {
         }
 
         /// #### 한국어 </br>
-        /// 텍스트 구획 데이터 버퍼의 내용을 갱신합니다. </br>
+        /// 구획 데이터 버퍼를 갱신합니다. </br>
+        /// 버퍼의 내용이 바로 갱신되지 않습니다. (상세: [wgpu::Queue]) </br>
         /// 
         /// #### English (Translation) </br>
-        /// Updates the contents of the text section data buffer. </br>
+        /// Updates the section data buffer. </br>
+        /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
         /// 
-        #[inline]
-        pub fn update_buffer(&self, queue: &wgpu::Queue) {
-            queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&self.data))
-        }
-
-        /// #### 한국어 </br>
-        /// 텍스트 문자 데이터 버퍼의 내용을 갱신합니다. </br>
-        /// 
-        /// #### English (Translation) </br>
-        /// Updates the contents of the text character data buffer. </br>
-        /// 
-        pub fn update_characters(&self, queue: &wgpu::Queue) {
-            for ch in self.characters.iter() {
-                if let Character::Char(_, data, buffer) = ch {
-                    queue.write_buffer(buffer, 0, bytemuck::bytes_of(data));
-                }
-            }
+        pub fn update_section<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
+        where F: Fn(&mut MutexGuard<'_, Section2dData>) {
+            let mut guard = self.data.lock().expect("Failed to access variable.");
+            mapping_func(&mut guard);
+            queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&*guard));
         }
 
         /// #### 한국어 </br>
@@ -299,10 +290,9 @@ pub mod d2 {
 
         fn draw<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
             for ch in self.chars() {
-                if let Character::Char(ch, _, buffer) = ch {
+                if let Character::Drawable(ch, drawable) = ch {
                     self.bind_texture(ch, rpass);
-                    rpass.set_vertex_buffer(0, buffer.slice(..));
-                    rpass.draw(0..4, 0..1);
+                    drawable.draw(rpass);
                 }
             }
         }
@@ -381,7 +371,8 @@ pub mod d2 {
 
 
 pub mod d3 {
-    use std::{collections::HashMap, char};
+    use std::sync::{Mutex, MutexGuard};
+    use std::collections::HashMap;
 
     use ab_glyph::Font;
     use bytemuck::{Pod, Zeroable};
@@ -527,7 +518,7 @@ pub mod d3 {
         texture_bind_groups: HashMap<char, wgpu::BindGroup>,
         buffer_bind_group: wgpu::BindGroup,
         buffer: wgpu::Buffer,
-        pub data: Section3dData,
+        pub data: Mutex<Section3dData>,
     }
 
     impl Section3d {
@@ -570,7 +561,7 @@ pub mod d3 {
                 texture_bind_groups, 
                 buffer_bind_group, 
                 buffer, 
-                data 
+                data: data.into()
             }
         }
 
@@ -594,6 +585,21 @@ pub mod d3 {
         #[inline]
         pub fn chars_mut(&mut self) -> &mut [Character] {
             &mut self.characters
+        }
+
+        /// #### 한국어 </br>
+        /// 구획 데이터 버퍼를 갱신합니다. </br>
+        /// 버퍼의 내용이 바로 갱신되지 않습니다. (상세: [wgpu::Queue]) </br>
+        /// 
+        /// #### English (Translation) </br>
+        /// Updates the section data buffer. </br>
+        /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
+        /// 
+        pub fn update_section<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
+        where F: Fn(&mut MutexGuard<'_, Section3dData>) {
+            let mut guard = self.data.lock().expect("Failed to access variable.");
+            mapping_func(&mut guard);
+            queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&*guard));
         }
 
         /// #### 한국어 </br>
@@ -629,10 +635,9 @@ pub mod d3 {
 
         fn draw<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
             for ch in self.chars() {
-                if let Character::Char(ch, _, buffer) = ch {
+                if let Character::Drawable(ch, drawable) = ch {
                     self.bind_texture(ch, rpass);
-                    rpass.set_vertex_buffer(0, buffer.slice(..));
-                    rpass.draw(0..4, 0..1);
+                    drawable.draw(rpass);
                 }
             }
         }
@@ -715,7 +720,7 @@ use std::collections::HashMap;
 use glam::{Mat4, Vec4, Vec2};
 use ab_glyph::{Font, ScaleFont};
 
-use super::character::{Align, GlyphData, Character};
+use super::character::{Align, CharacterData, Character, DrawableChar};
 
 type OffsetFn = dyn Fn(f32, f32) -> f32;
 
@@ -872,7 +877,7 @@ where F: Font, SF: ScaleFont<F> {
                 let x_pos = caret_x + bearing_x;
                 let y_pos = caret_y - height - bearing_y;
 
-                GlyphData {
+                CharacterData {
                     transform: Mat4::from_translation((x_pos, y_pos, 0.0).into()),
                     color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 },
                     size: (width, height).into(),
@@ -929,7 +934,12 @@ where F: Font, SF: ScaleFont<F> {
                 },
             );
 
-            Character::Char(ch, glyph, buffer)
+            Character::Drawable(
+                ch, 
+                DrawableChar { 
+                    buffer, 
+                    data: glyph.into(), 
+                })
         } else {
             Character::Control(ch)
         }

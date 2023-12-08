@@ -27,8 +27,10 @@ pub enum ScriptTags {
     StartMenu,
     SettingMenu,
     ExitMenu,
-    Okay,
-    Cancel,
+    Exit,
+    NoExit,
+    Store,
+    NoStore,
     ExitMessage,
     EnterStage,
 }
