@@ -415,7 +415,7 @@ fn sprite_pressed(tag: ty::SpriteButtonTags, this: &mut TitleScene, shared: &mut
 fn ui_pressed(tag: ty::SystemButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     match tag {
         ty::SystemButtonTags::ReturnButton => {
-            super::play_click_sound(this, shared)
+            super::play_cancel_sound(this, shared)
         },
         _ => Ok(())
     }

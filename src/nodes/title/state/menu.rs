@@ -152,7 +152,7 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
 
                     // (한국어) 다음 게임 장면 상태로 변경합니다.
                     // (English Translation) Change to the next game scene state.
-                    this.state = TitleState::ExitSetting;
+                    this.state = TitleState::EnterMsgBox;
                     this.elapsed_time = 0.0;
                 } else if KeyCode::F4 == code && !event.repeat && event.state.is_pressed() {
                     #[cfg(debug_assertions)] {
