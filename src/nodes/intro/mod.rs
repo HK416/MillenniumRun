@@ -96,7 +96,7 @@ fn setup_notify_texts(this: &mut IntroScene, shared: &mut Shared) -> AppResult<(
     // (English Translation) Get shared object to use.
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    let text_brush = shared.get::<TextBrush>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let font_set = shared.get::<FontSet>().unwrap();
     let script = shared.get::<Script>().unwrap();
 
@@ -152,7 +152,7 @@ fn setup_logo_images(this: &mut IntroScene, shared: &mut Shared) -> AppResult<()
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let asset_bundle = shared.get::<AssetBundle>().unwrap();
-    let ui_brush = shared.get::<UiBrush>().unwrap();
+    let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let tex_sampler = shared.get::<Arc<wgpu::Sampler>>().unwrap();

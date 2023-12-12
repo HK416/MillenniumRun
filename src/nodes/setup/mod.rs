@@ -230,7 +230,7 @@ fn setup_ui_brush(
     camera_bind_group_layout: &wgpu::BindGroupLayout,
     render_format: wgpu::TextureFormat,
     asset_bundle: &AssetBundle
-) -> AppResult<UiBrush> {
+) -> AppResult<Arc<UiBrush>> {
     UiBrush::new(
         device, 
         camera_bind_group_layout, 
@@ -260,7 +260,7 @@ fn setup_text_brush(
     camera_bind_group_layout: &wgpu::BindGroupLayout,
     render_format: wgpu::TextureFormat,
     asset_bundle: &AssetBundle
-) -> AppResult<TextBrush> {
+) -> AppResult<Arc<TextBrush>> {
     TextBrush::new(
         device, 
         &camera_bind_group_layout,
@@ -290,7 +290,7 @@ fn setup_sprite_brush(
     camera_bind_group_layout: &wgpu::BindGroupLayout,
     render_format: wgpu::TextureFormat,
     asset_bundle: &AssetBundle
-) -> AppResult<SpriteBrush> {
+) -> AppResult<Arc<SpriteBrush>> {
     SpriteBrush::new(
         &device,
         &camera_bind_group_layout,

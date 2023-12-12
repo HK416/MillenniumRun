@@ -57,7 +57,7 @@ pub fn update(this: &mut IntroScene, _shared: &mut Shared, _total_time: f64, ela
 pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let ui_brush = shared.get::<UiBrush>().unwrap();
+    let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();

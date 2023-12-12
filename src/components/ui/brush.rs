@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::mem::size_of;
 
 use glam::Mat4;
@@ -36,7 +37,7 @@ impl UiBrush {
         multisample: wgpu::MultisampleState,
         multiview: Option<std::num::NonZeroU32>,
         asset_bundle: &AssetBundle
-    ) -> AppResult<Self> {
+    ) -> AppResult<Arc<Self>> {
         let module = create_shader_module(device, asset_bundle)?;
         cleanup_assets(asset_bundle);
         
@@ -55,7 +56,7 @@ impl UiBrush {
         Ok(Self { 
             pipeline,
             texture_bind_group_layout,
-        })
+        }.into())
     }
 
     /// #### 한국어 </br>

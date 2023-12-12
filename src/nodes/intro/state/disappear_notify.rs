@@ -74,7 +74,7 @@ pub fn draw(
 ) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let text_brush = shared.get::<TextBrush>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();

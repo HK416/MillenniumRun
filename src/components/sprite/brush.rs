@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::mem::size_of;
 
 use glam::Mat4;
@@ -37,7 +38,7 @@ impl SpriteBrush {
         multisample: wgpu::MultisampleState,
         multiview: Option<std::num::NonZeroU32>,
         asset_bundle: &AssetBundle
-    ) -> AppResult<Self> {
+    ) -> AppResult<Arc<Self>> {
         let module = create_shader_module(device, asset_bundle)?;
         cleanup_assets(asset_bundle);
 
@@ -75,7 +76,7 @@ impl SpriteBrush {
             textured_pipeline,
             texture_blended_pipeline,
             texture_bind_group_layout,
-        })
+        }.into())
     }
 
     /// #### 한국어 </br>

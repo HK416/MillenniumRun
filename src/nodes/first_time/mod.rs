@@ -75,8 +75,8 @@ impl SceneNode for FirstTimeSetupScene {
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
         let tex_sampler = shared.get::<Arc<wgpu::Sampler>>().unwrap();
-        let ui_brush = shared.get::<UiBrush>().unwrap();
-        let text_brush = shared.get::<TextBrush>().unwrap();
+        let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
+        let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
         let asset_bundle = shared.get::<AssetBundle>().unwrap();
         let font_set = shared.get::<FontSet>().unwrap();
 

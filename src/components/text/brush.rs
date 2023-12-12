@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::mem::size_of;
 
 use glam::Mat4;
@@ -41,7 +42,7 @@ impl TextBrush {
         multisample: wgpu::MultisampleState,
         multiview: Option<std::num::NonZeroU32>,
         asset_bundle: &AssetBundle
-    ) -> AppResult<Self> {
+    ) -> AppResult<Arc<Self>> {
         let module = create_shader_module_2d(device, asset_bundle)?;
         cleanup_assets(asset_bundle);
 
@@ -86,7 +87,7 @@ impl TextBrush {
             tex_sampler,
             buffer_bind_group_layout,
             texture_bind_group_layout, 
-        })
+        }.into())
     }
 
     /// #### 한국어 </br>
