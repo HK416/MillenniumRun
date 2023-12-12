@@ -2,13 +2,17 @@ use std::sync::Arc;
 use std::slice::{Iter, IterMut};
 use std::collections::HashMap;
 
-use glam::{Vec4, Vec3, Vec2};
+use glam::{Mat4, Vec4, Vec3, Vec2};
 
 use crate::{
     components::sprite::{
         Sprite, 
         brush::SpriteBrush,
-        objects::{SpriteObject, SpriteBuilder},
+        objects::{
+            InstanceData, 
+            SpriteObject, 
+            SpriteBuilder
+        },
     },
     nodes::consts::PIXEL_PER_METER,
 };
@@ -59,16 +63,17 @@ impl Backgrounds {
         const BACKGROUND_POSITION: Vec3 = Vec3::new(0.0 * PIXEL_PER_METER, 0.0 * PIXEL_PER_METER, -10.0 * PIXEL_PER_METER);
         const BACKGROUND_SIZE: Vec2 = Vec2::new(18.0 * PIXEL_PER_METER, 18.0 * PIXEL_PER_METER);
         let desc = descs.get(&BackgroundTags::Background).expect("Descriptor not found!");
+        let instances = [InstanceData { transform: Mat4::from_translation(BACKGROUND_POSITION).into() }];
         let background = Arc::new(SpriteBuilder::new(
             Some("Background"),
             tex_sampler,
             desc.texture_view,
+            sprite_brush.ref_buffer_layout(),
             sprite_brush.ref_texture_layout()
         )
         .with_size(BACKGROUND_SIZE)
         .with_color(SPRITE_COLOR)
-        .with_translation(BACKGROUND_POSITION)
-        .build(device));
+        .build(device, instances));
 
 
         // (한국어) `캐비넷`을 생성합니다.
@@ -76,16 +81,17 @@ impl Backgrounds {
         const CABINET_POSITION: Vec3 = Vec3::new(4.0 * PIXEL_PER_METER, 4.0 * PIXEL_PER_METER, -5.0 * PIXEL_PER_METER);
         const CABINET_SIZE: Vec2 = Vec2::new(2.0 * PIXEL_PER_METER, 4.0 * PIXEL_PER_METER);
         let desc = descs.get(&BackgroundTags::Cabinet).expect("Descriptor not found!");
+        let instances = [InstanceData { transform: Mat4::from_translation(CABINET_POSITION).into() }];
         let cabinet = Arc::new(SpriteBuilder::new(
             Some("Cabinet"),
             tex_sampler,
             desc.texture_view,
+            sprite_brush.ref_buffer_layout(),
             sprite_brush.ref_texture_layout()
         )
         .with_size(CABINET_SIZE)
         .with_color(SPRITE_COLOR)
-        .with_translation(CABINET_POSITION)
-        .build(device));
+        .build(device, instances));
 
 
         // (한국어) `소파`를 생성합니다.
@@ -93,16 +99,17 @@ impl Backgrounds {
         const SOFA_POSITION: Vec3 = Vec3::new(0.0 * PIXEL_PER_METER, 2.5 * PIXEL_PER_METER, -3.0 * PIXEL_PER_METER);
         const SOFA_SIZE: Vec2 = Vec2::new(4.5 * PIXEL_PER_METER, 2.25 * PIXEL_PER_METER);
         let desc = descs.get(&BackgroundTags::Sofa).expect("Descriptor not found!");
+        let instances = [InstanceData { transform: Mat4::from_translation(SOFA_POSITION).into() }];
         let sofa = Arc::new(SpriteBuilder::new(
             Some("Sofa"),
             tex_sampler,
             desc.texture_view,
+            sprite_brush.ref_buffer_layout(),
             sprite_brush.ref_texture_layout()
         )
         .with_size(SOFA_SIZE)
         .with_color(SPRITE_COLOR)
-        .with_translation(SOFA_POSITION)
-        .build(device));
+        .build(device, instances));
 
 
         //-------------------------------------------------------------------------*
@@ -149,6 +156,6 @@ impl Backgrounds {
         sprite_brush: &'pass SpriteBrush,
         rpass: &mut wgpu::RenderPass<'pass>
     ) {
-        sprite_brush.draw_texture_blended(rpass, self.sprites().into_iter())
+        sprite_brush.draw_textured(rpass, self.sprites().into_iter())
     }
 }

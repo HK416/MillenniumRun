@@ -1,7 +1,8 @@
+use std::mem::size_of;
 use std::sync::{Mutex, MutexGuard};
 
+use glam::{Vec4, Vec2};
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Vec4, Vec2, Vec3, Quat};
 
 use crate::components::{
     sprite::Sprite,
@@ -48,13 +49,13 @@ impl Default for Texcoord {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
 pub struct InstanceData {
-    pub transform: Mat4,
+    pub transform: Transform,
 }
 
 impl Default for InstanceData {
     #[inline]
     fn default() -> Self {
-        Self { transform: Mat4::IDENTITY }
+        Self { transform: Transform::default() }
     }
 }
 
@@ -66,12 +67,13 @@ impl Default for InstanceData {
 /// #### English (Translation) </br>
 /// Contains data used when rendering sprite objects. </br>
 /// 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
 pub struct SpriteData {
     pub texcoord: Texcoord,
     pub color: Vec4,
     pub size: Vec2,
+    pub _padding0: [u8; size_of::<f32>() * 2],
 }
 
 impl Default for SpriteData {
@@ -80,7 +82,8 @@ impl Default for SpriteData {
         Self { 
             texcoord: Texcoord { top: 0.0, left: 0.0, bottom: 1.0, right: 1.0 }, 
             color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 }, 
-            size: Vec2 { x: 0.0, y: 0.0 } 
+            size: Vec2 { x: 0.0, y: 0.0 }, 
+            _padding0: [0u8; size_of::<f32>() * 2],
         }
     }
 }
@@ -96,13 +99,11 @@ impl Default for SpriteData {
 pub struct SpriteBuilder<'a> {
     pub name: Option<&'a str>,
     pub texcoord: Texcoord,
-    pub size: Vec2,
     pub color: Vec4,
-    pub scale: Vec3,
-    pub rotation: Quat,
-    pub translation: Vec3,
+    pub size: Vec2,
     pub tex_sampler: &'a wgpu::Sampler,
     pub texture_view: &'a wgpu::TextureView,
+    pub buffer_layout: &'a wgpu::BindGroupLayout,
     pub texture_layout: &'a wgpu::BindGroupLayout, 
 }
 
@@ -112,18 +113,17 @@ impl<'a> SpriteBuilder<'a> {
         name: Option<&'a str>, 
         tex_sampler: &'a wgpu::Sampler,
         texture_view: &'a wgpu::TextureView,
+        buffer_layout: &'a wgpu::BindGroupLayout,
         texture_layout: &'a wgpu::BindGroupLayout,
     ) -> Self {
         Self {
             name,
             texcoord: Texcoord { top: 0.0, left: 0.0, bottom: 1.0, right: 1.0 },
-            size: Vec2 { x: 1.0, y: 1.0 },
             color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 },
-            scale: Vec3 { x: 1.0, y: 1.0, z: 1.0 },
-            rotation: Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
-            translation: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
+            size: Vec2 { x: 1.0, y: 1.0 },
             tex_sampler,
             texture_view,
+            buffer_layout,
             texture_layout,
         }
     }
@@ -147,26 +147,9 @@ impl<'a> SpriteBuilder<'a> {
     }
 
     #[inline]
-    pub fn with_scale(mut self, scale: Vec3) -> Self {
-        self.scale = scale;
-        return self;
-    }
-
-    #[inline]
-    pub fn with_rotation(mut self, rotation: Quat) -> Self {
-        self.rotation = rotation;
-        return self;
-    }
-
-    #[inline]
-    pub fn with_translation(mut self, translation: Vec3) -> Self {
-        self.translation = translation;
-        return self;
-    }
-
-    #[inline]
-    pub fn build(self, device: &wgpu::Device) -> SpriteObject {
-        SpriteObject::new(self, device)
+    pub fn build<Iter>(self, device: &wgpu::Device, iter: Iter) -> SpriteObject 
+    where Iter: IntoIterator<Item = InstanceData>, Iter::IntoIter: ExactSizeIterator {
+        SpriteObject::new(self, device, iter)
     }
 }
 
@@ -179,33 +162,30 @@ impl<'a> SpriteBuilder<'a> {
 /// 
 #[derive(Debug)]
 pub struct SpriteObject {
-    pub data: Mutex<SpriteData>,
-    pub transform: Mutex<Transform>,
+    pub instances: Mutex<Vec<InstanceData>>,
     instance_buffer: wgpu::Buffer,
+    pub data: Mutex<SpriteData>,
     sprite_buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    sprite_bind_group: wgpu::BindGroup,
+    texture_bind_group: wgpu::BindGroup,
+
 }
 
 impl SpriteObject {
-    fn new<'a>(builder: SpriteBuilder<'a>, device: &wgpu::Device) -> Self {
+    fn new<'a, Iter>(builder: SpriteBuilder<'a>, device: &wgpu::Device, iter: Iter) -> Self 
+    where Iter: IntoIterator<Item = InstanceData>, Iter::IntoIter: ExactSizeIterator {
         // (한국어) 라벨 데이터를 생성합니다.
         // (English Translation) Create a label data.
-        let label = format!("SpriteObject({})", builder.name.unwrap_or("Unknown"));
+        let label = format!("Sprite({})", builder.name.unwrap_or("Unknown"));
 
         // (한국어) 스프라이트 오브젝트 인스턴스 데이터 버퍼를 생성합니다.
         // (English Translation) Creates a sprite object instance data buffer.
         use wgpu::util::DeviceExt;
-        let transform = Transform::from(
-            Mat4::from_scale_rotation_translation(
-                builder.scale,
-                builder.rotation,
-                builder.translation
-            )
-        ); 
+        let instances: Vec<_> = iter.into_iter().collect();
         let instance_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("InstanceData({})", label)),
-                contents: bytemuck::bytes_of(&InstanceData { transform: transform.into() }),
+                label: Some(&format!("VertexBuffer(InstanceData({}))", label)),
+                contents: bytemuck::cast_slice(&instances),
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST
             }
         );
@@ -215,19 +195,37 @@ impl SpriteObject {
         let data = SpriteData { 
             texcoord: builder.texcoord, 
             color: builder.color, 
-            size: builder.size 
+            size: builder.size, 
+            ..Default::default()
         };
         let sprite_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("SpriteData({})", label)),
+                label: Some(&format!("UniformBuffer(SpriteData({}))", label)),
                 contents: bytemuck::bytes_of(&data),
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
+            }
+        );
+
+        // (한국어) 스프라이트 바인드 그룹을 생성합니다.
+        // (English Translation) Create a sprite bind group.
+        let sprite_bind_group = device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                label: Some(&format!("BindGroup({})", label)),
+                layout: builder.buffer_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(
+                            sprite_buffer.as_entire_buffer_binding()
+                        ),
+                    },
+                ]
             }
         );
 
         // (한국어) 텍스처 이미지 바인드 그룹을 생성합니다.
         // (English Translation) Create a texture image bind group.
-        let bind_group = device.create_bind_group(
+        let texture_bind_group = device.create_bind_group(
             &wgpu::BindGroupDescriptor {
                 label: Some(&format!("BingGroup({})", label)),
                 layout: builder.texture_layout,
@@ -245,11 +243,12 @@ impl SpriteObject {
         );
 
         Self { 
+            instances: instances.into(),
+            instance_buffer,
             data: data.into(),
-            transform: transform.into(), 
-            instance_buffer, 
-            sprite_buffer, 
-            bind_group, 
+            sprite_buffer,
+            sprite_bind_group,
+            texture_bind_group,
         }
     }
 
@@ -262,10 +261,10 @@ impl SpriteObject {
     /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
     /// 
     pub fn update_instance<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
-    where F: Fn(&mut MutexGuard<'_, Transform>) {
-        let mut guard = self.transform.lock().expect("Failed to access variable.");
+    where F: Fn(&mut MutexGuard<'_, Vec<InstanceData>>) {
+        let mut guard = self.instances.lock().expect("Failed to access variable.");
         mapping_func(&mut guard);
-        queue.write_buffer(&self.instance_buffer, 0, bytemuck::bytes_of(&InstanceData { transform: (*guard).into() }));
+        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&*guard));
     }
 
     /// #### 한국어 </br>
@@ -287,9 +286,9 @@ impl SpriteObject {
 impl Sprite for SpriteObject {
     #[inline]
     fn bind<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
-        rpass.set_bind_group(1, &self.bind_group, &[]);
+        rpass.set_bind_group(1, &self.sprite_bind_group, &[]);
+        rpass.set_bind_group(2, &self.texture_bind_group, &[]);
         rpass.set_vertex_buffer(0, self.instance_buffer.slice(..));
-        rpass.set_vertex_buffer(1, self.sprite_buffer.slice(..));
     }
 
     #[inline]

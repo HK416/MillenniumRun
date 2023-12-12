@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::slice::{Iter, IterMut};
 use std::collections::HashMap;
 
-use glam::{Vec4, Vec3, Vec2};
+use glam::{Mat4, Vec4, Vec3, Vec2};
 
 use crate::{
     components::{
@@ -13,7 +13,11 @@ use crate::{
         sprite::{
             Sprite,
             brush::SpriteBrush,
-            objects::{SpriteObject, SpriteBuilder},
+            objects::{
+                InstanceData, 
+                SpriteObject, 
+                SpriteBuilder
+            },
         },
     },
     nodes::consts::PIXEL_PER_METER,
@@ -72,17 +76,18 @@ impl SpriteButtons {
         const YUZU_POSITION: Vec3 = Vec3::new(3.2 * PIXEL_PER_METER, 3.7 * PIXEL_PER_METER, -4.0 * PIXEL_PER_METER);
         const YUZU_SIZE: Vec2 = Vec2::new(2.0 * PIXEL_PER_METER, 2.0 * PIXEL_PER_METER);
         let desc = descs.get(&SpriteButtonTags::Yuzu).expect("Descriptor not found!");
+        let instances = [InstanceData { transform: Mat4::from_translation(YUZU_POSITION).into() }];
         let yuzu_button = Arc::new((
             SpriteBuilder::new(
                 Some("Yuzu"),
                 tex_sampler,
                 desc.texture_view,
+                sprite_brush.ref_buffer_layout(),
                 sprite_brush.ref_texture_layout()
             )
             .with_size(YUZU_SIZE)
             .with_color(SPRITE_COLOR)
-            .with_translation(YUZU_POSITION)
-            .build(device),
+            .build(device, instances),
             Box::new(AABB {
                 x: YUZU_POSITION.x,
                 y: YUZU_POSITION.y,
@@ -97,17 +102,18 @@ impl SpriteButtons {
         const ARIS_POSITION: Vec3 = Vec3::new(0.0 * PIXEL_PER_METER, 2.7 * PIXEL_PER_METER, -2.0 * PIXEL_PER_METER);
         const ARIS_SIZE: Vec2 = Vec2::new(2.0 * PIXEL_PER_METER, 2.0 * PIXEL_PER_METER);
         let desc = descs.get(&SpriteButtonTags::Aris).expect("Descriptor not found!");
+        let instances = [InstanceData { transform: Mat4::from_translation(ARIS_POSITION).into() }];
         let aris_button = Arc::new((
             SpriteBuilder::new(
                 Some("Aris"), 
                 tex_sampler, 
                 desc.texture_view,
+                sprite_brush.ref_buffer_layout(),
                 sprite_brush.ref_texture_layout()
             )
             .with_size(ARIS_SIZE)
             .with_color(SPRITE_COLOR)
-            .with_translation(ARIS_POSITION)
-            .build(device),
+            .build(device, instances),
             Box::new(AABB {
                 x: ARIS_POSITION.x,
                 y: ARIS_POSITION.y,
@@ -122,17 +128,18 @@ impl SpriteButtons {
         const MOMOI_POSITION: Vec3 = Vec3::new(-3.0 * PIXEL_PER_METER, 1.5 * PIXEL_PER_METER, -1.0 * PIXEL_PER_METER);
         const MOMOI_SIZE: Vec2 = Vec2::new(2.3 * PIXEL_PER_METER, 2.3 * PIXEL_PER_METER);
         let desc = descs.get(&SpriteButtonTags::Momoi).expect("Descriptor not found!");
+        let instances = [InstanceData { transform: Mat4::from_translation(MOMOI_POSITION).into() }];
         let momoi_button = Arc::new((
             SpriteBuilder::new(
                 Some("Momoi"), 
                 tex_sampler, 
                 desc.texture_view,
+                sprite_brush.ref_buffer_layout(),
                 sprite_brush.ref_texture_layout()
             )
             .with_size(MOMOI_SIZE)
             .with_color(SPRITE_COLOR)
-            .with_translation(MOMOI_POSITION)
-            .build(device),
+            .build(device, instances),
             Box::new(AABB {
                 x: MOMOI_POSITION.x,
                 y: MOMOI_POSITION.y,
@@ -147,17 +154,18 @@ impl SpriteButtons {
         const MIDORI_POSITION: Vec3 = Vec3::new(3.0 * PIXEL_PER_METER, 1.5 * PIXEL_PER_METER, -1.0 * PIXEL_PER_METER);
         const MIDORI_SIZE: Vec2 = Vec2::new(2.3 * PIXEL_PER_METER, 2.3 * PIXEL_PER_METER);
         let desc = descs.get(&SpriteButtonTags::Midori).expect("Descriptor not found!");
+        let instances = [InstanceData { transform: Mat4::from_translation(MIDORI_POSITION).into() }];
         let midori_button = Arc::new((
             SpriteBuilder::new(
                 Some("Midori"), 
                 tex_sampler, 
                 desc.texture_view,
+                sprite_brush.ref_buffer_layout(),
                 sprite_brush.ref_texture_layout()
             )
             .with_size(MIDORI_SIZE)
             .with_color(SPRITE_COLOR)
-            .with_translation(MIDORI_POSITION)
-            .build(device),
+            .build(device, instances),
             Box::new(AABB {
                 x: MIDORI_POSITION.x,
                 y: MIDORI_POSITION.y,
@@ -222,6 +230,6 @@ impl SpriteButtons {
         sprite_brush: &'pass SpriteBrush,
         rpass: &mut wgpu::RenderPass<'pass>
     ) {
-        sprite_brush.draw_texture_blended(rpass, self.sprites().into_iter())
+        sprite_brush.draw_textured(rpass, self.sprites().into_iter())
     }
 }

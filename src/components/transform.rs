@@ -1,3 +1,4 @@
+use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Mat3, Quat, Vec4, Vec3, Vec4Swizzles};
 
 
@@ -8,7 +9,8 @@ use glam::{Mat4, Mat3, Quat, Vec4, Vec3, Vec4Swizzles};
 /// #### English (Translation) </br>
 /// This is the transformation matrix in the world coordinate system. </br>
 /// 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
 pub struct Transform {
     inner: Mat4,
 }
