@@ -6,25 +6,11 @@ use winit::{
 
 use crate::{
     game_err,
+    components::sound::Volume,
     assets::interface::{AssetDecoder, AssetEncoder},
     system::error::{AppResult, GameError},
 };
 
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Volume(u8);
-
-impl Volume {
-    #[inline]
-    pub fn set(&mut self, val: u8) {
-        self.0 = val;
-    }
-
-    #[inline]
-    pub fn get_norm(&self) -> f32 {
-        self.0.clamp(0, 100) as f32 / 100.0
-    }
-}
 
 
 /// #### 한국어 </br>
@@ -68,23 +54,25 @@ pub enum ScreenMode {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Resolution {
-    W854H480,
-    W960H540,
     #[default]
-    W1280H720,
-    W1600H900,
-    W1920H1080,
+    W800H600,
+    W1024H768,
+    W1152H864,
+    W1280H960,
+    W1400H1050,
+    W1600H1200,
 }
 
 impl Resolution {
     #[inline]
     pub fn downgrade(self) -> Option<Self> {
         match self {
-            Resolution::W854H480 => None,
-            Resolution::W960H540 => Some(Resolution::W854H480),
-            Resolution::W1280H720 => Some(Resolution::W960H540),
-            Resolution::W1600H900 => Some(Resolution::W1280H720),
-            Resolution::W1920H1080 => Some(Resolution::W1600H900),
+            Self::W800H600 => None,
+            Self::W1024H768 => Some(Self::W800H600),
+            Self::W1152H864 => Some(Self::W1024H768),
+            Self::W1280H960 => Some(Self::W1152H864),
+            Self::W1400H1050 => Some(Self::W1280H960),
+            Self::W1600H1200 => Some(Self::W1400H1050),
         }
     }
 }
@@ -93,11 +81,12 @@ impl Into<LogicalSize<u32>> for Resolution {
     #[inline]
     fn into(self) -> LogicalSize<u32> {
         match self {
-            Resolution::W854H480 => (854, 480),
-            Resolution::W960H540 => (960, 540),
-            Resolution::W1280H720 => (1280, 720),
-            Resolution::W1600H900 => (1600, 900),
-            Resolution::W1920H1080 => (1920, 1080),
+            Self::W800H600 => (800, 600),
+            Self::W1024H768 => (1024, 768),
+            Self::W1152H864 => (1152, 864),
+            Self::W1280H960 => (1280, 960),
+            Self::W1400H1050 => (1400, 1050),
+            Self::W1600H1200 => (1600, 1200),
         }.into()
     }
 }
@@ -127,12 +116,12 @@ impl Default for Settings {
     fn default() -> Self {
         Self { 
             beginner: true, 
-            language: Language::Unknown, 
-            screen_mode: ScreenMode::Windowed, 
-            resolution: Resolution::W1280H720,
-            background_volume: Volume(80),
-            effect_volume: Volume(100),
-            voice_volume: Volume(85),
+            language: Language::default(), 
+            screen_mode: ScreenMode::default(), 
+            resolution: Resolution::default(),
+            background_volume: Volume::new(80),
+            effect_volume: Volume::new(100),
+            voice_volume: Volume::new(85),
         }
     }
 }

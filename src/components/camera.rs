@@ -173,7 +173,7 @@ impl GameCamera {
     /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
     /// 
     #[inline]
-    pub fn update_buffer(&self, queue: &wgpu::Queue) {
+    pub fn update(&self, queue: &wgpu::Queue) {
         queue.write_buffer(&self.viewport_buffer, 0, bytemuck::bytes_of(&self.viewport));
         queue.write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&CameraData {
             camera: self.transform.camera_transform(),

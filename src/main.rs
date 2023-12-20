@@ -81,16 +81,13 @@ fn game_loop(
 
     // (한국어) wgpu 프레임 버퍼를 설정합니다.
     // (English Translation) Set the wgpu framebuffer.
-    let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_capabilities.formats[0];
-    let swapchain_alpha_mode = swapchain_capabilities.alpha_modes[0];
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: swapchain_format,
+        format: wgpu::TextureFormat::Bgra8Unorm,
         width: window.inner_size().width,
         height: window.inner_size().height,
         present_mode: wgpu::PresentMode::AutoVsync,
-        alpha_mode: swapchain_alpha_mode,
+        alpha_mode: wgpu::CompositeAlphaMode::Auto,
         view_formats: vec![],
     };
     surface.configure(&device, &config);
@@ -167,7 +164,7 @@ fn game_loop(
                                 camera.viewport.width = width as f32;
                                 camera.viewport.height = height as f32;
                                 camera.scale_factor = window.current_monitor().map_or(1.0, |monitor| monitor.scale_factor() as f32);
-                                camera.update_buffer(&queue);
+                                camera.update(&queue);
                             }
                         }
                     },

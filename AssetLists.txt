@@ -20,48 +20,66 @@
 # 3>> temp/c.txt Optional
 #
 
-# Global
+#---------#
+# Setting #
+#---------#
 user.settings Optional
+
+#-------#
+# Fonts #
+#-------#
 fonts/nexon_lv2_gothic_medium.ttf Static
 fonts/nexon_lv2_gothic_bold.ttf Static
+fonts/nexon_lv2_gothic.ttf Static
 
-textures/sys/button_small.png Static
-textures/sys/button_small_ex.png Static
-textures/sys/button_wide.png Static
-textures/sys/button_start.png Static
-textures/sys/button_setting.png Static
-textures/sys/button_exit.png Static
-textures/sys/button_return.png Static
-textures/sys/button_enter.png Static
-textures/sys/window.png Static
-
-sounds/sys/click.ogg Static
-sounds/sys/cancel.ogg Static
-
-shaders/ui.wgsl Static
-shaders/sprite.wgsl Static
-shaders/text_2d.wgsl Static
-shaders/text_3d.wgsl Static
-
+#---------#
+# Scripts #
+#---------#
 scripts/kor.ron Static
 
+#---------#
+# Shaders #
+#---------#
+shaders/ui.wgsl Static
+shaders/text.wgsl Static
+shaders/sprite.wgsl Static
 
-# Intro Scene
-textures/intro/logo.png Static
+#--------#
+# Sprite #
+#--------#
+textures/background.dds Static
+textures/aris_standing.dds Static
+textures/momoi_standing.dds Static
+textures/midori_standing.dds Static
+textures/yuzu_standing.dds Static
 
-sounds/intro/yuzu.ogg Static
-sounds/intro/aris.ogg Static
-sounds/intro/momoi.ogg Static
-sounds/intro/midori.ogg Static
+#----------------#
+# User Interface #
+#----------------#
+textures/ui/logo.dds Static
+textures/ui/button_medium.dds Static
+textures/ui/button_wide.dds Static
+textures/ui/title_button_start.dds Static
+textures/ui/title_button_setting.dds Static
+textures/ui/title_button_exit.dds Static
+textures/ui/title_button_return.dds Static
+textures/ui/window_ratio_4_3.dds Static
 
+sounds/ui/click.ogg Static 
+sounds/ui/cancel.ogg Static 
 
-# Title Scene
-textures/title/sofa.png Static
-textures/title/cabinet.png Static
-textures/title/background.png Static
-textures/title/yuzu.png Static
-textures/title/aris.png Static
-textures/title/momoi.png Static
-textures/title/midori.png Static
+#------------------#
+# Character Voices #
+#------------------#
+sounds/aris/aris_title.ogg Static
 
-sounds/title/theme64.ogg Static
+sounds/momoi/momoi_title.ogg Static 
+
+sounds/midori/midori_title.ogg Static 
+
+sounds/yuzu/yuzu_title.ogg Static 
+
+#-----#
+# BGM #
+#-----#
+sounds/bgm/theme64.ogg Static

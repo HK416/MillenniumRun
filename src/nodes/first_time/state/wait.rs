@@ -10,7 +10,6 @@ use std::thread;
 use std::sync::Arc;
 
 use glam::{Vec4, Vec3, Vec4Swizzles};
-use rodio::OutputStreamHandle;
 use winit::{
     dpi::PhysicalPosition,
     event::{Event, WindowEvent, MouseButton},
@@ -21,12 +20,11 @@ use crate::{
     assets::bundle::AssetBundle, 
     components::{
         collider2d::Collider2d,
-        text::{Section, brush::TextBrush}, 
-        ui::{UserInterface, brush::UiBrush},
-        sound::{self, SoundDecoder}, 
+        text2d::brush::Text2dBrush, 
+        ui::brush::UiBrush,
         script::ScriptDecoder,
         camera::GameCamera,
-        user::{Language, Settings}, 
+        user::Language, 
     },
     render::depth::DepthBuffer,
     nodes::{
@@ -47,6 +45,10 @@ use crate::{
 
 pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
     use std::sync::Mutex;
+    use crate::components::sound::play_click_sound;
+
+    // (한국어) 눌린 버튼의 색상을 저장하는 변수입니다. 
+    // (English Translation) This is a variable that stores the color of the pressed button. 
     static FOCUSED: Mutex<Option<(Language, Vec3, Vec3)>> = Mutex::new(None);
     
     // (한국어) 사용할 공유 객체 가져오기.
@@ -88,15 +90,15 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
                     *guard = Some((*language, ui_color, text_color));
 
                     // <2>
-                    ui.update_buffer(queue, |data| {
+                    ui.update(queue, |data| {
                         data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
                     });
-                    text.update_section(queue, |data| {
+                    text.update(queue, |data| {
                         data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
                     });
 
                     // <3>
-                    play_click_sound(this, shared)?;
+                    play_click_sound(shared)?;
                 }
             } else if MouseButton::Left == button && !state.is_pressed() {
                 let mut guard = FOCUSED.lock().expect("Failed to access variable.");
@@ -104,10 +106,10 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
                     // (한국어) 버튼을 원래 색상으로 되돌립니다.
                     // (English Translation) Returns the button to its origin color.
                     if let Some((ui, text)) = this.buttons.get_mut(&language) {
-                        ui.update_buffer(queue, |data| {
+                        ui.update(queue, |data| {
                             data.color = (ui_color, 1.0).into();
                         });
-                        text.update_section(queue, |data| {
+                        text.update(queue, |data| {
                             data.color = (text_color, 1.0).into();
                         });
                     }
@@ -134,11 +136,14 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
                         let asset_bundle_cloned = asset_bundle.clone();
                         this.loading = Some(thread::spawn(move || {
                             let rel_path = match language_cloned {
-                                Language::Korean => Ok(path::sys::SCRIPT_KOR_PATH),
+                                Language::Korean => Ok(path::KOR_SCRIPTS_PATH),
                                 Language::Unknown => Err(game_err!("Game Logic Error", "Unknown locale!"))
                             }?;
 
-                            asset_bundle_cloned.get(rel_path)?.read(&ScriptDecoder)
+                            let script = asset_bundle_cloned.get(rel_path)?
+                                .read(&ScriptDecoder)?;
+
+                            Ok(Arc::new(script))
                         }));
                         this.state = FirstTimeSetupSceneState::Exit;
                         this.language = language;
@@ -161,7 +166,7 @@ pub fn update(_this: &mut FirstTimeSetupScene, _shared: &mut Shared, _total_time
 pub fn draw(this: &FirstTimeSetupScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -220,46 +225,17 @@ pub fn draw(this: &FirstTimeSetupScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 유저 인터페이스 오브젝트 그리기.
         // (English Translation) Drawing user interface objects.
-        ui_brush.draw(&mut rpass, this.buttons.values().map(|(ui, _)| ui as &dyn UserInterface));
+        ui_brush.draw(&mut rpass, this.buttons.values().map(|(ui, _)| ui));
 
         // // (한국어) 텍스트 그리기.
         // // (English Translation) Drawing texts.
-        text_brush.draw_2d(&mut rpass, this.buttons.values().map(|(_, text)| text as &dyn Section));
+        text_brush.draw(&mut rpass, this.buttons.values().map(|(_, text)| text));
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
     // (English Translation) Submit command buffers to the queue and output to the framebuffer.
     queue.submit(Some(encoder.finish()));
     frame.present();
-
-    Ok(())
-}
-
-
-/// #### 한국어 </br>
-/// 클릭음을 재생합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Play a click sound. </br>
-/// 
-fn play_click_sound(_this: &mut FirstTimeSetupScene, shared: &mut Shared) -> AppResult<()> {
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use.
-    let stream_handle = shared.get::<OutputStreamHandle>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-
-    // (한국어) 클릭 소리를 재생합니다.
-    // (English Translation) Play a click sound.
-    let source = asset_bundle.get(path::sys::CLICK_SOUND_PATH)?
-        .read(&SoundDecoder)?;
-    let sink = sound::create_sink(stream_handle)?;
-    sink.set_volume(settings.effect_volume.get_norm());
-    thread::spawn(move || {
-        sink.append(source);
-        sink.sleep_until_end();
-        sink.detach()
-    });
 
     Ok(())
 }

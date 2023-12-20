@@ -5,37 +5,34 @@ use crate::{
 };
 
 
+/// #### 한국어 </br>
+/// `dds` 이미지 파일로부터 텍스처를 만드는 디코더 입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a decoder that creates texture from `dds` image files. </br>
+/// 
 #[derive(Debug, Clone, Copy)]
-pub struct ImageDecoder<'a> {
-    label: Option<&'a str>,
-    device: &'a wgpu::Device,
-    queue: &'a wgpu::Queue,
+pub struct DdsTextureDecoder<'a> {
+    pub name: Option<&'a str>,
+    pub size: wgpu::Extent3d,
+    pub dimension: wgpu::TextureDimension,
+    pub format: wgpu::TextureFormat,
+    pub mip_level_count: u32,
+    pub sample_count: u32,
+    pub usage: wgpu::TextureUsages,
+    pub view_formats: &'a [wgpu::TextureFormat],
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
 }
 
-impl<'a> ImageDecoder<'a> {
-    #[inline]
-    pub const fn new(label: Option<&'a str>, device: &'a wgpu::Device, queue: &'a wgpu::Queue) -> Self {
-        Self { label, device, queue }
-    }
-}
-
-impl<'a> AssetDecoder for ImageDecoder<'a> {
+impl<'a> AssetDecoder for DdsTextureDecoder<'a> {
     type Output = wgpu::Texture;
 
-    #[inline]
     fn decode(&self, buf: &[u8]) -> AppResult<Self::Output> {
-        use std::io::Cursor;
-        use image::{EncodableLayout, io::Reader};
+        use ddsfile::Dds;
         use wgpu::util::DeviceExt;
 
-        let img = Reader::new(Cursor::new(buf))
-            .with_guessed_format()
-            .map_err(|err| game_err!(
-                "Image decoding failed",
-                "Image decoding failed for the following reasons: {}",
-                err.to_string()
-            ))?
-            .decode()
+        let dds = Dds::read(buf)
             .map_err(|err| game_err!(
                 "Image decoding failed",
                 "Image decoding failed for the following reasons: {}",
@@ -45,20 +42,16 @@ impl<'a> AssetDecoder for ImageDecoder<'a> {
         let texture = self.device.create_texture_with_data(
             self.queue, 
             &wgpu::TextureDescriptor {
-                label: self.label,
-                size: wgpu::Extent3d {
-                    width: img.width(),
-                    height: img.height(),
-                    depth_or_array_layers: 1
-                },
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                mip_level_count: 1,
-                sample_count: 1,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[]
+                label: Some(&format!("Texture({})", self.name.unwrap_or("Unknown"))),
+                size: self.size,
+                dimension: self.dimension,
+                format: self.format,
+                mip_level_count: self.mip_level_count,
+                sample_count: self.sample_count,
+                usage: self.usage,
+                view_formats: self.view_formats,
             }, 
-            img.to_rgba8().as_bytes()
+            &dds.data
         );
 
         Ok(texture)

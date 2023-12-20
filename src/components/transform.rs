@@ -15,6 +15,7 @@ pub struct Transform {
     inner: Mat4,
 }
 
+#[allow(dead_code)]
 impl Transform {
     #[inline]
     pub fn new() -> Self {
@@ -289,6 +290,7 @@ pub struct Orthographic {
 /// #### English (Translation) </br>
 /// Contains the data needed to generate the projection matrix. </br>
 ///  
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Projection {
     Perspective(Perspective),

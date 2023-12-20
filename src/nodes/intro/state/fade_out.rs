@@ -2,8 +2,11 @@ use std::sync::Arc;
 
 use crate::{
     game_err,
-    components::{ui::{UserInterface, brush::UiBrush}, camera::GameCamera},
-    nodes::{intro::IntroScene, title::EnterTitleScene},
+    components::{ui::brush::UiBrush, camera::GameCamera},
+    nodes::{
+        intro::IntroScene, 
+        title::TitleLoading, 
+    },
     render::depth::DepthBuffer,
     scene::state::SceneState,
     system::{
@@ -41,16 +44,14 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elap
     // (English Translation) Updates the alpha value of the logo image over time.
     let delta_time = (this.elapsed_time / DURATION).min(1.0) as f32;
     let alpha = 1.0 - 1.0 * delta_time;
-    for ui in this.logo_images.iter_mut() {
-        ui.update_buffer(queue, |data| {
-            data.color.w = alpha;
-        });
-    }
+    this.logo.update(queue, |data| {
+        data.color.w = alpha;
+    });
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) Changes to the next state if it is greater than the duration.
     if this.elapsed_time >= DURATION {
-        *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(EnterTitleScene::default()));
+        *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(TitleLoading::default()));
         return Ok(());
     }
 
@@ -120,7 +121,7 @@ pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
         });
 
         camera.bind(&mut rpass);
-        ui_brush.draw(&mut rpass, this.logo_images.iter().map(|it| it as &dyn UserInterface));
+        ui_brush.draw(&mut rpass, [&this.logo].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

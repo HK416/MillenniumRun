@@ -8,11 +8,11 @@ use crate::{
     game_err,
     assets::bundle::AssetBundle,
     components::{
+        camera::GameCamera,
         sound::SoundDecoder,
         user::Settings, 
     },
-    nodes::{path, intro::{IntroScene, state::IntroState}},
-    render::depth::DepthBuffer,
+    nodes::intro::{IntroScene, state::IntroState},
     system::{
         error::{AppResult, GameError},
         shared::Shared,
@@ -28,19 +28,19 @@ use crate::{
 /// This is an update function when the `intro` game scene is in the `PlayTitleVoice` state. </br>
 /// 
 pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
-    use crate::components::sound::create_sink;
+    use crate::{components::sound::play_sound, nodes::path};
 
     const NUM_CHARACTER: usize = 4;
     const VOICES: [&'static str; NUM_CHARACTER] = [
-        path::intro::YUZU_SOUND_PATH,
-        path::intro::ARIS_SOUND_PATH,
-        path::intro::MOMOI_SOUND_PATH,
-        path::intro::MIDORI_SOUND_PATH,
+        path::ARIS_TITLE_SOUND_PATH,
+        path::MOMOI_TITLE_SOUND_PATH,
+        path::MIDORI_TITLE_SOUND_PATH,
+        path::YUZU_TITLE_SOUND_PATH,
     ];
     
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let stream_handle = shared.get::<OutputStreamHandle>().unwrap();
+    let stream = shared.get::<OutputStreamHandle>().unwrap();
     let asset_bundle = shared.get::<AssetBundle>().unwrap();
     let settings = shared.get::<Settings>().unwrap();
 
@@ -49,11 +49,10 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, _ela
     let mut rng = rand::thread_rng();
     let source = asset_bundle.get(VOICES[rng.gen_range(0..NUM_CHARACTER)])?
         .read(&SoundDecoder)?;
-    let sink = create_sink(stream_handle)?;
-    sink.set_volume(settings.voice_volume.get_norm());
+    let sink = play_sound(settings.voice_volume, source, stream)?;
     thread::spawn(move || {
-        sink.append(source);
         sink.sleep_until_end();
+        sink.detach();
     });
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
@@ -81,7 +80,7 @@ pub fn draw(_this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
+    let camera = shared.get::<GameCamera>().unwrap();
 
     // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
     // (English Translation) Wait until the previous operation is finished.
@@ -104,7 +103,7 @@ pub fn draw(_this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
     // (English Translation) Creates a command buffer.
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
     {
-        let mut _rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("RenderPass(IntroScene(PlayTitleVoice(Ui)))"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment { 
                 view: &view, 
@@ -114,17 +113,12 @@ pub fn draw(_this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
                     store: wgpu::StoreOp::Store,
                 }
             })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth.view(),
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
+            depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
         });
+
+        camera.bind(&mut rpass);
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

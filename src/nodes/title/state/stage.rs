@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use glam::{Vec4, Vec3, Vec4Swizzles};
+use glam::{Vec4, Vec3, Vec4Swizzles, Vec3Swizzles};
 use winit::{
     event::{Event, WindowEvent, MouseButton}, 
     keyboard::{PhysicalKey, KeyCode}, 
@@ -11,14 +11,16 @@ use crate::{
     game_err,
     components::{
         collider2d::Collider2d,
-        sprite::brush::SpriteBrush,
-        text::brush::TextBrush,
+        text2d::brush::Text2dBrush,
         ui::brush::UiBrush, 
+        lights::PointLights,
         camera::GameCamera,
+        sprite::SpriteBrush,
     },
     nodes::title::{
+        utils,
         TitleScene,
-        ty, state::TitleState, 
+        state::TitleState, 
     },
     render::depth::DepthBuffer,
     system::{
@@ -27,6 +29,22 @@ use crate::{
         shared::Shared,
     }
 };
+
+/// #### 한국어 </br>
+/// 현재 눌려져있는 스프라이트의 원래 색상 데이터를 담고 있습니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Contains the original color data of the currently pressed sprite. </br>
+/// 
+static FOCUSED_SPRITE: Mutex<Option<(usize, Vec<Vec3>)>> = Mutex::new(None);
+
+/// #### 한국어 </br>
+/// 현재 눌려져있는 시스템 버튼의 원래 색상 데이터를 담고 있습니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Contains the original color data of the currently pressed system button. </br>
+/// 
+static FOCUSED_SYS_BTN: Mutex<Option<(usize, Vec3, Vec<Vec3>)>> = Mutex::new(None);
 
 
 
@@ -43,9 +61,10 @@ pub fn update(_this: &mut TitleScene, _shared: &mut Shared, _total_time: f64, _e
 pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
+    let point_lights = shared.get::<Arc<PointLights>>().unwrap();
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -75,7 +94,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
     {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("RenderPass(TitleScene(StageState(Sprite)))"),
+            label: Some("RenderPass(TitleScene(StageState(Background)))"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment { 
                 view: &view, 
                 resolve_target: None, 
@@ -100,11 +119,37 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 배경 오브젝트들 그리기.
         // (English Translation) Drawing background objects.
-        this.background.draw(sprite_brush, &mut rpass);
+        sprite_brush.draw(point_lights, &mut rpass, [this.background.as_ref()].into_iter());
+    }
+
+    {
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("RenderPass(TitleScene(EnterStage(Sprites)))"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment { 
+                view: &view, 
+                resolve_target: None, 
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                }
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth.view(),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        camera.bind(&mut rpass);
 
         // (한국어) 스프라이트 오브젝트들 그리기.
         // (English Translation) Drawing sprite objects.
-        this.sprite.draw(sprite_brush, &mut rpass);
+        sprite_brush.draw(point_lights, &mut rpass, this.sprites.iter().map(|(it, _)| it.as_ref()));
     }
 
     {
@@ -132,9 +177,20 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         camera.bind(&mut rpass);
 
-        // (한국어) 버튼 그리기.
-        // (English Translation) Drawing the buttons.
-        this.system.draw(ui_brush, text_brush, &mut rpass);
+        // (한국어) 시스템 버튼 그리기.
+        // (English Translation) Drawing the system buttons.
+        ui_brush.draw(
+            &mut rpass, 
+            this.system_buttons.iter()
+            .map(|(ui, _)| ui.as_ref())
+        );
+        text_brush.draw(
+            &mut rpass, 
+            this.system_buttons.iter()
+            .map(|(_, it)| it)
+            .flatten()
+            .map(|it| it.as_ref())
+        );
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -147,12 +203,52 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
 
 fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
+    use crate::components::sound;
+    
+    // (한국어) 사용할 공유 객체 가져오기.
+    // (English Translation) Get shared object to use.
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+
     match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput { event, .. }
             => if let PhysicalKey::Code(code) = event.physical_key {
                 if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
-                    super::play_cancel_sound(this, shared)?;
+                    sound::play_cancel_sound(shared)?;
+
+                    // (한국어) 스프라이트를 원래 색상으로 되돌립니다.
+                    // (English Translation) Returns the sprite to its origin color.
+                    {
+                        let mut guard = FOCUSED_SPRITE.lock().expect("Failed to access variable.");
+                        if let Some((index, sprite_colors)) = guard.take() {
+                            if let Some((sprite, _)) = this.sprites.get(index) {
+                                sprite.update(queue, |instances| {
+                                    for (&sprite_color, instance) in sprite_colors.iter().zip(instances.iter_mut()) {
+                                        instance.color = (sprite_color, instance.color.w).into();
+                                    }
+                                });
+                            }
+                        }
+                    }
+
+                    // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
+                    // (English Translation) Returns the color of the selected ui to its original color.
+                    {
+                        let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
+                        if let Some((index, ui_color, section_colors)) = guard.take() {
+                            if let Some((ui, sections)) = this.system_buttons.get(index) {
+                                ui.update(queue, |data| {
+                                    data.color = (ui_color, data.color.w).into();
+                                });
+                                for (section_color, section) in section_colors.into_iter().zip(sections.iter()) {
+                                    section.update(queue, |data| {
+                                        data.color = (section_color, data.color.w).into();
+                                    });
+                                }
+                            }
+                        }
+                    }
+
 
                     // (한국어) 다음 게임 장면 상태로 변경합니다.
                     // (English Translation) Change to the next game scene state.
@@ -177,9 +273,6 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
 
 
 fn handle_mouse_input_for_sprites(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    use std::sync::Mutex;
-    static FOCUSED: Mutex<Option<(ty::SpriteButtonTags, Vec3)>> = Mutex::new(None);
-
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
@@ -201,11 +294,9 @@ fn handle_mouse_input_for_sprites(this: &mut TitleScene, shared: &mut Shared, ev
                     
                     // (한국어) 마우스 커서가 스프라이트 영역 안에 있는지 확인합니다.
                     // (English Translation) Make sure the mouse cursor is inside the sprite area.
-                    let pickable = this.sprite.pickable();
-                    let select = pickable.into_iter()
-                        .find(|(_, sprite)| {
-                            sprite.1.test(&(x, y))
-                        });
+                    let select = this.sprites.iter()
+                        .enumerate()
+                        .find(|(_, (_, collider))| collider.test(&(x, y)));
 
                     // (한국어)
                     // 마우스 커서가 스프라이트 영역 안에 있는 경우:
@@ -219,23 +310,29 @@ fn handle_mouse_input_for_sprites(this: &mut TitleScene, shared: &mut Shared, ev
                     // 2. Change the color of the sprite.
                     // 3. Calls the sprite pressed function.
                     //
-                    if let Some((tag, sprite)) = select {
+                    if let Some((index, (sprite, _))) = select {
                         // <1>
-                        let sprite_color = sprite.0.data.lock().expect("Failed to access variable.").color.xyz();
-                        let mut guard = FOCUSED.lock().expect("Failed to access variable.");
-                        *guard = Some((tag, sprite_color));
+                        let sprite_colors = sprite.instances.lock()
+                            .expect("Failed to access variable.")
+                            .iter()
+                            .map(|data| data.color.xyz())
+                            .collect();
+                        let mut guard = FOCUSED_SPRITE.lock().expect("Failed to access variable.");
+                        *guard = Some((index, sprite_colors));
 
                         // <2>
-                        sprite.0.update_sprite(queue, |data| {
-                            data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
+                        sprite.update(queue, |instances| {
+                            for instance in instances.iter_mut() {
+                                instance.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
+                            }
                         });
 
                         // <3>
-                        sprite_pressed(tag, this, shared)?;
+                        sprite_pressed(utils::Sprites::from(index), this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
-                    let mut guard = FOCUSED.lock().expect("Failed to access variable.");
-                    if let Some((tag, sprite_color)) = guard.take() {
+                    let mut guard = FOCUSED_SPRITE.lock().expect("Failed to access variable.");
+                    if let Some((index, sprite_colors)) = guard.take() {
                         // (한국어) 
                         // 윈도우 좌표계상 마우스 위치를 월드 좌표계상 마우스 위치로 변환합니다.
                         // 
@@ -247,26 +344,28 @@ fn handle_mouse_input_for_sprites(this: &mut TitleScene, shared: &mut Shared, ev
 
                         // (한국어) 스프라이트를 원래 색상으로 되돌립니다.
                         // (English Translation) Returns the sprite to its origin color.
-                        if let Some(sprite) = this.sprite.get_mut(tag as usize) {
-                            sprite.0.update_sprite(queue, |data| {
-                                data.color = (sprite_color, data.color.w).into();
+                        if let Some((sprite, _)) = this.sprites.get_mut(index) {
+                            sprite.update(queue, |instances| {
+                                for (instance, sprite_color) in instances.iter_mut().zip(sprite_colors.iter()) {
+                                    instance.color = (sprite_color.xyz(), instance.color.w).into();
+                                }
                             });
                         };
 
                         // (한국어) 마우스 커서가 스프라이트 영역 안에 있는지 확인합니다.
                         // (English Translation) Make sure the mouse cursor is inside the sprite area.
-                        let pickable = this.sprite.pickable();
-                        let select = pickable.into_iter()
-                            .find_map(|(tag, sprite)| {
-                                sprite.1.test(&(x, y)).then(|| tag)
+                        let select = this.sprites.iter()
+                            .enumerate()
+                            .find_map(|(idx, (_, collider))| {
+                                if collider.test(&(x, y)) { Some(idx) } else { None }
                             });
 
                         // (한국어) 선택된 스프라이트가 이전에 선택된 스프라이트와 일치할 경우:
                         // (English Translation) If the selected sprite matches a previously selected sprite:
-                        if select.is_some_and(|select| tag == select) {
+                        if select.is_some_and(|select| index == select) {
                             // (한국어) 스프라이트 떼어짐 함수를 호출합니다.
                             // (English Translation) Calls the sprite released function.
-                            sprite_released(tag, this, shared)?;
+                            sprite_released(utils::Sprites::from(index), this, shared)?;
                         }
                     }
                 }
@@ -274,11 +373,11 @@ fn handle_mouse_input_for_sprites(this: &mut TitleScene, shared: &mut Shared, ev
             WindowEvent::CursorMoved { .. } => {
                 // (한국어) 선택된 ui가 있는 경우:
                 // (English Translation) If there is a selected ui:
-                let guard = FOCUSED.lock().expect("Failed to access variable.");
-                if let Some((tag, _)) = guard.as_ref() {
+                let guard = FOCUSED_SPRITE.lock().expect("Failed to access variable.");
+                if let Some((index, _)) = guard.as_ref() {
                     // (한국어) ui 끌림 함수를 호출합니다.
                     // (English Translation) Calls the ui dragged function.
-                    sprite_dragged(*tag, this, shared)?;
+                    sprite_dragged(utils::Sprites::from(*index), this, shared)?;
                 }
             },
             _ => { /* empty */ }
@@ -290,14 +389,7 @@ fn handle_mouse_input_for_sprites(this: &mut TitleScene, shared: &mut Shared, ev
 }
 
 
-fn handle_mouse_input_for_ui(
-    this: &mut TitleScene, 
-    shared: &mut Shared, 
-    event: &Event<AppEvent>
-) -> AppResult<()> {
-    use std::sync::Mutex;
-    static FOCUSED: Mutex<Option<(ty::SystemButtonTags, Vec3, Vec<Vec3>)>> = Mutex::new(None);
-
+fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
@@ -310,9 +402,11 @@ fn handle_mouse_input_for_ui(
                 if MouseButton::Left == *button && state.is_pressed() {
                     // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                     // (English Translation) Make sure the mouse cursor is inside the ui area.
-                    let pickable = this.system.pickable();
-                    let select = pickable.into_iter()
-                        .find(|(_, (ui, _))| ui.test(&(cursor_pos, camera)));
+                    let select = this.system_buttons.iter()
+                        .enumerate()
+                        .find(|(_, (ui, _))| {
+                            ui.test(&(cursor_pos, camera))
+                        });
 
                     // (한국어)
                     // 마우스 커서가 ui 영역 안에 있는 경우:
@@ -326,58 +420,58 @@ fn handle_mouse_input_for_ui(
                     // 2. Change the color of the ui and the color of the text.
                     // 3. Calls the ui pressed function.
                     //
-                    if let Some((tag, (ui, texts))) = select {
+                    if let Some((index, (ui, sections))) = select {
                         // <1>
                         let ui_color = ui.data.lock().expect("Failed to access variable.").color.xyz();
-                        let text_colors = texts.iter().map(|it| {
+                        let section_colors = sections.iter().map(|it| {
                             it.data.lock().expect("Failed to get variable").color.xyz()
                         }).collect();
-                        let mut guard = FOCUSED.lock().expect("Failed to access variable.");
-                        *guard = Some((tag, ui_color, text_colors));
+                        let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
+                        *guard = Some((index, ui_color, section_colors));
 
                         // <2>
-                        ui.update_buffer(queue, |data| {
+                        ui.update(queue, |data| {
                             data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
                         });
-                        for text in texts.iter() {
-                            text.update_section(queue, |data| {
+                        for section in sections.iter() {
+                            section.update(queue, |data| {
                                 data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
                             });
                         }
 
                         // <3>
-                        ui_pressed(tag, this, shared)?;
+                        ui_pressed(utils::SystemButtons::from(index), this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
-                    let mut guard = FOCUSED.lock().expect("Failed to access variable.");
-                    if let Some((tag, ui_color, text_colors)) = guard.take() {
+                    let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
+                    if let Some((index, ui_color, section_colors)) = guard.take() {
                         // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
                         // (English Translation) Returns the color of the selected ui to its original color.
-                        if let Some((ui, texts)) = this.system.get_mut(tag as usize) {
-                            ui.update_buffer(queue, |data| {
+                        if let Some((ui, sections)) = this.system_buttons.get_mut(index) {
+                            ui.update(queue, |data| {
                                 data.color = (ui_color, data.color.w).into();
                             });
-                            for (text_color, text) in text_colors.into_iter().zip(texts.iter()) {
-                                text.update_section(queue, |data| {
-                                    data.color = (text_color, data.color.w).into();
+                            for (section_color, section) in section_colors.into_iter().zip(sections.iter()) {
+                                section.update(queue, |data| {
+                                    data.color = (section_color, data.color.w).into();
                                 });
                             }
                         };
                         
                         // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                         // (English Translation) Make sure the mouse cursor is inside the ui area.
-                        let pickable = this.system.pickable();
-                        let select = pickable.into_iter()
-                            .find_map(|(tag, (ui, _))| {
-                                ui.test(&(cursor_pos, camera)).then_some(tag)
+                        let select = this.system_buttons.iter()
+                            .enumerate()
+                            .find_map(|(idx, (ui, _))| {
+                                if ui.test(&(cursor_pos, camera)) { Some(idx) } else { None }
                             });
 
                         // (한국어) 선택된 ui가 이전에 선택된 ui와 일치하는 경우:
                         // (English Translation) If the selected ui matches a previously selected ui:
-                        if select.is_some_and(|select| tag == select) {
+                        if select.is_some_and(|select| index == select) {
                             // (한국어) ui 떼어짐 함수를 호출합니다.
                             // (English Translation) Calls the ui released function.
-                            ui_released(tag, this, shared)?;
+                            ui_released(utils::SystemButtons::from(index), this, shared)?;
                         }
                     }
                 }
@@ -385,11 +479,11 @@ fn handle_mouse_input_for_ui(
             WindowEvent::CursorMoved { .. } => {
                 // (한국어) 선택된 ui가 있는 경우:
                 // (English Translation) If there is a selected ui:
-                let guard = FOCUSED.lock().expect("Failed to access variable.");
-                if let Some((tag, _, _)) = guard.as_ref() {
+                let guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
+                if let Some((index, _, _)) = guard.as_ref() {
                     // (한국어) ui 끌림 함수를 호출합니다.
                     // (English Translation) Calls the ui dragged function.
-                    ui_dragged(*tag, this, shared)?;
+                    ui_dragged(utils::SystemButtons::from(*index), this, shared)?;
                 }
             },
             _ => { /* empty */ }
@@ -403,8 +497,8 @@ fn handle_mouse_input_for_ui(
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn sprite_pressed(tag: ty::SpriteButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
+fn sprite_pressed(sp: utils::Sprites, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match sp {
         _ => Ok(())
     }
 }
@@ -412,43 +506,12 @@ fn sprite_pressed(tag: ty::SpriteButtonTags, this: &mut TitleScene, shared: &mut
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_pressed(tag: ty::SystemButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
-        ty::SystemButtonTags::ReturnButton => {
-            super::play_cancel_sound(this, shared)
-        },
-        _ => Ok(())
-    }
-}
+fn ui_pressed(btn: utils::SystemButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    use crate::components::sound;
 
-
-#[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn sprite_released(tag: ty::SpriteButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
-        ty::SpriteButtonTags::Yuzu => {
-            shared.push(ty::SpriteButtonTags::Yuzu);
-            this.state = TitleState::EnterSelected;
-            this.elapsed_time = 0.0;
-            Ok(())
-        },
-        ty::SpriteButtonTags::Aris => {
-            shared.push(ty::SpriteButtonTags::Aris);
-            this.state = TitleState::EnterSelected;
-            this.elapsed_time = 0.0;
-            Ok(())
-        },
-        ty::SpriteButtonTags::Momoi => {
-            shared.push(ty::SpriteButtonTags::Momoi);
-            this.state = TitleState::EnterSelected;
-            this.elapsed_time = 0.0;
-            Ok(())
-        },
-        ty::SpriteButtonTags::Midori => {
-            shared.push(ty::SpriteButtonTags::Midori);
-            this.state = TitleState::EnterSelected;
-            this.elapsed_time = 0.0;
-            Ok(())
+    match btn {
+        utils::SystemButtons::Return => {
+            sound::play_cancel_sound(shared)
         },
         _ => Ok(())
     }
@@ -457,9 +520,52 @@ fn sprite_released(tag: ty::SpriteButtonTags, this: &mut TitleScene, shared: &mu
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_released(tag: ty::SystemButtonTags, this: &mut TitleScene, _shared: &mut Shared) -> AppResult<()> {
-    match tag {
-        ty::SystemButtonTags::ReturnButton => {
+fn sprite_released(sp: utils::Sprites, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    // (한국어) 선택된 스프라이트의 이미지를 변경합니다. 
+    // (English Translation) Changes the image of the selected sprite. 
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let (sprite, _) = this.sprites.get(sp as usize).unwrap();
+    sprite.update(queue, |instances| {
+        for instance in instances.iter_mut() {
+            instance.texture_index = 1;
+        }
+    });
+    
+    match sp {
+        utils::Sprites::Yuzu => {
+            shared.push(utils::Sprites::Yuzu);
+            this.state = TitleState::EnterSelected;
+            this.elapsed_time = 0.0;
+            Ok(())
+        },
+        utils::Sprites::Aris => {
+            shared.push(utils::Sprites::Aris);
+            this.state = TitleState::EnterSelected;
+            this.elapsed_time = 0.0;
+            Ok(())
+        },
+        utils::Sprites::Momoi => {
+            shared.push(utils::Sprites::Momoi);
+            this.state = TitleState::EnterSelected;
+            this.elapsed_time = 0.0;
+            Ok(())
+        },
+        utils::Sprites::Midori => {
+            shared.push(utils::Sprites::Midori);
+            this.state = TitleState::EnterSelected;
+            this.elapsed_time = 0.0;
+            Ok(())
+        },
+        _ => Ok(())
+    }
+}
+
+
+#[allow(unused_variables)]
+#[allow(unreachable_patterns)]
+fn ui_released(btn: utils::SystemButtons, this: &mut TitleScene, _shared: &mut Shared) -> AppResult<()> {
+    match btn {
+        utils::SystemButtons::Return => {
             this.state = TitleState::ExitStage;
             this.elapsed_time = 0.0;
             Ok(())
@@ -471,8 +577,8 @@ fn ui_released(tag: ty::SystemButtonTags, this: &mut TitleScene, _shared: &mut S
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn sprite_dragged(tag: ty::SpriteButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
+fn sprite_dragged(sp: utils::Sprites, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match sp {
         _ => Ok(())
     }
 }
@@ -480,8 +586,8 @@ fn sprite_dragged(tag: ty::SpriteButtonTags, this: &mut TitleScene, shared: &mut
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_dragged(tag: ty::SystemButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
+fn ui_dragged(btn: utils::SystemButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match btn {
         _ => Ok(())
     }
 }

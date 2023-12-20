@@ -8,6 +8,7 @@ use crate::scene::node::SceneNode;
 /// #### English (Translation) </br>
 /// Indicates the next scene state change in the game scene. </br>
 /// 
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub enum SceneState {
     /// #### 한국어 </br>

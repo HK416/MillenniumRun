@@ -1,0 +1,256 @@
+use std::sync::Arc;
+
+use glam::{Mat4, Vec4, Vec3, Vec2};
+
+use crate::{
+    components::{
+        collider2d::shape::AABB,
+        sprite::{Sprite, SpriteBrush, InstanceData},
+        transform::Transform,
+    },
+    nodes::consts::PIXEL_PER_METER,
+    system::error::AppResult,
+};
+
+
+
+/// #### 한국어 </br>
+/// 배경 스프라이트를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a background sprite. </br>
+/// 
+pub(super) fn create_background_sprite(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    sprite_brush: &SpriteBrush
+) -> AppResult<Arc<Sprite>> {
+    Ok(Arc::new(Sprite::new(
+        device,
+        tex_sampler, 
+        texture_view, 
+        sprite_brush, 
+        [InstanceData {
+            transform: Transform::default(),
+            color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 0.0 },
+            size: Vec2 { x: 8.0, y: 8.0 } * PIXEL_PER_METER,
+            texture_index: 0,
+        }]
+    )))
+}
+
+
+
+const SCALE: f32 = 1.8;
+const SPRITE_COLOR: Vec4 = Vec4::new(1.0, 1.0, 1.0, 1.0);
+
+const ARIS_X: f32 = -2.8 * PIXEL_PER_METER;
+const ARIS_Y: f32 = 0.5 * 1.52 * PIXEL_PER_METER;
+const ARIS_HEIGHT: f32 = 1.52 * PIXEL_PER_METER;
+const ARIS_WIDTH: f32 = ARIS_HEIGHT * 1024.0 / 1412.0;
+const ARIS_TRANSLATION: Vec3 = Vec3::new(ARIS_X, ARIS_Y, 0.0);
+const ARIS_SIZE: Vec2 = Vec2::new(ARIS_WIDTH * SCALE, ARIS_HEIGHT * SCALE);
+
+const MOMOI_X: f32 = -1.4 * PIXEL_PER_METER;
+const MOMOI_Y: f32 = 0.5 * 1.43 * PIXEL_PER_METER;
+const MOMOI_HEIGHT: f32 = 1.43 * PIXEL_PER_METER;
+const MOMOI_WIDTH: f32 = MOMOI_HEIGHT * 1024.0 / 1184.0;
+const MOMOI_TRANSLATION: Vec3 = Vec3::new(MOMOI_X, MOMOI_Y, 0.0);
+const MOMOI_SIZE: Vec2 = Vec2::new(MOMOI_WIDTH * SCALE, MOMOI_HEIGHT * SCALE);
+
+const MIDORI_X: f32 = 0.725 * PIXEL_PER_METER;
+const MIDORI_Y: f32 = 0.5 * 1.43 * PIXEL_PER_METER;
+const MIDORI_HEIGHT: f32 = 1.43 * PIXEL_PER_METER;
+const MIDORI_WIDTH: f32 = MIDORI_HEIGHT * 1024.0 / 1356.0;
+const MIDORI_TRANSLATION: Vec3 = Vec3::new(MIDORI_X, MIDORI_Y, 0.0);
+const MIDORI_SIZE: Vec2 = Vec2::new(MIDORI_WIDTH * SCALE, MIDORI_HEIGHT * SCALE);
+
+const YUZU_X: f32 = 2.2 * PIXEL_PER_METER;
+const YUZU_Y: f32 = 0.5 * 1.5 * PIXEL_PER_METER;
+const YUZU_HEIGHT: f32 = 1.5 * PIXEL_PER_METER;
+const YUZU_WIDTH: f32 = YUZU_HEIGHT * 1024.0 / 1861.0;
+const YUZU_TRANSLATION: Vec3 = Vec3::new(YUZU_X, YUZU_Y, 0.0);
+const YUZU_SIZE: Vec2 = Vec2::new(YUZU_WIDTH * SCALE, YUZU_HEIGHT * SCALE);
+
+const STAGE_VIEW_WIDTH: f32 = 2.0 * PIXEL_PER_METER;
+const STAGE_VIEW_HEIGHT: f32 = STAGE_VIEW_WIDTH * 3.0 / 4.0;
+
+pub const STAGE_ARIS_TOP: f32 = ARIS_Y + 0.5 * ARIS_HEIGHT * SCALE + 0.5 * STAGE_VIEW_HEIGHT;
+pub const STAGE_ARIS_LEFT: f32 = ARIS_X - 0.5 * STAGE_VIEW_WIDTH;
+pub const STAGE_ARIS_BOTTOM: f32 = ARIS_Y + 0.5 * ARIS_HEIGHT * SCALE - 0.5 * STAGE_VIEW_HEIGHT;
+pub const STAGE_ARIS_RIGHT: f32 = ARIS_X + 0.5 * STAGE_VIEW_WIDTH;
+
+pub const STAGE_MOMOI_TOP: f32 = MOMOI_Y + 0.5 * MOMOI_HEIGHT * SCALE + 0.5 * STAGE_VIEW_HEIGHT;
+pub const STAGE_MOMOI_LEFT: f32 = MOMOI_X - 0.5 * STAGE_VIEW_WIDTH;
+pub const STAGE_MOMOI_BOTTOM: f32 = MOMOI_Y + 0.5 * MOMOI_HEIGHT * SCALE - 0.5 * STAGE_VIEW_HEIGHT;
+pub const STAGE_MOMOI_RIGHT: f32 = MOMOI_X + 0.5 * STAGE_VIEW_WIDTH;
+
+pub const STAGE_MIDORI_TOP: f32 = MIDORI_Y + 0.5 * MIDORI_HEIGHT * SCALE + 0.5 * STAGE_VIEW_HEIGHT;
+pub const STAGE_MIDORI_LEFT: f32 = MIDORI_X - 0.5 * STAGE_VIEW_WIDTH;
+pub const STAGE_MIDORI_BOTTOM: f32 = MIDORI_Y + 0.5 * MIDORI_HEIGHT * SCALE - 0.5 * STAGE_VIEW_HEIGHT;
+pub const STAGE_MIDORI_RIGHT: f32 = MIDORI_X + 0.5 * STAGE_VIEW_WIDTH;
+
+pub const STAGE_YUZU_TOP: f32 = YUZU_Y + 0.5 * YUZU_HEIGHT * SCALE + 0.5 * STAGE_VIEW_HEIGHT;
+pub const STAGE_YUZU_LEFT: f32 = YUZU_X - 0.5 * STAGE_VIEW_WIDTH;
+pub const STAGE_YUZU_BOTTOM: f32 = YUZU_Y + 0.5 * YUZU_HEIGHT * SCALE - 0.5 * STAGE_VIEW_HEIGHT;
+pub const STAGE_YUZU_RIGHT: f32 = YUZU_X + 0.5 * STAGE_VIEW_WIDTH;
+
+
+/// #### 한국어 </br>
+/// 스테이지 스프라이트의 목록입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a list of stage sprites. </br>
+/// 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Sprites {
+    Aris = 0,
+    Momoi = 1,
+    Midori = 2,
+    Yuzu = 3,
+}
+
+impl From<usize> for Sprites {
+    #[inline]
+    fn from(value: usize) -> Self {
+        match value {
+            0 => Self::Aris,
+            1 => Self::Momoi,
+            2 => Self::Midori,
+            3 => Self::Yuzu,
+            _ => panic!("index out of range!"),
+        }
+    }
+}
+
+
+/// #### 한국어 </br>
+/// 캐릭터 스프라이트를 생성하는데 사용되는 텍스처 뷰 집합입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// A set of texture views used to create the charactor sprites. </br>
+/// 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct CharactorSpriteTextureViews<'a> {
+    pub aris_texture_view: &'a wgpu::TextureView,
+    pub momoi_texture_view: &'a wgpu::TextureView,
+    pub midori_texture_view: &'a wgpu::TextureView,
+    pub yuzu_texture_view: &'a wgpu::TextureView,
+}
+
+
+/// #### 한국어 </br>
+/// 캐릭터 스프라이트를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a charactor sprite. </br>
+/// 
+pub(super) fn create_character_sprites<'a>(
+    device: &'a wgpu::Device, 
+    tex_sampler: &'a wgpu::Sampler, 
+    texture_views: CharactorSpriteTextureViews<'a>, 
+    sprite_brush: &'a SpriteBrush, 
+) -> AppResult<Vec<(Arc<Sprite>, AABB)>> {
+    // (한국어) `Aris` 스프라이트를 생성합니다. 
+    // (English Translation) Create the `Aris` sprite.
+    let aris = (
+        Arc::new(Sprite::new(
+            device,
+            tex_sampler, 
+            texture_views.aris_texture_view,
+            sprite_brush, 
+            [InstanceData {
+                transform: Mat4::from_translation(ARIS_TRANSLATION).into(),
+                color: SPRITE_COLOR,
+                size: ARIS_SIZE,
+                texture_index: 0,
+            }]
+        )),
+        AABB {
+            x: ARIS_X + 0.0,
+            y: ARIS_Y + 0.0,
+            width: ARIS_WIDTH * SCALE * 0.3,
+            height: ARIS_HEIGHT * SCALE * 1.0,
+        }
+    );
+
+
+    // (한국어) `Momoi` 스프라이트를 생성합니다. 
+    // (English Translation) Create the `Momoi` sprite.
+    let momoi = (
+        Arc::new(Sprite::new(
+            device,
+            tex_sampler, 
+            texture_views.momoi_texture_view, 
+            sprite_brush, 
+            [InstanceData {
+                transform: Mat4::from_translation(MOMOI_TRANSLATION).into(),
+                color: SPRITE_COLOR,
+                size: MOMOI_SIZE,
+                texture_index: 0,
+            }]
+        )),
+        AABB {
+            x: MOMOI_X + 0.25 * MOMOI_WIDTH,
+            y: MOMOI_Y + 0.0,
+            width: MOMOI_WIDTH * SCALE * 0.5,
+            height: MOMOI_HEIGHT * SCALE * 1.0,
+        }
+    );
+
+
+    // (한국어) `Midori` 스프라이트를 생성합니다. 
+    // (English Translation) Create the `Midori` sprite.
+    let midori = (
+        Arc::new(Sprite::new(
+            device,
+            tex_sampler, 
+            texture_views.midori_texture_view, 
+            sprite_brush, 
+            [InstanceData {
+                transform: Mat4::from_translation(MIDORI_TRANSLATION).into(),
+                color: SPRITE_COLOR,
+                size: MIDORI_SIZE,
+                texture_index: 0,
+            }]
+        )),
+        AABB {
+            x: MIDORI_X - 0.25 * MIDORI_WIDTH,
+            y: MIDORI_Y + 0.0,
+            width: MIDORI_WIDTH * SCALE * 0.5,
+            height: MIDORI_HEIGHT * SCALE * 1.0,
+        }
+    );
+
+
+    // (한국어) `Midori` 스프라이트를 생성합니다. 
+    // (English Translation) Create the `Midori` sprite.
+    let yuzu = (
+        Arc::new(Sprite::new(
+            device,
+            tex_sampler, 
+            texture_views.yuzu_texture_view, 
+            sprite_brush, 
+            [InstanceData {
+                transform: Mat4::from_translation(YUZU_TRANSLATION).into(),
+                color: SPRITE_COLOR,
+                size: YUZU_SIZE,
+                texture_index: 0,
+            }]
+        )),
+        AABB {
+            x: YUZU_X + 0.3 * YUZU_WIDTH,
+            y: YUZU_Y + 0.0,
+            width: YUZU_WIDTH * SCALE * 0.5,
+            height: YUZU_HEIGHT * SCALE * 1.0,
+        }
+    );
+
+    return Ok(vec![
+        aris, 
+        momoi, 
+        midori, 
+        yuzu, 
+    ]);
+} 

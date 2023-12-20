@@ -1,5 +1,3 @@
-use crate::components::text::font;
-
 use super::Collider2d;
 
 

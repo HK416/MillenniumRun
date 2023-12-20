@@ -6,48 +6,30 @@ use winit::dpi::PhysicalPosition;
 
 use crate::components::{
     collider2d::Collider2d,
+    ui::brush::UiBrush,
     camera::GameCamera,
-    ui::{
-    UserInterface,
     anchor::Anchor,
     margin::Margin,
-    }
 };
 
 
 
 /// #### 한국어 </br>
-/// 유저 인터페이스 렌더링에 사용되는 데이터를 담고있습니다. </br>
+/// 사용자 인터페이스를 렌더링하는데 사용되는 인스턴스 데이터를 담고 있습니다. </br>
 /// 
 /// #### English (Translation) </br>
-/// Contains data used for user interface rendering. </br>
+/// Contains instance data used to render the user interface. </br>
 /// 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
-pub struct UiData {
+pub struct InstanceData {
     pub transform: Mat4,
     pub anchor: Anchor,
     pub margin: Margin,
     pub color: Vec4,
 }
 
-impl From<UiObjectBuilder<'_>> for UiData {
-    #[inline]
-    fn from(value: UiObjectBuilder<'_>) -> Self {
-        Self { 
-            transform: Mat4::from_scale_rotation_translation(
-                value.scale,
-                value.rotation,
-                value.translation,
-            ), 
-            anchor: value.anchor, 
-            margin: value.margin, 
-            color: value.color 
-        }
-    }
-}
-
-impl Default for UiData {
+impl Default for InstanceData {
     #[inline]
     fn default() -> Self {
         Self {
@@ -69,38 +51,38 @@ impl Default for UiData {
 /// 
 #[derive(Debug, Clone, Copy)]
 pub struct UiObjectBuilder<'a> {
-    pub name: Option<&'a str>,
-    pub anchor: Anchor,
-    pub margin: Margin,
-    pub color: Vec4,
-    pub scale: Vec3,
-    pub rotation: Quat,
-    pub translation: Vec3,
-    pub tex_sampler: &'a wgpu::Sampler,
-    pub texture_view: &'a wgpu::TextureView,
-    pub texture_layout: &'a wgpu::BindGroupLayout,
+    pub name: Option<&'a str>, 
+    pub anchor: Anchor, 
+    pub margin: Margin, 
+    pub color: Vec4, 
+    pub scale: Vec3, 
+    pub rotation: Quat, 
+    pub translation: Vec3, 
+    pub tex_sampler: &'a wgpu::Sampler, 
+    pub texture_view: &'a wgpu::TextureView, 
+    pub ui_brush: &'a UiBrush, 
 }
 
 #[allow(dead_code)]
 impl<'a> UiObjectBuilder<'a> {
     #[inline]
     pub fn new(
-        name: Option<&'a str>,
-        tex_sampler: &'a wgpu::Sampler,
-        texture_view: &'a wgpu::TextureView,
-        texture_layout: &'a wgpu::BindGroupLayout
+        name: Option<&'a str>, 
+        tex_sampler: &'a wgpu::Sampler, 
+        texture_view: &'a wgpu::TextureView, 
+        ui_brush: &'a UiBrush
     ) -> Self {
         Self {
-            name,
-            anchor: Anchor::default(),
-            margin: Margin::default(),
-            color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 },
-            scale: Vec3 { x: 1.0, y: 1.0, z: 1.0 },
-            rotation: Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
-            translation: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
-            texture_layout,
-            tex_sampler,
-            texture_view,
+            name, 
+            anchor: Anchor::default(), 
+            margin: Margin::default(), 
+            color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 }, 
+            scale: Vec3 { x: 1.0, y: 1.0, z: 1.0 }, 
+            rotation: Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }, 
+            translation: Vec3 { x: 0.0, y: 0.0, z: 0.0 }, 
+            tex_sampler, 
+            texture_view, 
+            ui_brush, 
         }
     }
 
@@ -156,27 +138,34 @@ impl<'a> UiObjectBuilder<'a> {
 /// 
 #[derive(Debug)]
 pub struct UiObject {
-    pub data: Mutex<UiData>,
     buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+    pub data: Mutex<InstanceData>,
 }
 
 impl UiObject {
-    fn new<'a>(
-        builder: UiObjectBuilder<'a>, 
-        device: &wgpu::Device
-    ) -> Self {
+    fn new<'a>(builder: UiObjectBuilder<'a>, device: &wgpu::Device) -> Self {
+        use wgpu::util::DeviceExt;
+
         // (한국어) 라벨 데이터를 생성합니다.
         // (English Translation) Create a label data.
         let label = format!("UiObject({})", builder.name.unwrap_or("Unknown"));
 
         // (한국어) 사용자 인터페이스 데이터 버퍼를 생성합니다.
         // (English Translation) Create a user interface data buffer.
-        use wgpu::util::DeviceExt;
-        let data = UiData::from(builder);
+        let data = InstanceData {
+            transform: Mat4::from_scale_rotation_translation(
+                builder.scale, 
+                builder.rotation, 
+                builder.translation
+            ), 
+            anchor: builder.anchor, 
+            margin: builder.margin, 
+            color: builder.color, 
+        };
         let buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("UiData({})", label)),
+                label: Some(&format!("Vertex(InstanceData({}))", label)),
                 contents: bytemuck::bytes_of(&data),
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             }
@@ -187,7 +176,7 @@ impl UiObject {
         let bind_group = device.create_bind_group(
             &wgpu::BindGroupDescriptor {
                 label: Some(&format!("BingGroup(Texture({}))", label)),
-                layout: builder.texture_layout,
+                layout: &builder.ui_brush.texture_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
@@ -202,9 +191,9 @@ impl UiObject {
         );
 
         Self { 
-            data: data.into(), 
             buffer, 
-            bind_group,
+            bind_group, 
+            data: data.into(), 
         }
     }
 
@@ -217,27 +206,24 @@ impl UiObject {
     /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
     /// 
     #[inline]
-    pub fn update_buffer<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
-    where F: Fn(&mut MutexGuard<'_, UiData>) {
+    pub fn update<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
+    where F: Fn(&mut MutexGuard<'_, InstanceData>) {
         let mut guard = self.data.lock().expect("Failed to access variable.");
         mapping_func(&mut guard);
         queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&*guard));
     }
-}
 
-impl UserInterface for UiObject {
     #[inline]
-    fn bind<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
+    pub(super) fn bind<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
         rpass.set_bind_group(1, &self.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.buffer.slice(..));
     }
 
     #[inline]
-    fn draw<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
+    pub(super) fn draw<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
         rpass.draw(0..4, 0..1);
     }
 }
-
 
 impl Collider2d<(&PhysicalPosition<f64>, &GameCamera)> for UiObject {
     fn test(&self, other: &(&PhysicalPosition<f64>, &GameCamera)) -> bool {

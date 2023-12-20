@@ -12,8 +12,8 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        ui::{UserInterface, brush::UiBrush}, 
-        text::{brush::TextBrush, Section}, 
+        text2d::brush::Text2dBrush, 
+        ui::brush::UiBrush, 
         camera::GameCamera,
     },
     nodes::{
@@ -21,8 +21,8 @@ use crate::{
             MAX_BUTTON_SCALE,
             INIT_BUTTON_SCALE,
             FirstTimeSetupScene,
-        },
-        intro::IntroScene,
+        }, 
+        intro::IntroLoading,
     },
     scene::state::SceneState,
     system::{
@@ -55,10 +55,10 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
     // (English Translation) Updates the alpha value of the button 
     let alpha = 1.0 - 1.0 * delta;
     for (ui, text) in this.buttons.values_mut() {
-        ui.update_buffer(queue, |data| {
+        ui.update(queue, |data| {
             data.color.w = alpha;
         });
-        text.update_section(queue, |data| {
+        text.update(queue, |data| {
             data.color.w = alpha;
         });
     }
@@ -67,12 +67,12 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
     // (English Translation) Updates the scale value of the button.
     let scale = INIT_BUTTON_SCALE + (MAX_BUTTON_SCALE - INIT_BUTTON_SCALE) * delta;
     if let Some((ui, text)) = this.buttons.get_mut(&this.language) {
-        ui.update_buffer(queue, |data| {
+        ui.update(queue, |data| {
             data.transform.x_axis.x = scale.x;
             data.transform.y_axis.y = scale.y;
             data.transform.z_axis.z = scale.z;
         });
-        text.update_section(queue, |data| {
+        text.update(queue, |data| {
             data.transform.x_axis.x = scale.x;
             data.transform.y_axis.y = scale.y;
             data.transform.z_axis.z = scale.z;
@@ -89,11 +89,9 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
     // and the script for the selected language has been loaded.
     //
     if this.elapsed_time >= TOTAL_DURATION 
-    && this.loading.as_ref().unwrap().is_finished() {
-        let script = this.loading.take().unwrap().join().unwrap()?;
-        shared.push(script);
-
-        *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(IntroScene::default()));
+    && this.loading.as_ref().is_some_and(|it| it.is_finished()) {
+        shared.push(this.loading.take().unwrap().join().unwrap()?);
+        *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(IntroLoading::default()));
         return Ok(());
     }
 
@@ -103,7 +101,7 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
 pub fn draw(this: &FirstTimeSetupScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -162,11 +160,11 @@ pub fn draw(this: &FirstTimeSetupScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 유저 인터페이스 오브젝트 그리기.
         // (English Translation) Drawing user interface objects.
-        ui_brush.draw(&mut rpass, this.buttons.values().map(|(ui, _)| ui as &dyn UserInterface));
+        ui_brush.draw(&mut rpass, this.buttons.values().map(|(ui, _)| ui));
 
         // // (한국어) 텍스트 그리기.
         // // (English Translation) Drawing texts.
-        text_brush.draw_2d(&mut rpass, this.buttons.values().map(|(_, text)| text as &dyn Section));
+        text_brush.draw(&mut rpass, this.buttons.values().map(|(_, text)| text));
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

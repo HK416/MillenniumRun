@@ -1,6 +1,6 @@
 [package]
 name = "MillenniumRun"
-version = "0.4.4"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.73"
 authors = ["HK416 <powerspirit127@gmail.com>", ]
@@ -27,6 +27,7 @@ rust-embed = { version = "8.0.*", features = ["debug-embed", "interpolate-folder
 sha2 = "0.10.*" # MIT or Apache-2.0 license.
 
 image = "0.24.*" # MIT license.
+ddsfile = "0.5.*" # MIT license. 
 wgpu = { version = "0.18.*", features = ["spirv"] } # Graphics crate / MIT or Apache-2.0 license.
 winit = { version = "0.29.*", features = ["rwh_05"] } # Window crate / Apache-2.0 license.
 rodio = "0.17.*" # Sound crate / MIT or Apache-2.0 license.

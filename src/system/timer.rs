@@ -108,11 +108,6 @@ impl GameTimer {
     }
 
     #[inline]
-    pub fn frame_rate(&self) -> u64 {
-        self.frame_rate
-    }
-
-    #[inline]
     pub fn total_time_sec(&self) -> f64 {
         self.current_time_point.saturating_duration_since(
             self.base_timepoint

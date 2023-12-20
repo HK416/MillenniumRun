@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     game_err,
     components::{
-        text::{Section, brush::TextBrush}, 
+        text2d::brush::Text2dBrush, 
         camera::GameCamera,
     },
     nodes::intro::{IntroScene, state::IntroState}, 
@@ -43,8 +43,8 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elap
     // (English Translation) Updates the alpha value of the notification text over time.
     let delta_time = (this.elapsed_time / DURATION).min(1.0) as f32;
     let alpha = 1.0 - 1.0 * delta_time;
-    for section in this.notify_texts.iter_mut() {
-        section.update_section(queue, |data| {
+    for section in this.notifications.iter_mut() {
+        section.update(queue, |data| {
             data.color.w = alpha;
         })
     }
@@ -74,7 +74,7 @@ pub fn draw(
 ) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -126,7 +126,7 @@ pub fn draw(
         });
 
         camera.bind(&mut rpass);
-        text_brush.draw_2d(&mut rpass, this.notify_texts.iter().map(|text| text as &dyn Section));
+        text_brush.draw(&mut rpass, this.notifications.iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

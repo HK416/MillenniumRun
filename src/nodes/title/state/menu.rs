@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use glam::{Vec4, Vec3, Vec4Swizzles};
 use winit::{
@@ -11,14 +11,16 @@ use crate::{
     game_err,
     components::{
         collider2d::Collider2d,
-        sprite::brush::SpriteBrush,
-        text::brush::TextBrush,
-        ui::brush::UiBrush,
-        camera::GameCamera,
+        text2d::brush::Text2dBrush, 
+        ui::brush::UiBrush, 
+        lights::PointLights, 
+        sprite::SpriteBrush,
+        camera::GameCamera, 
     },
     nodes::title::{
+        utils,
         TitleScene, 
-        ty, state::TitleState,
+        state::TitleState,
     },
     render::depth::DepthBuffer,
     system::{
@@ -27,6 +29,14 @@ use crate::{
         shared::Shared,
     },
 };
+
+/// #### 한국어 </br>
+/// 현재 눌려져있는 메뉴 버튼의 원래 색상 데이터를 담고 있습니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Contains the original color data of the currently pressed menu button. </br>
+/// 
+static FOCUSED_MENU_BTN: Mutex<Option<(usize, Vec3, Vec<Vec3>)>> = Mutex::new(None);
 
 
 
@@ -43,8 +53,9 @@ pub fn update(_this: &mut TitleScene, _shared: &mut Shared, _total_time: f64, _e
 pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
+    let point_light = shared.get::<Arc<PointLights>>().unwrap();
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -100,7 +111,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         
         // (한국어) 배경 오브젝트 그리기.
         // (English Translation) Drawing background objects.
-        this.background.draw(sprite_brush, &mut rpass);
+        sprite_brush.draw(&point_light, &mut rpass, [this.background.as_ref()].into_iter());
     }
 
     {
@@ -130,7 +141,18 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 메뉴 버튼 그리기.
         // (English Translation) Drawing the menu buttons.
-        this.menu.draw(ui_brush, text_brush, &mut rpass);
+        ui_brush.draw(
+            &mut rpass, 
+            this.menu_buttons.iter()
+            .map(|(ui, _)| ui.as_ref())
+        );
+        text_brush.draw(
+            &mut rpass, 
+            this.menu_buttons.iter()
+            .map(|(_, it)| it)
+            .flatten()
+            .map(|it| it.as_ref())
+        );
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -143,24 +165,39 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
 
 fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
+    use crate::components::sound;
+    
+    // (한국어) 사용할 공유 객체를 가져옵니다.
+    // (English Translation) Get shared object to use.
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+
     match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput { event, .. }
             => if let PhysicalKey::Code(code) = event.physical_key {
                 if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
-                    super::play_cancel_sound(this, shared)?;
+                    sound::play_click_sound(shared)?;
+
+                    // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다. 
+                    // (English Translation) Returns the color of the selected ui to its original color.
+                    let mut guard = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
+                    if let Some((index, ui_color, section_colors)) = guard.take() {
+                        if let Some((ui, sections)) = this.menu_buttons.get(index) {
+                            ui.update(queue, |data| {
+                                data.color = (ui_color, data.color.w).into();
+                            });
+                            for (section_color, section) in section_colors.into_iter().zip(sections.iter()) {
+                                section.update(queue, |data| {
+                                    data.color = (section_color, data.color.w).into();
+                                });
+                            }
+                        }
+                    }
 
                     // (한국어) 다음 게임 장면 상태로 변경합니다.
                     // (English Translation) Change to the next game scene state.
                     this.state = TitleState::EnterMsgBox;
                     this.elapsed_time = 0.0;
-                } else if KeyCode::F4 == code && !event.repeat && event.state.is_pressed() {
-                    #[cfg(debug_assertions)] {
-                        // (한국어) 다음 게임 장면 상태로 변경합니다.
-                        // (English Translation) Change to the next game scene state.
-                        this.state = TitleState::Dev;
-                        this.elapsed_time = 0.0;
-                    }
                 };
             },
             _ => { /* empty */ }
@@ -173,9 +210,6 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
 
 
 fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) ->AppResult<()> {
-    use std::sync::Mutex;
-    static FOCUSED: Mutex<Option<(ty::MenuButtonTags, Vec3, Vec<Vec3>)>> = Mutex::new(None);
-
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
@@ -188,9 +222,11 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
                 if MouseButton::Left == *button && state.is_pressed() {
                     // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                     // (English Translation) Make sure the mouse cursor is inside the ui area.
-                    let pickable = this.menu.pickable();
-                    let select = pickable.into_iter()
-                        .find(|(_, (ui, _))| ui.test(&(cursor_pos, camera)));
+                    let select = this.menu_buttons.iter()
+                        .enumerate()
+                        .find(|(_, (ui, _))| {
+                            ui.test(&(cursor_pos, camera))
+                        });
 
                     // (한국어)
                     // 마우스 커서가 ui 영역 안에 있는 경우:
@@ -204,58 +240,62 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
                     // 2. Change the color of the ui and the color of the text.
                     // 3. Calls the ui pressed function.
                     //
-                    if let Some((tag, (ui, texts))) = select {
+                    if let Some((index, (ui, sections))) = select {
                         // <1>
                         let ui_color = ui.data.lock().expect("Failed to access variable.").color.xyz();
-                        let text_colors = texts.iter().map(|it| {
+                        let section_colors = sections.iter().map(|it| {
                             it.data.lock().expect("Failed to access variable.").color.xyz()
                         }).collect();
-                        let mut gaurd = FOCUSED.lock().expect("Failed to access variable.");
-                        *gaurd = Some((tag, ui_color, text_colors));
+                        let mut gaurd = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
+                        *gaurd = Some((index, ui_color, section_colors));
 
                         // <2>
-                        ui.update_buffer(queue, |data| {
+                        ui.update(queue, |data| {
                             data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
                         });
-                        for text in texts.iter() {
-                            text.update_section(queue, |data| {
+                        for section in sections.iter() {
+                            section.update(queue, |data| {
                                 data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
                             });
                         }
 
                         // <3>
-                        ui_pressed(tag, this, shared)?;
+                        ui_pressed(utils::MenuButtons::from(index), this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
-                    let mut guard = FOCUSED.lock().expect("Failed to access variable.");
-                    if let Some((tag, ui_color, text_colors)) = guard.take() {
+                    let mut guard = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
+                    if let Some((index, ui_color, section_colors)) = guard.take() {
                         // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
                         // (English Translation) Returns the color of the selected ui to its original color.
-                        if let Some((ui, texts)) = this.menu.get_mut(tag as usize) {
-                            ui.update_buffer(queue, |data| {
+                        if let Some((ui, sections)) = this.menu_buttons.get(index) {
+                            ui.update(queue, |data| {
                                 data.color = (ui_color, data.color.w).into();
                             });
-                            for (text_color, text) in text_colors.into_iter().zip(texts.iter()) {
-                                text.update_section(queue, |data| {
-                                    data.color = (text_color, data.color.w).into();
+                            for (section_color, section) in section_colors.into_iter().zip(sections.iter()) {
+                                section.update(queue, |data| {
+                                    data.color = (section_color, data.color.w).into();
                                 });
                             }
                         };
                         
                         // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                         // (English Translation) Make sure the mouse cursor is inside the ui area.
-                        let pickable = this.menu.pickable();
-                        let select = pickable.into_iter()
-                            .find_map(|(tag, (ui, _))| {
-                                ui.test(&(cursor_pos, camera)).then_some(tag)
+                        let select = this.menu_buttons.iter()
+                            .enumerate()
+                            .find_map(|(idx, (ui, _))| {
+                                if ui.test(&(cursor_pos, camera)) {
+                                    Some(idx)
+                                } else {
+                                    None
+                                }
                             });
 
                         // (한국어) 선택된 ui가 이전에 선택된 ui와 일치하는 경우:
                         // (English Translation) If the selected ui matches a previously selected ui:
-                        if select.is_some_and(|select| tag == select) {
+                        if select.is_some_and(|select| index == select) {
                             // (한국어) ui 떼어짐 함수를 호출합니다.
                             // (English Translation) Calls the ui released function.
-                            ui_released(tag, this, shared)?;
+                            ui_released(utils::MenuButtons::from(index), this, shared)?;
                         }
                     }
                 }
@@ -263,11 +303,11 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
             WindowEvent::CursorMoved { .. } => {
                 // (한국어) 선택된 ui가 있는 경우:
                 // (English Translation) If there is a selected ui:
-                let guard = FOCUSED.lock().expect("Failed to access variable.");
-                if let Some((tag, _, _)) = guard.as_ref() {
+                let guard = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
+                if let Some((index, _, _)) = guard.as_ref() {
                     // (한국어) ui 끌림 함수를 호출합니다.
                     // (English Translation) Calls the ui dragged function.
-                    ui_dragged(*tag, this, shared)?;
+                    ui_dragged(utils::MenuButtons::from(*index), this, shared)?;
                 }
             },
             _ => { /* empty */ } 
@@ -281,16 +321,18 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_pressed(tag: ty::MenuButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
-        ty::MenuButtonTags::StartButton => {
-            super::play_click_sound(this, shared)
+fn ui_pressed(btn: utils::MenuButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    use crate::components::sound;
+    
+    match btn {
+        utils::MenuButtons::Start => {
+            sound::play_click_sound(shared)
         },
-        ty::MenuButtonTags::SettingButton => {
-            super::play_click_sound(this, shared)
+        utils::MenuButtons::Setting => {
+            sound::play_click_sound(shared)
         },
-        ty::MenuButtonTags::ExitButton => {
-            super::play_click_sound(this, shared)
+        utils::MenuButtons::Exit => {
+            sound::play_click_sound(shared)
         },
         _ => Ok(())
     }
@@ -299,19 +341,19 @@ fn ui_pressed(tag: ty::MenuButtonTags, this: &mut TitleScene, shared: &mut Share
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_released(tag: ty::MenuButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
-        ty::MenuButtonTags::StartButton => {
+fn ui_released(btn: utils::MenuButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match btn {
+        utils::MenuButtons::Start => {
             this.state = TitleState::EnterStage;
             this.elapsed_time = 0.0;
             Ok(())
         },
-        ty::MenuButtonTags::SettingButton => {
+        utils::MenuButtons::Setting => {
             this.state = TitleState::EnterSetting;
             this.elapsed_time = 0.0;
             Ok(())
         },
-        ty::MenuButtonTags::ExitButton => {
+        utils::MenuButtons::Exit => {
             this.state = TitleState::EnterMsgBox;
             this.elapsed_time = 0.0;
             Ok(())
@@ -323,8 +365,8 @@ fn ui_released(tag: ty::MenuButtonTags, this: &mut TitleScene, shared: &mut Shar
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_dragged(tag: ty::MenuButtonTags, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
+fn ui_dragged(btn: utils::MenuButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match btn {
         _ => Ok(())
     }
 }

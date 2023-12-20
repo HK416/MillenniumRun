@@ -10,50 +10,47 @@ pub mod consts {
 
 pub mod path {
     pub const SETTINGS_PATH: &'static str = "user.settings";
-    pub const FONT_MEDIUM_PATH: &'static str = "fonts/nexon_lv2_gothic_medium.ttf";
-    pub const FONT_BLOD_PATH: &'static str = "fonts/nexon_lv2_gothic_bold.ttf";
 
+    // Fonts ------------------------------------------------------------------
+    pub const NEXON_LV2_GOTHIC_BOLD_PATH: &'static str = "fonts/nexon_lv2_gothic_bold.ttf";
+    pub const NEXON_LV2_GOTHIC_MEDIUM_PATH: &'static str = "fonts/nexon_lv2_gothic_medium.ttf";
+    pub const NEXON_LV2_GOTHIC_PATH: &'static str = "fonts/nexon_lv2_gothic.ttf";
+
+    // Scripts ----------------------------------------------------------------
+    pub const KOR_SCRIPTS_PATH: &'static str = "scripts/kor.ron";
+
+    // Shaders ----------------------------------------------------------------
     pub const UI_SHADER_PATH: &'static str = "shaders/ui.wgsl";
-    pub const TEXT2D_SHADER_PATH: &'static str = "shaders/text_2d.wgsl";
-    pub const TEXT3D_SHADER_PATH: &'static str = "shaders/text_3d.wgsl";
+    pub const UI_TEXT_SHADER_PATH: &'static str = "shaders/text.wgsl";
     pub const SPRITE_SHADER_PATH: &'static str = "shaders/sprite.wgsl";
 
-    pub mod sys {
-        pub const WINDOW_TEXTURE_PATH: &'static str = "textures/sys/window.png";
+    // Textures ---------------------------------------------------------------
+    pub const LOGO_TEXTURE_PATH: &'static str = "textures/ui/logo.dds";
+    pub const BUTTON_MEDIUM_TEXTURE_PATH: &'static str = "textures/ui/button_medium.dds";
+    pub const BUTTON_WIDE_TEXTURE_PATH: &'static str = "textures/ui/button_wide.dds";
+    pub const TITLE_BUTTON_START_TEXTURE_PATH: &'static str = "textures/ui/title_button_start.dds";
+    pub const TITLE_BUTTON_SETTING_TEXTURE_PATH: &'static str = "textures/ui/title_button_setting.dds";
+    pub const TITLE_BUTTON_EXIT_TEXTURE_PATH: &'static str = "textures/ui/title_button_exit.dds";
+    pub const TITLE_BUTTON_RETURN_TEXTURE_PATH: &'static str = "textures/ui/title_button_return.dds";
+    pub const WINDOW_RATIO_4_3_TEXTURE_PATH: &'static str = "textures/ui/window_ratio_4_3.dds";
 
-        pub const BUTTON_SMALL_TEXTURE_PATH: &'static str = "textures/sys/button_small.png";
-        pub const BUTTON_SMALL_EX_TEXTURE_PATH: &'static str = "textures/sys/button_small_ex.png";
-        pub const BUTTON_WIDE_TEXTURE_PATH: &'static str = "textures/sys/button_wide.png";
-        pub const BUTTON_START_TEXTURE_PATH: &'static str = "textures/sys/button_start.png";
-        pub const BUTTON_SETTING_TEXTURE_PATH: &'static str = "textures/sys/button_setting.png";
-        pub const BUTTON_EXIT_TEXTURE_PATH: &'static str = "textures/sys/button_exit.png";
-        pub const BUTTON_ENTER_TEXTURE_PATH: &'static str = "textures/sys/button_enter.png";
-        pub const BUTTON_RETURN_TEXTURE_PATH: &'static str = "textures/sys/button_return.png";
+    pub const BACKGROUND_TEXTURE_PATH: &'static str = "textures/background.dds";
+    pub const ARIS_STANDING_TEXTURE_PATH: &'static str = "textures/aris_standing.dds";
+    pub const MOMOI_STANDING_TEXTURE_PATH: &'static str = "textures/momoi_standing.dds";
+    pub const MIDORI_STANDING_TEXTURE_PATH: &'static str = "textures/midori_standing.dds";
+    pub const YUZU_STANDING_TEXTURE_PATH: &'static str = "textures/yuzu_standing.dds";
 
-        pub const CLICK_SOUND_PATH: &'static str = "sounds/sys/click.ogg";
-        pub const CANCEL_SOUND_PATH: &'static str = "sounds/sys/cancel.ogg";
+    // Sounds -----------------------------------------------------------------
+    pub const THEME64_SOUND_PATH: &'static str = "sounds/bgm/theme64.ogg";
 
-        pub const SCRIPT_KOR_PATH: &'static str = "scripts/kor.ron";
-    }
+    pub const CLICK_SOUND_PATH: &'static str = "sounds/ui/click.ogg";
+    pub const CANCEL_SOUND_PATH: &'static str = "sounds/ui/cancel.ogg";
+    
+    pub const ARIS_TITLE_SOUND_PATH: &'static str = "sounds/aris/aris_title.ogg";
 
-    pub mod intro {
-        pub const LOGO_TEXTURE_PATH: &'static str = "textures/intro/logo.png";
+    pub const MOMOI_TITLE_SOUND_PATH: &'static str = "sounds/momoi/momoi_title.ogg";
 
-        pub const YUZU_SOUND_PATH: &'static str = "sounds/intro/yuzu.ogg";
-        pub const ARIS_SOUND_PATH: &'static str = "sounds/intro/aris.ogg";
-        pub const MOMOI_SOUND_PATH: &'static str = "sounds/intro/momoi.ogg";
-        pub const MIDORI_SOUND_PATH: &'static str = "sounds/intro/midori.ogg";
-    }
+    pub const MIDORI_TITLE_SOUND_PATH: &'static str = "sounds/midori/midori_title.ogg";
 
-    pub mod title {
-        pub const SOFA_TEXTURE_PATH: &'static str = "textures/title/sofa.png";
-        pub const CABINET_TEXTURE_PATH: &'static str = "textures/title/cabinet.png";
-        pub const BACKGROUND_PATH: &'static str = "textures/title/background.png";
-        pub const YUZU_TEXTURE_PATH: &'static str = "textures/title/yuzu.png";
-        pub const ARIS_TEXTURE_PATH: &'static str = "textures/title/aris.png";
-        pub const MOMOI_TEXTURE_PATH: &'static str = "textures/title/momoi.png";
-        pub const MIDORI_TEXTURE_PATH: &'static str = "textures/title/midori.png";
-
-        pub const BGM_SOUND_PATH: &'static str = "sounds/title/theme64.ogg";
-    }
+    pub const YUZU_TITLE_SOUND_PATH: &'static str = "sounds/yuzu/yuzu_title.ogg";
 }

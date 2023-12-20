@@ -23,16 +23,15 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ScriptTags {
     NotifyTitle,
-    NotifyText,
-    StartMenu,
-    SettingMenu,
-    ExitMenu,
-    Exit,
-    NoExit,
-    Store,
-    NoStore,
+    NotifyTextLine0,
+    StartMenuButton,
+    SettingMenuButton,
+    ExitMenuButton,
+    ExitButton,
+    NoExitButton,
+    StoreButton,
     ExitMessage,
-    EnterStage,
+    EnterStageButton,
 }
 
 

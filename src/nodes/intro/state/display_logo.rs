@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     game_err,
-    components::{ui::{UserInterface, brush::UiBrush}, camera::GameCamera},
+    components::{ui::brush::UiBrush, camera::GameCamera},
     nodes::intro::{IntroScene, state::IntroState},
     render::depth::DepthBuffer,
     system::{
@@ -109,7 +109,7 @@ pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
         });
 
         camera.bind(&mut rpass);
-        ui_brush.draw(&mut rpass, this.logo_images.iter().map(|it| it as &dyn UserInterface));
+        ui_brush.draw(&mut rpass, [&this.logo].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

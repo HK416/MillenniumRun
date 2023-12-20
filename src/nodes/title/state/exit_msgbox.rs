@@ -5,10 +5,11 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        sprite::brush::SpriteBrush,
-        text::{brush::TextBrush, section::d2::Section2d},
+        text2d::{brush::Text2dBrush, section::Section2d},
         ui::{brush::UiBrush, objects::UiObject},
         camera::GameCamera,
+        lights::PointLights,
+        sprite::SpriteBrush,
     },
     nodes::title::{
         TitleScene,
@@ -51,8 +52,8 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     let delta = smooth_step(this.elapsed_time, DURATION);
     let alpha = 1.0 * delta;
     let scale = 1.0 - 1.0 * delta;
-    update_ui_alpha(this.menu.iter_mut(), queue, alpha);
-    update_ui_scale(this.exit_window.iter_mut(), queue, scale);
+    update_ui_alpha(this.menu_buttons.iter_mut(), queue, alpha);
+    update_ui_scale(this.exit_msg_box.iter_mut(), queue, scale);
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) Changes to the next state if it is greater than the duration. 
@@ -68,8 +69,9 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
 pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
+    let point_lights = shared.get::<Arc<PointLights>>().unwrap();
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -125,7 +127,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         
         // (한국어) 배경 오브젝트 그리기.
         // (English Translation) Drawing background objects.
-        this.background.draw(sprite_brush, &mut rpass);
+        sprite_brush.draw(&point_lights, &mut rpass, [this.background.as_ref()].into_iter());
     }
 
     {
@@ -155,7 +157,18 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 메뉴 버튼 그리기.
         // (English Translation) Drawing the menu buttons.
-        this.menu.draw(ui_brush, text_brush, &mut rpass);
+        ui_brush.draw(
+            &mut rpass, 
+            this.menu_buttons.iter()
+            .map(|(ui, _)| ui.as_ref())
+        );
+        text_brush.draw(
+            &mut rpass, 
+            this.menu_buttons.iter()
+            .map(|(_, it)| it)
+            .flatten()
+            .map(|it| it.as_ref())
+        );
     }
 
     {
@@ -183,9 +196,20 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         camera.bind(&mut rpass);
 
-        // (한국어) 메시지 박스 그리기.
+        // (한국어) 메시지 상자 그리기.
         // (English Translation) Drawing the message box.
-        this.exit_window.draw(ui_brush, text_brush, &mut rpass);
+        ui_brush.draw(
+            &mut rpass, 
+            this.exit_msg_box.iter()
+            .map(|(ui, _)| ui.as_ref())
+        );
+        text_brush.draw(
+            &mut rpass, 
+            this.exit_msg_box.iter()
+            .map(|(_, it)| it)
+            .flatten()
+            .map(|it| it.as_ref())
+        );
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -213,13 +237,13 @@ fn smooth_step(elapsed_time: f64, duration: f64) -> f32 {
 fn update_ui_scale<'a, Iter>(iter: Iter, queue: &wgpu::Queue, scale: f32) 
 where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
     for (ui, texts) in iter {
-        ui.update_buffer(queue, |data| {
+        ui.update(queue, |data| {
             data.transform.x_axis.x = scale;
             data.transform.y_axis.y = scale;
             data.transform.z_axis.z = scale;
         });
         for text in texts.iter_mut() {
-            text.update_section(queue, |data| {
+            text.update(queue, |data| {
                 data.transform.x_axis.x = scale;
                 data.transform.y_axis.y = scale;
                 data.transform.z_axis.z = scale;
@@ -237,11 +261,11 @@ where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
 fn update_ui_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
 where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
     for (ui, texts) in iter {
-        ui.update_buffer(queue, |data| {
+        ui.update(queue, |data| {
             data.color.w = alpha;
         });
         for text in texts.iter_mut() {
-            text.update_section(queue, |data| {
+            text.update(queue, |data| {
                 data.color.w = alpha;
             })
         }

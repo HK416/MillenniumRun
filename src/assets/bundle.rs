@@ -69,7 +69,7 @@ impl AssetBundle {
     pub fn new() -> AppResult<Self> {
         let root_path = ROOT_ASSET_PATH.clone()?;
         let asset_list = Arc::new(ASSET_LISTS.clone()?);
-        let loaded_assets = Arc::new(RwLock::new(HashMap::with_capacity(asset_list.capacity())));
+        let loaded_assets = Arc::new(RwLock::new(HashMap::with_capacity(asset_list.len())));
         
         // (한국어) 에셋 파일 감시자를 생성합니다.
         // (English Translation) Create an asset file watcher.
@@ -97,6 +97,7 @@ impl AssetBundle {
         // (한국어) 에셋 파일 검사를 시작합니다.
         // (English Translation) Start checking asset files.
         check_assets(&root_path, &asset_list)?;
+
 
         Ok(Self { root_path, asset_list, loaded_assets, integrity_flag })
     }
@@ -264,33 +265,39 @@ fn get_subpath<'a>(path: &'a Path, base: &'a Path) -> Result<&'a Path, String> {
 /// and checks if the key values match for static type asset files. </br>
 /// If an error occurs during the check, it returns `PanicMsg`. </br>
 /// 
-fn check_assets<P: AsRef<Path>>(
-    root_path: P, 
+fn check_assets(
+    root_path: &Path, 
     asset_list: &HashMap<PathBuf, Types>,
 ) -> AppResult<()> {
+    let mut handles = Vec::with_capacity(asset_list.len());
+
     for (rel_path, types) in asset_list.iter() {
-        let abs_path = PathBuf::from_iter([root_path.as_ref(), rel_path]);
-        if !types.creatable() && !abs_path.is_file() {
-            return Err(game_err!(
-                ERR_TITLE_VERIFICATION_FAILED,
-                "{} {}",
-                ERR_VERIFICATION_FAILED,
-                "Asset is not a file or path cannot be found!"
-            ));
-        }
-
-        if !types.writable() {
-            let key_file = AssetKeys::get(
-                rel_path.to_str().unwrap()
-            ).ok_or_else(|| game_err!(
-                ERR_TITLE_VERIFICATION_FAILED,
-                "{} {}",
-                ERR_VERIFICATION_FAILED,
-                "Asset key not found!"
-            ))?;
-
-            let hash = {
-                let mut file = OpenOptions::new()
+        let types_cloned = types.clone();
+        let rel_path_cloned = rel_path.clone();
+        let root_path_cloned = root_path.to_path_buf().clone();
+        handles.push(thread::spawn(move || {
+            let abs_path = PathBuf::from_iter([&root_path_cloned, &rel_path_cloned]);
+            if !types_cloned.creatable() && !abs_path.is_file() {
+                return Err(game_err!(
+                    ERR_TITLE_VERIFICATION_FAILED,
+                    "{} {}",
+                    ERR_VERIFICATION_FAILED,
+                    "Asset is not a file or path cannot be found!"
+                ));
+            }
+            
+            if !types_cloned.writable() {
+                let key_file = AssetKeys::get(
+                    rel_path_cloned.to_str().unwrap()
+                ).ok_or_else(|| game_err!(
+                    ERR_TITLE_VERIFICATION_FAILED,
+                    "{} {}",
+                    ERR_VERIFICATION_FAILED,
+                    "Asset key not found!"
+                ))?;
+                
+                let hash = {
+                    let mut file = OpenOptions::new()
                     .read(true)
                     .open(abs_path)
                     .map_err(|e| game_err!(
@@ -299,26 +306,34 @@ fn check_assets<P: AsRef<Path>>(
                         ERR_VERIFICATION_FAILED,
                         e.to_string()
                     ))?;
-                let mut hasher = Sha256::new();
-                io::copy(&mut file, &mut hasher)
+                    let mut hasher = Sha256::new();
+                    io::copy(&mut file, &mut hasher)
                     .map_err(|e| game_err!(
                         ERR_TITLE_VERIFICATION_FAILED,
                         "{} {}",
                         ERR_VERIFICATION_FAILED,
                         e.to_string()
                     ))?;
-                hasher.finalize()
-            };
-
-            if key_file.data.as_ref().ne(hash.as_slice()) {
-                return Err(game_err!(
-                    ERR_TITLE_VERIFICATION_FAILED,
-                    "{} {}",
-                    ERR_VERIFICATION_FAILED,
-                    "Key values in asset files do not match!"
-                ));
+                    hasher.finalize()
+                };
+                
+                if key_file.data.as_ref().ne(hash.as_slice()) {
+                    return Err(game_err!(
+                        ERR_TITLE_VERIFICATION_FAILED,
+                        "{} {}",
+                        ERR_VERIFICATION_FAILED,
+                        "Key values in asset files do not match!"
+                    ));
+                }
             }
-        }
+
+            Ok(())
+        }));
     }
+
+    for th in handles { 
+        th.join().unwrap()?;
+    }
+
     Ok(())
 }

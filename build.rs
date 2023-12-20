@@ -13,7 +13,7 @@ mod assets {
     lazy_static! {
         pub static ref ASSET_LISTS: HashMap<PathBuf, Types> = {
             let txt = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/AssetLists.txt"));
-            parsing_asset_lists_txt(txt).unwrap()
+            parsing_asset_lists_txt(txt)
         };
     }
 
@@ -92,7 +92,7 @@ mod assets {
     /// Parses the file `AssetLists.txt` and returns a list of assets. </br>
     /// If an error occurs during parsing, an error message is returned. </br>
     /// 
-    pub fn parsing_asset_lists_txt(txt: &str) -> Result<HashMap<PathBuf, Types>, String> {
+    pub fn parsing_asset_lists_txt(txt: &str) -> HashMap<PathBuf, Types> {
         const COMMENT_CH: char = '#';
         let mut list = HashMap::new();
 
@@ -114,7 +114,7 @@ mod assets {
                     match idx {
                         0 => path_str.push(ch),
                         1 => type_str.push(ch),
-                        _ => return Err(format!("invalid syntax. (line:{})", line + 1)),
+                        _ => panic!("invalid syntax. (line:{})", line + 1),
                     }
                 }
             }
@@ -137,36 +137,36 @@ mod assets {
                     "Static" => Types::Static,
                     "Dynamic" => Types::Dynamic,
                     "Optional" => Types::Optional,
-                    _ => return Err(format!("invalid types. (line:{})", line + 1)),
+                    _ => panic!("invalid types. (line:{})", line + 1),
                 };
 
                 // (한국어) <경로>가 루트 에셋 디렉토리의 하위 경로인지 확인합니다.
                 // (English Translation) Checks if <Path> is a subpath of the root asset directory.
                 if !utils::is_subpath(ASSET_DIR_REL_PATH_STR, &path) {
-                    return Err(format!("This file is not in a subpath of the asset directory. (line:{})", line + 1));
+                    panic!("This file is not in a subpath of the asset directory. (line:{})", line + 1);
                 }
 
                 // (한국어) <유형>이 선택적 유형이 아닌 경우 에셋 파일이 존재하는지 확인합니다.
                 // (English Translation) If <Type> is not an optional type, check if the asset file exists.
                 if !types.creatable() && !utils::file_exsist(ASSET_DIR_REL_PATH_STR, &path) {
-                    return Err(format!("The given asset's path is not a file or cannot be found. (line:{})", line + 1));
+                    panic!("The given asset's path is not a file or cannot be found. (line:{})", line + 1);
                 }
                 
                 // (한국어) 이미 리스트에 <경로>가 포함되어 있는지 확인합니다.
                 // (English Translation) Check if the list already contains the <Path>.
                 match list.contains_key(&path) {
                     false => list.insert(path, types),
-                    true => return Err(format!("duplicate path. (line:{})", line + 1)),
+                    true => panic!("duplicate path. (line:{})", line + 1),
                 };
             }
             // (한국어) [3] <경로>와 <유형>중 하나만 존재하는 경우
             // (English Translation) [3] If only one of <Path> and <Type> exists.
             else {
-                return Err(format!("invalid syntax. (line:{})", line + 1));
+                panic!("invalid syntax. (line:{})", line + 1);
             }
         }
 
-        Ok(list)
+        return list;
     }
 }
 
@@ -185,7 +185,9 @@ mod utils {
     pub fn file_exsist<R: AsRef<Path>, P: AsRef<Path>>(root: R, subpath: P) -> bool {
         let path = PathBuf::from_iter([root.as_ref(), subpath.as_ref()])
             .canonicalize()
-            .unwrap();
+            .unwrap_or_else(|err| 
+                panic!("The following error occurred: {}, (subpath: {})", err, subpath.as_ref().display())
+            );
         path.is_file()
     }
 }
@@ -204,6 +206,7 @@ fn gen_asset_sha256_keys() {
     use std::fs;
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
+    use std::thread;
 
     use fs_extra::dir;
     use sha2::{Digest, Sha256};
@@ -218,39 +221,66 @@ fn gen_asset_sha256_keys() {
     // (한국어) 기존의 키값을 저장하는 디렉토리를 삭제하고 새로 생성합니다.
     // (English Translation) Delete the directory that stores the existing key value and create a new one.
     dir::create(KEY_DIR_REL_PATH_STR, true).expect("Failed to create asset key directory.");
+    
+    // (한국어) 스레드 핸들 리스트를 생성합니다.
+    // (English Translation) Create a list of thread handles.
+    let mut handles = Vec::with_capacity(ASSET_LISTS.len());
 
+    // (한국어) 각각의 스레드에서 해시 값을 생성하는 작업을 수행합니다.
+    // (English Translation) Each thread performs the task of generating a hash value.
     for (path, types) in ASSET_LISTS.iter() {
-        // (한국어) `AssetLists.txt`목록에 있는 에셋 파일이 존재하는지 확인합니다.
-        // (English) Checking if the asset file in the `AssetLists.txt` list exists.
-        let asset_file_path = PathBuf::from_iter([Path::new(ASSET_DIR_REL_PATH_STR), path]);
-        if !types.creatable() {
-            assert!(asset_file_path.is_file(), "The given asset's path is not a file or cannot be found.");
-        }
-
-        // (한국어) 키 파일 경로의 디렉토리가 없는 경우 생성합니다.
-        // (English) Creating the directory in the key file path if it does not exist.
-        let key_file_path = PathBuf::from_iter([Path::new(KEY_DIR_REL_PATH_STR), path]);
-        if let Some(key_dir_path) = key_file_path.parent() {
-            if !key_dir_path.try_exists().is_ok_and(|flag| flag) {
-                dir::create_all(key_dir_path, false).expect("Failed to create asset key subdirectory.")
+        handles.push(thread::spawn(move || {
+            // (한국어) `AssetLists.txt`목록에 있는 에셋 파일이 존재하는지 확인합니다.
+            // (English) Checking if the asset file in the `AssetLists.txt` list exists.
+            let asset_file_path = PathBuf::from_iter([Path::new(ASSET_DIR_REL_PATH_STR), path]);
+            if !types.creatable() && !asset_file_path.is_file() {
+                return Err(format!("The given asset's path is not a file or cannot be found."));
             }
-        }
 
-        // (한국어) 정적 데이터 유형일경우 SHA256 해시 값을 생성하고 파일에 저장합니다.
-        // (English) If it's a static datatype, generate a SHA256 hash value and save it to a file.
-        if !types.writable() {
-            let hash = {
-                let mut asset_file = fs::File::open(&asset_file_path)
-                    .expect("Failed to open asset file.");
-                let mut hasher = Sha256::new();
-                io::copy(&mut asset_file, &mut hasher).unwrap();
-                hasher.finalize()
-            };
+            // (한국어) 키 파일 경로의 디렉토리가 없는 경우 생성합니다.
+            // (English) Creating the directory in the key file path if it does not exist.
+            let key_file_path = PathBuf::from_iter([Path::new(KEY_DIR_REL_PATH_STR), path]);
+            if let Some(key_dir_path) = key_file_path.parent() {
+                if !key_dir_path.try_exists().is_ok_and(|flag| flag) {
+                    dir::create_all(key_dir_path, false)
+                        .map_err(|err| {
+                            format!("Failed to create asset key subdirectory. (error: {})", err.to_string())
+                        })?;
+                }
+            }
 
-            let mut key_file = fs::File::create(key_file_path)
-                .expect("Failed to create key file.");
-            key_file.write_all(hash.as_slice()).expect("Failed to write file.");
-        }
+            // (한국어) 정적 데이터 유형일경우 SHA256 해시 값을 생성하고 파일에 저장합니다.
+            // (English) If it's a static datatype, generate a SHA256 hash value and save it to a file.
+            if !types.writable() {
+                let hash = {
+                    let mut asset_file = fs::File::open(&asset_file_path)
+                        .map_err(|err| {
+                            format!("Failed to open asset file. (error: {})", err.to_string())
+                        })?;
+                    let mut hasher = Sha256::new();
+                    io::copy(&mut asset_file, &mut hasher)
+                        .map_err(|err| {
+                            format!("Failed to copy asset file. (error: {})", err.to_string())
+                        })?;
+                    hasher.finalize()
+                };
+
+                let mut key_file = fs::File::create(key_file_path)
+                    .map_err(|err| {
+                        format!("Failed to create key file. (error: {})", err.to_string())
+                    })?;
+                key_file.write_all(hash.as_slice())
+                    .map_err(|err| {
+                        format!("Failed to write file. (error: {})", err.to_string())
+                    })?;
+            }
+
+            Ok(())
+        }));
+    }
+
+    for th in handles {
+        th.join().unwrap().unwrap_or_else(|err| panic!("{}", err));
     }
 }
 

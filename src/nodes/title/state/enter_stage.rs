@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
-use glam::Vec3;
 use winit::event::Event;
 
 use crate::{
     game_err,
     components::{
-        sprite::brush::SpriteBrush,
-        text::{brush::TextBrush, section::d2::Section2d},
+        text2d::{brush::Text2dBrush, section::Section2d},
         ui::{brush::UiBrush, objects::UiObject},
+        lights::PointLights,
         camera::GameCamera, 
+        transform::Projection,
+        sprite::SpriteBrush, 
     },
     nodes::title::{
-        MENU_CAMERA_POS, 
-        STAGE_CAMERA_POS,
-        TitleScene, state::TitleState, 
+        TitleScene, 
+        state::TitleState, 
     },
     render::depth::DepthBuffer,
     system::{
@@ -58,11 +58,9 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     let menu_alpha = 1.0 - 1.0 * delta;
     let delta = delta_time(this.elapsed_time, MOVING_TIME).min(1.0);
     let stage_alpha = 1.0 * delta;
-    let position = MENU_CAMERA_POS + (STAGE_CAMERA_POS - MENU_CAMERA_POS) * delta;
-
-    update_button_alpha(this.menu.iter_mut(), &queue, menu_alpha);
-    update_button_alpha(this.system.iter_mut(), &queue, stage_alpha);
-    update_camera_pos(&mut camera, position, &queue);
+    update_button_alpha(this.menu_buttons.iter_mut(), &queue, menu_alpha);
+    update_button_alpha(this.system_buttons.iter_mut(), &queue, stage_alpha);
+    update_camera(&mut camera, &queue, delta);
 
     // (한국어) 사용 완료한 공유 객체를 반환합니다.
     // (English Translation) Returns a shared object that has been used.
@@ -83,8 +81,9 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
 pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
+    let point_lights = shared.get::<Arc<PointLights>>().unwrap();
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -140,11 +139,37 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 배경 오브젝트들 그리기.
         // (English Translation) Drawing background objects.
-        this.background.draw(sprite_brush, &mut rpass);
+        sprite_brush.draw(point_lights, &mut rpass, [this.background.as_ref()].into_iter());
+    }
+
+    {
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("RenderPass(TitleScene(EnterStage(Sprites)))"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment { 
+                view: &view, 
+                resolve_target: None, 
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                }
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth.view(),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        camera.bind(&mut rpass);
 
         // (한국어) 스프라이트 오브젝트들 그리기.
         // (English Translation) Drawing sprite objects.
-        this.sprite.draw(sprite_brush, &mut rpass);
+        sprite_brush.draw(point_lights, &mut rpass, this.sprites.iter().map(|(it, _)| it.as_ref()));
     }
 
     {
@@ -171,14 +196,36 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         });
 
         camera.bind(&mut rpass);
-
+        
         // (한국어) 메뉴 버튼 그리기.
-        // (English Translation) Drawing menu buttons.
-        this.menu.draw(ui_brush, text_brush, &mut rpass);
+        // (English Translation) Drawing the menu buttons.
+        ui_brush.draw(
+            &mut rpass, 
+            this.menu_buttons.iter()
+            .map(|(it, _)| it.as_ref())
+        );
+        text_brush.draw(
+            &mut rpass, 
+            this.menu_buttons.iter()
+            .map(|(_, it)| it)
+            .flatten()
+            .map(|it| it.as_ref())
+        );
 
         // (한국어) 시스템 버튼 그리기.
         // (English Translation) Drawing system buttons.
-        this.system.draw(ui_brush, text_brush, &mut rpass);
+        ui_brush.draw(
+            &mut rpass, 
+            this.system_buttons.iter()
+            .map(|(it, _)| it.as_ref())
+        );
+        text_brush.draw(
+            &mut rpass, 
+            this.system_buttons.iter()
+            .map(|(_, it)| it)
+            .flatten()
+            .map(|it| it.as_ref())
+        );
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -197,14 +244,23 @@ fn delta_time(elapsed_time: f64, duration: f64) -> f32 {
 
 
 /// #### 한국어 </br>
-/// 게임 카메라의 위치와 투영 행렬을 갱신합니다. </br>
+/// 게임 카메라의 투영 행렬을 갱신합니다. </br>
 /// 
 /// #### English (Translation) </br>
-/// Update the game camera's position and projection matrix. </br>
+/// Update the game camera's projection matrix. </br>
 /// 
-fn update_camera_pos(camera: &mut GameCamera, position: Vec3, queue: &wgpu::Queue) {
-    camera.transform.set_position(position);
-    camera.update_buffer(queue);
+fn update_camera(camera: &mut GameCamera, queue: &wgpu::Queue, delta: f32) {
+    use crate::nodes::title::utils;
+
+    camera.projection = Projection::new_ortho(
+        utils::MENU_TOP + (utils::STAGE_TOP - utils::MENU_TOP) * delta, 
+        utils::MENU_LEFT + (utils::STAGE_LEFT - utils::MENU_LEFT) * delta, 
+        utils::MENU_BOTTOM + (utils::STAGE_BOTTOM - utils::MENU_BOTTOM) * delta, 
+        utils::MENU_RIGHT + (utils::STAGE_RIGHT - utils::MENU_RIGHT) * delta, 
+        0.0, 
+        1000.0
+    );
+    camera.update(queue);
 }
 
 
@@ -216,12 +272,12 @@ fn update_camera_pos(camera: &mut GameCamera, position: Vec3, queue: &wgpu::Queu
 /// 
 fn update_button_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
 where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
-    for (ui, texts) in iter {
-        ui.update_buffer(queue, |data| {
+    for (ui, sections) in iter {
+        ui.update(queue, |data| {
             data.color.w = alpha;
         });
-        for text in texts.iter_mut() {
-            text.update_section(queue, |data| {
+        for section in sections.iter_mut() {
+            section.update(queue, |data| {
                 data.color.w = alpha;
             });
         }
