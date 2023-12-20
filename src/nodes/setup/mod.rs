@@ -1,3 +1,6 @@
+#[cfg(debug_assertions)]
+mod parser;
+
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
@@ -132,11 +135,34 @@ impl SceneNode for SetupScene {
         Ok(())
     }
 
+    #[allow(unreachable_code)]
     fn update(&mut self, shared: &mut Shared, _: f64, _: f64) -> AppResult<()> {
         // (한국어) 모든 에셋 파일의 로드가 완료되었는지 확인합니다.
         // (English Translation) Verify that all asset files have completed loading.
         if self.loading.as_ref().is_some_and(|it| it.is_finished()) {
             self.loading.take().unwrap().join().unwrap()?;
+
+            
+            #[cfg(debug_assertions)] {
+                // (한국어) 주어진 명령줄을 구문분석 합니다.
+                // (English Translation) 주어진 명령줄을 구문분석 합니다.
+                let config = parser::parse_command_lines();
+                if let Some(next_scene) = config.next_scene {
+                    // (한국어) 다음 장면이 설정되어 있는 경우 다음 장면으로 변경합니다.
+                    // (English Translation) If the next scene is set, change to the next scene.
+                    *shared.get_mut().unwrap() = SceneState::Change(next_scene);
+                    
+                    // (한국어) 설정된 언어의 스크립트 파일을 불러옵니다.
+                    // (English Translation) Loads the script file of the set language.
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let script = match config.language {
+                        Language::Korean | Language::Unknown => asset_bundle.get(path::KOR_SCRIPTS_PATH)?.read(&ScriptDecoder)?,
+                    };
+                    shared.push(Arc::new(script));
+                } 
+
+                return  Ok(());
+            }
 
             // (한국어) 사용할 공유 객체 가져오기.
             // (English Translation) Get shared object to use.

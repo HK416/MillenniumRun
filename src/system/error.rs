@@ -1,10 +1,6 @@
 use std::fmt;
 use std::result::Result;
 
-use winit::event_loop::EventLoopProxy;
-
-use crate::system::event::AppEvent;
-
 
 
 #[macro_export]
@@ -79,22 +75,6 @@ impl ToString for GameError {
     }
 }
 
-
-/// #### 한국어 </br>
-/// 에러 메시지를 이벤트 루프에 전달하고, 프로세스를 종료합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// An error message is passed to the event loop and the process terminates. </br>
-/// 
-#[inline]
-pub fn send_panic_msg_and_abort(
-    event_loop_proxy: &EventLoopProxy<AppEvent>,
-    err: GameError
-) -> ! {
-    use std::process::abort;
-    event_loop_proxy.send_event(AppEvent::GameError(err.clone())).unwrap();
-    abort()
-}
 
 
 /// #### 한국어 </br>

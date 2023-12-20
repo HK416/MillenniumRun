@@ -15,7 +15,6 @@ use crate::{
         ui::brush::UiBrush,
         camera::GameCamera,
         transform::{Transform, Projection},
-        lights::PointLight,
         script::Script,
         sprite::SpriteBrush, 
     },

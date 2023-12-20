@@ -30,7 +30,7 @@ use crate::{
         state::SceneState,
     },
     system::{
-        error::GameError,
+        error::{AppResult, GameError},
         event::AppEvent,
         shared::Shared,
         timer::GameTimer,
@@ -74,9 +74,7 @@ fn game_loop(
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
     depth_buffer: Arc<DepthBuffer>
-) {
-    use crate::system::error::send_panic_msg_and_abort;
-
+) -> AppResult<()> {
     const MAX_UPDATE_COUNT: usize = 30;
     const MAX_FRAMERATE: u64 = 60;
     const FIXED_TIME_SEC: f64 = 1.0 / MAX_FRAMERATE as f64;
@@ -120,10 +118,7 @@ fn game_loop(
     // (한국어) 게임 장면을 생성하고 진입합니다.
     // (English Translation) Create and enter the game scene.
     let mut entry_scene: Box<dyn SceneNode> = Box::new(SetupScene::default());
-    entry_scene.enter(&mut shared)
-        .unwrap_or_else(|err| 
-            send_panic_msg_and_abort(&event_loop_proxy, err)
-        );
+    entry_scene.enter(&mut shared)?;
 
     // (한국어) 장면 스택에 장면을 추가합니다.
     // (English Translation) Add a scene to the scene stack.
@@ -184,26 +179,18 @@ fn game_loop(
 
             // (한국어) 게임 장면에 이벤트를 전달합니다.
             // (English Translation) Passes events to the game scene.
-            scene_stack.back_mut()
-                .unwrap()
-                .handle_events(&mut shared, event)
-                .unwrap_or_else(|err| send_panic_msg_and_abort(&event_loop_proxy, err));
+            scene_stack.back_mut().unwrap().handle_events(&mut shared, event)?;
         }
 
         let mut update_cnt = 0;
         while elapsed_time_sec >= FIXED_TIME_SEC && update_cnt < MAX_UPDATE_COUNT {
             // (한국어) 게임 장면을 갱신합니다.
             // (English Translation) Update the game scene.
-            scene_stack.back_mut()
-                .unwrap()
-                .update(
-                    &mut shared, 
-                    timer.total_time_sec(), 
-                    FIXED_TIME_SEC
-                )
-                .unwrap_or_else(|err|
-                    send_panic_msg_and_abort(&event_loop_proxy, err)
-                );
+            scene_stack.back_mut().unwrap().update(
+                &mut shared, 
+                timer.total_time_sec(), 
+                FIXED_TIME_SEC
+            )?;
 
             elapsed_time_sec -= FIXED_TIME_SEC;
             update_cnt += 1;
@@ -213,12 +200,7 @@ fn game_loop(
         // (한국어) 게임 장면을 그립니다.
         // (English Translation) Draw the game scene.
         window.pre_present_notify();
-        scene_stack.back()
-            .unwrap()
-            .draw(&mut shared)
-            .unwrap_or_else(|err| 
-                send_panic_msg_and_abort(&event_loop_proxy, err)
-            );
+        scene_stack.back().unwrap().draw(&mut shared)?;
 
         // (한국어) 게임 장면 상태에 따라 게임 장면을 갱신합니다.
         // (English Translation) Updates the game scene according to the game scene state.
@@ -228,9 +210,7 @@ fn game_loop(
                 // (한국어) 가장 최근의 게임 장면을 장면 스택에서 제거하고 종료합니다.
                 // (English Translation) Remove the most recent game scene from the scene stack and exits.
                 let mut old = scene_stack.pop_back().unwrap();
-                old.exit(&mut shared).unwrap_or_else(|err| 
-                    send_panic_msg_and_abort(&event_loop_proxy, err)
-                );
+                old.exit(&mut shared)?;
 
                 // (한국어) 장면 스택이 비어있는 경우 애플리케이션을 종료합니다.
                 // (English Translation) Terminates the application if the scene stack is empty.
@@ -243,46 +223,38 @@ fn game_loop(
             SceneState::Push(mut new) => {
                 // (한국어) 새로운 게임 장면에 진입하고 장면 스택에 추가합니다.
                 // (English Translation) Enters a new game scene and adds it to the scene stack.
-                new.enter(&mut shared).unwrap_or_else(|err| 
-                    send_panic_msg_and_abort(&event_loop_proxy, err)
-                );
+                new.enter(&mut shared)?;
                 scene_stack.push_back(new);
             },
             SceneState::Change(mut new) => {
                 // (한국어) 가장 최근의 게임 장면을 장면 스택에서 제거하고 종료합니다.
                 // (English Translation) Remove the most recent game scene from the scene stack and exits.
                 let mut old = scene_stack.pop_back().unwrap();
-                old.exit(&mut shared).unwrap_or_else(|err|
-                    send_panic_msg_and_abort(&event_loop_proxy, err)
-                );
+                old.exit(&mut shared)?;
 
                 // (한국어) 새로운 게임 장면에 진입하고 장면 스택에 추가합니다.
                 // (English Translation) Enters a new game scene and adds it to the scene stack.
-                new.enter(&mut shared).unwrap_or_else(|err|
-                    send_panic_msg_and_abort(&event_loop_proxy, err)
-                );
+                new.enter(&mut shared)?;
                 scene_stack.push_back(new);
             },
             SceneState::Reset(mut new) => {
                 while let Some(mut old) = scene_stack.pop_back() {
                     // (한국어) 가장 최근의 게임 장면을 장면 스택에서 제거하고 종료합니다.
                     // (English Translation) Remove the most recent game scene from the scene stack and exits.
-                    old.exit(&mut shared).unwrap_or_else(|err|
-                        send_panic_msg_and_abort(&event_loop_proxy, err)
-                    );
+                    old.exit(&mut shared)?;
                 };
 
                 // (한국어) 새로운 게임 장면에 진입하고 장면 스택에 추가합니다.
                 // (English Translation) Enters a new game scene and adds it to the scene stack.
-                new.enter(&mut shared).unwrap_or_else(|err|
-                    send_panic_msg_and_abort(&event_loop_proxy, err)
-                );
+                new.enter(&mut shared)?;
                 scene_stack.push_back(new);
             }
         };
 
         shared.push(SceneState::default());
     }
+
+    Ok(())
 }
 
 
@@ -359,7 +331,7 @@ fn main() {
     let window_cloned = window.clone();
     let event_loop_proxy = event_loop.create_proxy();
     let asset_bundle_cloned = asset_bundle.clone();
-    thread::spawn(move || game_loop(
+    let mut handle = Some(thread::spawn(move || game_loop(
         window_cloned, 
         event_loop_proxy,
         asset_bundle_cloned, 
@@ -369,13 +341,36 @@ fn main() {
         device, 
         queue,
         depth_buffer
-    ));
+    )));
 
     // (한국어) 윈도우 메시지 루프를 실행합니다.
     // (English Translation) Executes the window message loop.
     log::info!("Run window message loop.");
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop.run(move |event, elwt| {
+        // (한국어) 현재 게임 스레드가 작동하고 있는지 확인합니다.
+        // (English Translation) Verify that the current game thread is working.
+        if handle.as_ref().is_some_and(|it| it.is_finished()) {
+            // (한국어) 현재 게임 스레드가 작동하고 있지 않는 경우 스레드를 join 합니다.
+            // (English Translation) Joins a thread if the current game thread is not working.
+            //
+            let result = handle.take().unwrap().join().unwrap();
+            
+
+            // (한국어) 
+            // 오류 메시지를 반환했을 경우 오류 메시지를 화면에 띄우고 애플리케이션을 중단시킵니다.
+            // 그렇지 않은 경우 애플리케이션 실행을 종료합니다.
+            // 
+            // (English Translation) 
+            // If it returns an error message, it displays the error message on the screen and aborts the application.
+            // Otherwise, end application execution.
+            //
+            match result {
+                Err(err) => popup_err_msg_and_abort(err),
+                _ => { elwt.exit(); },
+            }
+        }
+
         // (한국어) 애플리케이션 에셋 파일의 무결성을 검사합니다.
         // (English Translation) Check the integrity of application asset files.
         if !asset_bundle.check_integrity() {
@@ -397,15 +392,19 @@ fn main() {
             if window_id == window.id() && (event == WindowEvent::CloseRequested || event == WindowEvent::Destroyed) {
                 RUNNING_FLAG.store(false, MemOrdering::Release);
                 elwt.exit();
+
+                // (한국어) 게임 스레드 핸들이 있는 경우 게임 스레드 핸들을 join 합니다.
+                // (English Translation) Joins the game thread handle, if it exists.
+                if let Some(th) = handle.take() {
+                    _ = th.join().unwrap();
+                }
+
                 return;
             } else if window_id != window.id() {
                 return;
             }
         } else if let Event::UserEvent(event) = event_cloned {
             match event {
-                AppEvent::GameError(err) => {
-                    popup_err_msg_and_abort(err);
-                },
                 AppEvent::Terminate => {
                     elwt.exit();
                 },
