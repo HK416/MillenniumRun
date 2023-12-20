@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 mod assets;
 mod components;
 mod nodes;
@@ -160,11 +162,12 @@ fn game_loop(
                             config.height = height;
                             surface.configure(&device, config);
                             shared.push(Arc::new(DepthBuffer::new(&window, &device)));
-                            if let Some(camera) = shared.get_mut::<GameCamera>() {
-                                camera.viewport.width = width as f32;
-                                camera.viewport.height = height as f32;
-                                camera.scale_factor = window.current_monitor().map_or(1.0, |monitor| monitor.scale_factor() as f32);
-                                camera.update(&queue);
+                            if let Some(camera) = shared.get::<Arc<GameCamera>>() {
+                                camera.update(&queue, |data| {
+                                    data.viewport.width = width as f32;
+                                    data.viewport.height = height as f32;
+                                    data.scale_factor = window.current_monitor().map_or(1.0, |monitor| monitor.scale_factor() as f32);
+                                });
                             }
                         }
                     },

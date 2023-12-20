@@ -45,8 +45,8 @@ pub fn handle_events(_this: &mut TitleScene, _shared: &mut Shared, _event: Event
 pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let queue = shared.pop::<Arc<wgpu::Queue>>().unwrap();
-    let mut camera = shared.pop::<GameCamera>().unwrap();
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let camera = shared.get::<Arc<GameCamera>>().unwrap();
 
     // (한국어) 경과한 시간을 갱신합니다.
     // (English Translation) Updates the elapsed time.
@@ -61,12 +61,7 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
 
     update_button_alpha(this.menu_buttons.iter_mut(), &queue, menu_alpha);
     update_button_alpha(this.system_buttons.iter_mut(), &queue, stage_alpha);
-    update_camera(&mut camera, &queue, delta);
-
-    // (한국어) 사용 완료한 공유 객체를 반환합니다.
-    // (English Translation) Returns a shared object that has been used.
-    shared.push(camera);
-    shared.push(queue);
+    update_camera(camera, queue, delta);
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) changes to the next state if it is greater than the duration.
@@ -90,7 +85,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
-    let camera = shared.get::<GameCamera>().unwrap();
+    let camera = shared.get::<Arc<GameCamera>>().unwrap();
 
     
     // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
@@ -249,18 +244,18 @@ fn delta_time(elapsed_time: f64, duration: f64) -> f32 {
 /// #### English (Translation) </br>
 /// Update the game camera's projection matrix. </br>
 /// 
-fn update_camera(camera: &mut GameCamera, queue: &wgpu::Queue, delta: f32) {
+fn update_camera(camera: &GameCamera, queue: &wgpu::Queue, delta: f32) {
     use crate::nodes::title::utils;
-
-    camera.projection = Projection::new_ortho(
-        utils::STAGE_TOP + (utils::MENU_TOP - utils::STAGE_TOP) * delta, 
-        utils::STAGE_LEFT + (utils::MENU_LEFT - utils::STAGE_LEFT) * delta, 
-        utils::STAGE_BOTTOM + (utils::MENU_BOTTOM - utils::STAGE_BOTTOM) * delta, 
-        utils::STAGE_RIGHT + (utils::MENU_RIGHT - utils::STAGE_RIGHT) * delta, 
-        0.0, 
-        1000.0
-    );
-    camera.update(queue);
+    camera.update(queue, |data| {
+        data.projection = Projection::new_ortho(
+            utils::STAGE_TOP + (utils::MENU_TOP - utils::STAGE_TOP) * delta, 
+            utils::STAGE_LEFT + (utils::MENU_LEFT - utils::STAGE_LEFT) * delta, 
+            utils::STAGE_BOTTOM + (utils::MENU_BOTTOM - utils::STAGE_BOTTOM) * delta, 
+            utils::STAGE_RIGHT + (utils::MENU_RIGHT - utils::STAGE_RIGHT) * delta, 
+            0.0, 
+            1000.0
+        );
+    });
 }
 
 

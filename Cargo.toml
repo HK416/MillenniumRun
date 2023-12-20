@@ -1,6 +1,6 @@
 [package]
 name = "MillenniumRun"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 rust-version = "1.73"
 authors = ["HK416 <powerspirit127@gmail.com>", ]
@@ -32,7 +32,7 @@ wgpu = { version = "0.18.*", features = ["spirv"] } # Graphics crate / MIT or Ap
 winit = { version = "0.29.*", features = ["rwh_05"] } # Window crate / Apache-2.0 license.
 rodio = "0.17.*" # Sound crate / MIT or Apache-2.0 license.
 ab_glyph = "0.2.*" # Font crate / Apache-2.0 license.
-glam = { version = "0.24.*", features = ["debug-glam-assert", "serde", "bytemuck", "scalar-math"] } # Math crate / MIT or Apache-2.0 license.
+glam = { version = "0.25.*", features = ["debug-glam-assert", "serde", "bytemuck", "scalar-math"] } # Math crate / MIT or Apache-2.0 license.
 native-dialog = "0.7.*" # Window Dialog crate / MIT license.
 
 

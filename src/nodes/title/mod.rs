@@ -7,7 +7,6 @@ use std::thread::{self, JoinHandle};
 use winit::event::Event;
 use rodio::{OutputStreamHandle, Source, Sink};
 
-use crate::nodes::title::utils::create_title_scene;
 use crate::{
     game_err,
     assets::bundle::AssetBundle,
@@ -62,7 +61,7 @@ impl SceneNode for TitleLoading {
         let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap().clone();
         let asset_bundle = shared.get::<AssetBundle>().unwrap().clone();
         self.loading = Some(thread::spawn(move || {
-            create_title_scene(
+            utils::create_title_scene(
                 &nexon_lv2_gothic_medium, 
                 &device, 
                 &queue, 
@@ -76,10 +75,10 @@ impl SceneNode for TitleLoading {
         }));
 
         // (한국어) 카메라를 설정 합니다.
-        let mut camera = shared.pop::<GameCamera>().unwrap();
+        // (English Translation) Set up the camera.
+        let camera = shared.get::<Arc<GameCamera>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        utils::reset_camera(&mut camera, queue);
-        shared.push(camera);
+        utils::reset_camera(camera, queue);
 
         Ok(())
     }
@@ -98,7 +97,7 @@ impl SceneNode for TitleLoading {
         let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let camera= shared.get::<GameCamera>().unwrap();
+        let camera= shared.get::<Arc<GameCamera>>().unwrap();
 
         // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
         // (English Translation) Wait until the previous operation is finished.

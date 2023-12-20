@@ -156,7 +156,7 @@ impl HandleInner for DynamicHandle {
     }
 
     #[inline]
-    fn read_or_default<T, D, E>(&mut self, encoder: &E, decoder: &D) -> AppResult<D::Output>
+    fn read_or_default<T, D, E>(&mut self, _encoder: &E, decoder: &D) -> AppResult<D::Output>
         where T: Default, D: AssetDecoder<Output = T>, E: AssetEncoder<Input = T> {
         decoder.decode(&self.bytes)
     }
@@ -297,6 +297,7 @@ pub enum AssetHandle {
     Optional(Arc<RwLock<OptionalHandle>>),
 }
 
+#[allow(dead_code)]
 impl AssetHandle {
     const ERR_ACCESS_FAILED: &'static str = "Failed to access asset internal data.";
 
@@ -444,6 +445,7 @@ pub enum WeakAssetHandle{
     Optional(Weak<RwLock<OptionalHandle>>),
 }
 
+#[allow(dead_code)]
 impl WeakAssetHandle {
     /// ### 한국어
     /// `AssetHandle`로 업그레이드하려고 시도합니다.  

@@ -1,4 +1,5 @@
 use std::mem::size_of;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use glam::{Mat4, Vec3};
 use bytemuck::{Pod, Zeroable};
@@ -53,14 +54,14 @@ impl Default for Viewport {
 /// 
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
-pub struct CameraData {
+pub struct CameraUniform {
     pub camera: Mat4,
     pub projection: Mat4,
     pub position: Vec3,
     pub scale_factor: f32,
 }
 
-impl Default for CameraData {
+impl Default for CameraUniform {
     fn default() -> Self {
         Self {
             camera: Mat4::IDENTITY,
@@ -74,6 +75,20 @@ impl Default for CameraData {
 
 
 /// #### 한국어 </br>
+/// 카메라의 데이터를 담고 있습니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Contains camera data. </br>
+/// 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CameraData {
+    pub viewport: Viewport,
+    pub transform: Transform, 
+    pub projection: Projection, 
+    pub scale_factor: f32, 
+}
+
+/// #### 한국어 </br>
 /// 월드 좌표상에 존재하는 게임 카메라 오브젝트 입니다. </br>
 /// 
 /// #### English (Translation) </br>
@@ -84,10 +99,7 @@ pub struct GameCamera {
     bind_group: wgpu::BindGroup,
     camera_buffer: wgpu::Buffer,
     viewport_buffer: wgpu::Buffer,
-    pub viewport: Viewport,
-    pub transform: Transform,
-    pub projection: Projection,
-    pub scale_factor: f32,
+    pub data: Mutex<CameraData>,
 }
 
 impl GameCamera {
@@ -99,7 +111,7 @@ impl GameCamera {
         scale_factor: f32,
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout
-    ) -> Self {
+    ) -> Arc<Self> {
         // (한국어) 라벨 데이터를 생성합니다.
         // (English Translation) Create a label data.
         let label = format!("GameCamera({})", name.unwrap_or("Unknown"));
@@ -107,14 +119,20 @@ impl GameCamera {
         // (한국어) 카메라 데이터 유니폼 버퍼를 생성합니다.
         // (English Translation) Create a camera data uniform buffer.
         use wgpu::util::DeviceExt;
+        let data = CameraData {
+            viewport,
+            transform,
+            projection,
+            scale_factor,
+        };
         let camera_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("Uniform(CameraData({}))", label)),
-                contents: bytemuck::bytes_of(&CameraData {
-                    camera: transform.camera_transform(),
-                    projection: projection.projection_transform(),
-                    position: transform.get_position(),
-                    scale_factor: scale_factor,
+                contents: bytemuck::bytes_of(&CameraUniform {
+                    camera: data.transform.camera_transform(), 
+                    projection: data.projection.projection_transform(), 
+                    position: data.transform.get_position(), 
+                    scale_factor: data.scale_factor
                 }),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             }
@@ -125,7 +143,7 @@ impl GameCamera {
         let viewport_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("Uniform(Viewport({}))", label)),
-                contents: bytemuck::bytes_of(&viewport),
+                contents: bytemuck::bytes_of(&data.viewport),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             }
         );
@@ -157,11 +175,8 @@ impl GameCamera {
             bind_group,
             camera_buffer,
             viewport_buffer,
-            viewport,
-            transform,
-            projection, 
-            scale_factor,
-        }
+            data: data.into(), 
+        }.into()
     }   
 
     /// #### 한국어 </br>
@@ -173,13 +188,16 @@ impl GameCamera {
     /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
     /// 
     #[inline]
-    pub fn update(&self, queue: &wgpu::Queue) {
-        queue.write_buffer(&self.viewport_buffer, 0, bytemuck::bytes_of(&self.viewport));
-        queue.write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&CameraData {
-            camera: self.transform.camera_transform(),
-            projection: self.projection.projection_transform(),
-            position: self.transform.get_position(),
-            scale_factor: self.scale_factor,
+    pub fn update<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
+    where F: Fn(&mut MutexGuard<'_, CameraData>) {
+        let mut guard = self.data.lock().expect("Failed to access variable.");
+        mapping_func(&mut guard);
+        queue.write_buffer(&self.viewport_buffer, 0, bytemuck::bytes_of(&guard.viewport));
+        queue.write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&CameraUniform {
+            camera: guard.transform.camera_transform(),
+            projection: guard.projection.projection_transform(),
+            position: guard.transform.get_position(),
+            scale_factor: guard.scale_factor,
         }));
     }
 
@@ -203,10 +221,16 @@ impl GameCamera {
     /// 
     pub fn to_world_coordinates(&self, pos: &PhysicalPosition<f64>) -> (f32, f32) {
         use glam::vec4;
-        let x = -1.0 + 2.0 * (pos.x as f32 - self.viewport.x) / self.viewport.width;
-        let y = -1.0 + 2.0 * (pos.y as f32 - self.viewport.y) / self.viewport.height;
-        let inv_projection = self.projection.projection_transform().inverse();
-        let inv_camrea = self.transform.camera_transform().inverse();
+
+        let guard = self.data.lock().expect("Failed to access variable.");
+        let viewport = &guard.viewport;
+        let transform = &guard.transform;
+        let projection = &guard.projection;
+
+        let x = -1.0 + 2.0 * (pos.x as f32 - viewport.x) / viewport.width;
+        let y = -1.0 + 2.0 * (pos.y as f32 - viewport.y) / viewport.height;
+        let inv_projection = projection.projection_transform().inverse();
+        let inv_camrea = transform.camera_transform().inverse();
         let point = inv_camrea * inv_projection * vec4(x, y, 0.0, 1.0);
         (point.x, point.y)
     }

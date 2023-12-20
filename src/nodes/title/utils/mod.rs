@@ -48,17 +48,18 @@ pub const STAGE_RIGHT: f32 = 4.0 * PIXEL_PER_METER;
 /// #### English (Translation) </br>
 /// Reset the camera to its initial state. </br>
 /// 
-pub fn reset_camera(camera: &mut GameCamera, queue: &wgpu::Queue) {
-    camera.transform = Transform::new();
-    camera.projection = Projection::new_ortho(
-        MENU_TOP, 
-        MENU_LEFT, 
-        MENU_BOTTOM, 
-        MENU_RIGHT, 
-        0.0, 
-        1000.0
-    );
-    camera.update(queue);
+pub fn reset_camera(camera: &GameCamera, queue: &wgpu::Queue) {
+    camera.update(queue, |data| {
+        data.transform = Transform::new();
+        data.projection = Projection::new_ortho(
+            MENU_TOP, 
+            MENU_LEFT, 
+            MENU_BOTTOM, 
+            MENU_RIGHT, 
+            0.0, 
+            1000.0
+        );
+    });
 }
 
 

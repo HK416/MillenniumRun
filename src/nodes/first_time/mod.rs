@@ -8,9 +8,6 @@ use ab_glyph::Font;
 use glam::{Vec3, Vec4};
 use winit::{event::Event, window::Window};
 
-use crate::components::camera::GameCamera;
-use crate::render::depth::DepthBuffer;
-use crate::scene::state::SceneState;
 use crate::{
     game_err,
     assets::bundle::AssetBundle,
@@ -24,14 +21,13 @@ use crate::{
             brush::UiBrush,
             objects::{UiObject, UiObjectBuilder},
         },
-        anchor::Anchor,
-        margin::Margin,
-        script::Script,
+        camera::GameCamera,
+        anchor::Anchor, margin::Margin, script::Script,
         user::{Language, Settings, SettingsEncoder}, 
     },
     nodes::path,
     render::texture::DdsTextureDecoder, 
-    scene::node::SceneNode,
+    scene::{node::SceneNode, state::SceneState},
     system::{
         error::{AppResult, GameError},
         event::AppEvent,
@@ -138,7 +134,7 @@ impl SceneNode for FirstTimeSetupLoading {
         Ok(())
     }
 
-    fn update(&mut self, shared: &mut Shared, total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    fn update(&mut self, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
         // (한국어) `FirstTimeSetup` 게임 장면이 준비된 경우 게임 장면으로 변경합니다.
         // (English Translation) If the `FirstTimeSetup` game scene is ready, change to the game scene.
         if self.loading.as_ref().is_some_and(|it| it.is_finished()) {
@@ -155,8 +151,7 @@ impl SceneNode for FirstTimeSetupLoading {
         let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
-        let camera= shared.get::<GameCamera>().unwrap();
+        let camera= shared.get::<Arc<GameCamera>>().unwrap();
 
 
         // (한국어) 이전 작업이 끝날 때 까지 기다립니다.

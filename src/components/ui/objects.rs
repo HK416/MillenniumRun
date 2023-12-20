@@ -227,10 +227,12 @@ impl UiObject {
 
 impl Collider2d<(&PhysicalPosition<f64>, &GameCamera)> for UiObject {
     fn test(&self, other: &(&PhysicalPosition<f64>, &GameCamera)) -> bool {
+        let (pos, view, scale) = {
+            let guard = other.1.data.lock().expect("Failed to access variable.");
+            (other.0, guard.viewport, guard.scale_factor)
+        };
+        
         let guard = self.data.lock().expect("Failed to access variable.");
-        let pos = other.0;
-        let view = other.1.viewport;
-        let scale = other.1.scale_factor;
         let anchor = guard.anchor;
         let margin = guard.margin;
 

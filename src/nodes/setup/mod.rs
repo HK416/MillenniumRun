@@ -175,7 +175,7 @@ fn setup_main_camera(
     window: &Window,
     device: &wgpu::Device, 
     layout: &wgpu::BindGroupLayout
-) -> GameCamera {
+) -> Arc<GameCamera> {
     let scale_factor = window.current_monitor()
         .map_or(1.0, |handle| handle.scale_factor() as f32);
     GameCamera::new(

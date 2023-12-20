@@ -18,6 +18,7 @@ pub enum Types {
     Optional,
 }
 
+#[allow(dead_code)]
 impl Types {
     /// #### 한국어 </br>
     /// 에셋이 읽기 가능한지 여부를 반환합니다. </br>

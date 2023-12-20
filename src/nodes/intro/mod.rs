@@ -131,7 +131,7 @@ impl SceneNode for IntroLoading {
         let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let camera= shared.get::<GameCamera>().unwrap();
+        let camera= shared.get::<Arc<GameCamera>>().unwrap();
 
         // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
         // (English Translation) Wait until the previous operation is finished.

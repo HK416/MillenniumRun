@@ -69,7 +69,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
-    let camera = shared.get::<GameCamera>().unwrap();
+    let camera = shared.get::<Arc<GameCamera>>().unwrap();
 
     
     // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
@@ -330,7 +330,7 @@ fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: 
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
-    let camera = shared.get::<GameCamera>().unwrap();
+    let camera = shared.get::<Arc<GameCamera>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     
     match event {
@@ -441,7 +441,7 @@ fn handle_mouse_input_for_sys(this: &mut TitleScene, shared: &mut Shared, event:
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
-    let camera = shared.get::<GameCamera>().unwrap();
+    let camera = shared.get::<Arc<GameCamera>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     
     match event {
