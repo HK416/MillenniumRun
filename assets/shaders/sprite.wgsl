@@ -11,7 +11,8 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) color: vec4<f32>,
+    @location(0) position: vec3<f32>,
+    @location(1) color: vec4<f32>,
     @location(2) texcoord: vec2<f32>,
     @location(3) texture_index: u32,
 }
@@ -81,9 +82,11 @@ fn vs_main(in: VertexInput) -> VertexOutput {
         in.transform_col_2,
         in.transform_col_3,
     );
+    let world_position = transform * vec4<f32>(position, 1.0);
 
     var out: VertexOutput;
-    out.clip_position = cam.projection * cam.camera * transform * vec4<f32>(position, 1.0);
+    out.clip_position = cam.projection * cam.camera * world_position;
+    out.position = world_position.xyz;
     out.color = in.color;
     out.texcoord = texcoord;
     out.texture_index = in.texture_index;
@@ -97,7 +100,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     var light_color: vec3<f32>;
     for (var i = 0u; i < lights.num_points; i++) {
-        let atte = attenuation(in.clip_position.xyz, lights.point_lights[i]);
+        let atte = attenuation(in.position.xyz, lights.point_lights[i]);
         light_color += lights.point_lights[i].color * atte;
     }
 

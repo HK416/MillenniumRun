@@ -15,6 +15,7 @@ use crate::{
         ui::brush::UiBrush,
         camera::GameCamera,
         transform::{Transform, Projection},
+        lights::PointLight,
         script::Script,
         sprite::SpriteBrush, 
     },
@@ -530,6 +531,7 @@ pub fn create_title_scene<F: Font>(
     )?;
 
     return Ok(TitleScene {
+        light_timer: 0.0, 
         elapsed_time: 0.0, 
         state: TitleState::Enter,
         background, 

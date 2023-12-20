@@ -16,6 +16,7 @@ use crate::{
         text2d::{font::FontSet, brush::Text2dBrush, section::Section2d},
         ui::{brush::UiBrush, objects::UiObject},
         camera::GameCamera,
+        lights::{PointLight, PointLights}, 
         sound::SoundDecoder,
         script::Script,
         user::Settings,
@@ -43,7 +44,7 @@ pub struct TitleLoading {
 
 impl SceneNode for TitleLoading {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
-        use crate::nodes::path;
+        use crate::nodes::{path, consts::PIXEL_PER_METER};
 
         // (한국어) 사용할 공유 객체를 가져옵니다.
         // (English Translation) Get shared object to use.
@@ -73,12 +74,28 @@ impl SceneNode for TitleLoading {
                 &asset_bundle
             )
         }));
-
+        
+        // (한국어) 사용할 공유 객체 가져오기.
+        // (English Translation) Get shared object to use.
+        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        let camera = shared.get::<Arc<GameCamera>>().unwrap();
+        let lights = shared.get::<Arc<PointLights>>().unwrap();
+        
+        
         // (한국어) 카메라를 설정 합니다.
         // (English Translation) Set up the camera.
-        let camera = shared.get::<Arc<GameCamera>>().unwrap();
-        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
         utils::reset_camera(camera, queue);
+
+        // (한국어) 조명을 설정합니다.
+        // (English Translation) Set up the light.
+        lights.update(queue, |data| {
+            data.num_points = 1;
+            data.point_lights[0] = PointLight {
+                position: (0.0, -5.0 * PIXEL_PER_METER, 0.0).into(),
+                color: (56.0 / 255.0, 65.0 / 255.0, 157.0 / 255.0).into(),
+                ..Default::default()
+            };
+        });
 
         Ok(())
     }
@@ -171,6 +188,7 @@ impl Default for TitleLoading {
 /// 
 #[derive(Debug)]
 pub struct TitleScene {
+    pub light_timer: f64,
     pub elapsed_time: f64,
     pub state: state::TitleState,
     pub background: Arc<Sprite>,
@@ -214,6 +232,15 @@ impl SceneNode for TitleScene {
         // (한국어) 배경 음악을 제거합니다.
         // (English Translation) Detach background music.
         shared.pop::<Sink>().unwrap().detach();
+
+        // (한국어) 조명을 제거합니다.
+        // (English Translation) Detach the light.
+        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        let lights = shared.get::<Arc<PointLights>>().unwrap();
+        lights.update(queue, |data| {
+            data.num_points = 0;
+        });
+
         Ok(())
     }
 
@@ -224,6 +251,7 @@ impl SceneNode for TitleScene {
 
     #[inline]
     fn update(&mut self, shared: &mut Shared, total_time: f64, elapsed_time: f64) -> AppResult<()> {
+        update_light(self, shared, total_time, elapsed_time)?;
         state::UPDATES[self.state as usize](self, shared, total_time, elapsed_time)
     }
 
@@ -231,4 +259,27 @@ impl SceneNode for TitleScene {
     fn draw(&self, shared: &mut Shared) -> AppResult<()> {
         state::DRAWS[self.state as usize](self, shared)
     }
+}
+
+
+fn update_light(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    use std::f32::consts::PI;
+    const PERIOD: f64 = 1.3;
+    
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer.
+    this.light_timer = (this.light_timer + elapsed_time) % PERIOD;
+    let delta = (this.light_timer / (0.5 * PERIOD)) as f32 * PI;
+    
+    // (한국어) 조명을 갱신합니다.
+    // (English Translation) Updates the light.
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let lights = shared.get::<Arc<PointLights>>().unwrap();
+    lights.update(queue, |data| {
+        data.point_lights[0].constant = 0.001 + 0.0005 * delta.sin();
+        data.point_lights[0].linear = 0.0007 + 0.0001 * delta.sin();
+        data.point_lights[0].quadratic = 0.000001 + 0.00005 * delta.sin();
+    });
+    
+    Ok(())
 }
