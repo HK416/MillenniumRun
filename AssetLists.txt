@@ -49,9 +49,15 @@ shaders/sprite.wgsl Static
 #--------#
 textures/background.dds Static
 textures/aris_standing.dds Static
+textures/aris_player.dds Static
 textures/momoi_standing.dds Static
+textures/momoi_player.dds Static
 textures/midori_standing.dds Static
+textures/midori_player.dds Static
 textures/yuzu_standing.dds Static
+textures/yuzu_player.dds Static
+
+textures/tile.dds Static 
 
 #----------------#
 # User Interface #
@@ -64,6 +70,7 @@ textures/ui/title_button_setting.dds Static
 textures/ui/title_button_exit.dds Static
 textures/ui/title_button_return.dds Static
 textures/ui/window_ratio_4_3.dds Static
+textures/ui/background.dds Static
 
 sounds/ui/click.ogg Static 
 sounds/ui/cancel.ogg Static 

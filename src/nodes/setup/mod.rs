@@ -141,7 +141,6 @@ impl SceneNode for SetupScene {
         // (English Translation) Verify that all asset files have completed loading.
         if self.loading.as_ref().is_some_and(|it| it.is_finished()) {
             self.loading.take().unwrap().join().unwrap()?;
-
             
             #[cfg(debug_assertions)] {
                 // (한국어) 주어진 명령줄을 구문분석 합니다.
@@ -159,9 +158,8 @@ impl SceneNode for SetupScene {
                         Language::Korean | Language::Unknown => asset_bundle.get(path::KOR_SCRIPTS_PATH)?.read(&ScriptDecoder)?,
                     };
                     shared.push(Arc::new(script));
+                    return  Ok(());
                 } 
-
-                return  Ok(());
             }
 
             // (한국어) 사용할 공유 객체 가져오기.

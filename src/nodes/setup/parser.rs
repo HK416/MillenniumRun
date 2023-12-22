@@ -6,6 +6,7 @@ use crate::{
         first_time::FirstTimeSetupLoading,
         intro::IntroLoading,
         title::TitleLoading,
+        in_game::InGameLoading,
     },
     scene::node::SceneNode,
 };
@@ -19,7 +20,7 @@ Options
     -l <LANGUAGE>, --language <LANGUAGE> : Specify the language used. This option does not affect the user settings file.
 
 Scenes
-    FirstTimeSetup, Intro, Title
+    FirstTimeSetup, Intro, Title, InGame
 
 Languages
     Korean
@@ -100,6 +101,7 @@ where I: Iterator<Item = &'a String> {
             "FirstTimeSetup" => config.next_scene = Some(Box::new(FirstTimeSetupLoading::default())),
             "Intro" => config.next_scene = Some(Box::new(IntroLoading::default())),
             "Title" => config.next_scene = Some(Box::new(TitleLoading::default())),
+            "InGame" => config.next_scene = Some(Box::new(InGameLoading::default())),
             _ => help()
         }
     } else {

@@ -2,6 +2,7 @@ pub mod first_time;
 pub mod intro;
 pub mod setup;
 pub mod title;
+pub mod in_game;
 
 pub mod consts {
     pub const PIXEL_PER_METER: f32 = 50.0 / 1.0;
@@ -33,12 +34,19 @@ pub mod path {
     pub const TITLE_BUTTON_EXIT_TEXTURE_PATH: &'static str = "textures/ui/title_button_exit.dds";
     pub const TITLE_BUTTON_RETURN_TEXTURE_PATH: &'static str = "textures/ui/title_button_return.dds";
     pub const WINDOW_RATIO_4_3_TEXTURE_PATH: &'static str = "textures/ui/window_ratio_4_3.dds";
+    pub const UI_BACKGROUND_TEXTURE_PATH: &'static str = "textures/ui/background.dds";
 
     pub const BACKGROUND_TEXTURE_PATH: &'static str = "textures/background.dds";
     pub const ARIS_STANDING_TEXTURE_PATH: &'static str = "textures/aris_standing.dds";
     pub const MOMOI_STANDING_TEXTURE_PATH: &'static str = "textures/momoi_standing.dds";
     pub const MIDORI_STANDING_TEXTURE_PATH: &'static str = "textures/midori_standing.dds";
     pub const YUZU_STANDING_TEXTURE_PATH: &'static str = "textures/yuzu_standing.dds";
+
+    pub const TILE_TEXTURE_PATH: &'static str = "textures/tile.dds";
+    pub const ARIS_PLAYER_TEXTURE_PATH: &'static str = "textures/aris_player.dds";
+    pub const MOMOI_PLAYER_TEXTURE_PATH: &'static str = "textures/momoi_player.dds";
+    pub const MIDORI_PLAYER_TEXTURE_PATH: &'static str = "textures/midori_player.dds";
+    pub const YUZU_PLAYER_TEXTURE_PATH: &'static str = "textures/yuzu_player.dds";
 
     // Sounds -----------------------------------------------------------------
     pub const THEME64_SOUND_PATH: &'static str = "sounds/bgm/theme64.ogg";
