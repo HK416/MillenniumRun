@@ -1,18 +1,16 @@
 struct VertexInput {
     @builtin(vertex_index) vertex_index: u32,
-    @location(0) transform_col_0: vec4<f32>,
-    @location(1) transform_col_1: vec4<f32>,
-    @location(2) transform_col_2: vec4<f32>,
-    @location(3) transform_col_3: vec4<f32>,
-    @location(4) anchor_top: f32,
-    @location(5) anchor_left: f32,
-    @location(6) anchor_bottom: f32,
-    @location(7) anchor_right: f32,
-    @location(8) margin_top: i32,
-    @location(9) margin_left: i32,
-    @location(10) margin_bottom: i32,
-    @location(11) margin_right: i32,
-    @location(12) color: vec4<f32>,
+    @location(0) local_transform_col_0: vec4<f32>, 
+    @location(1) local_transform_col_1: vec4<f32>, 
+    @location(2) local_transform_col_2: vec4<f32>, 
+    @location(3) local_transform_col_3: vec4<f32>, 
+    @location(4) global_transform_col_0: vec4<f32>, 
+    @location(5) global_transform_col_1: vec4<f32>, 
+    @location(6) global_transform_col_2: vec4<f32>, 
+    @location(7) global_transform_col_3: vec4<f32>, 
+    @location(8) anchor: vec4<f32>,
+    @location(9) margin: vec4<i32>,
+    @location(10) color: vec4<f32>,
 }
 
 struct VertexOutput {
@@ -49,14 +47,24 @@ var tex_sampler: sampler;
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
+    let anchor_top = in.anchor.x;
+    let anchor_left = in.anchor.y;
+    let anchor_bottom = in.anchor.z;
+    let anchor_right = in.anchor.w;
+
+    let margin_top = in.margin.x;
+    let margin_left = in.margin.y;
+    let margin_bottom = in.margin.z;
+    let margin_right = in.margin.w;
+
     // (한국어) 사용자 인터페이스의 영역을 계산합니다.
     // (English Translation) Calculate the area of the user interface.
     let min_x: f32 = 2.0 * view.x / view.width - 1.0;
     let min_y: f32 = 2.0 * view.y / view.height - 1.0;
-    let top: f32 = min_y + 2.0 * in.anchor_top + 2.0 * f32(in.margin_top) * cam.scale_factor / view.height;
-    let left: f32 = min_x + 2.0 * in.anchor_left + 2.0 * f32(in.margin_left) * cam.scale_factor / view.width;
-    let bottom: f32 = min_y + 2.0 * in.anchor_bottom + 2.0 * f32(in.margin_bottom) * cam.scale_factor / view.height;
-    let right: f32 = min_x + 2.0 * in.anchor_right + 2.0 * f32(in.margin_right) * cam.scale_factor / view.width;
+    let top: f32 = min_y + 2.0 * anchor_top + 2.0 * f32(margin_top) * cam.scale_factor / view.height;
+    let left: f32 = min_x + 2.0 * anchor_left + 2.0 * f32(margin_left) * cam.scale_factor / view.width;
+    let bottom: f32 = min_y + 2.0 * anchor_bottom + 2.0 * f32(margin_bottom) * cam.scale_factor / view.height;
+    let right: f32 = min_x + 2.0 * anchor_right + 2.0 * f32(margin_right) * cam.scale_factor / view.width;
 
     // (한국어) 사용자 인터페이스의 뷰포트 좌표계상 가로와 세로의 길이를 계산합니다.
     // (English Translation) Calculates the width and height of the user interface in the viewport coordinates.
@@ -93,22 +101,23 @@ fn vs_main(in: VertexInput) -> VertexOutput {
         default { }
     }
 
-    let translation: mat4x4<f32> = mat4x4<f32>(
-        vec4<f32>(1.0, 0.0, 0.0, 0.0),
-        vec4<f32>(0.0, 1.0, 0.0, 0.0),
-        vec4<f32>(0.0, 0.0, 1.0, 0.0),
-        vec4<f32>(x, y, 0.0, 1.0),
+    let local_transform = mat4x4<f32>(
+        in.local_transform_col_0, 
+        in.local_transform_col_1, 
+        in.local_transform_col_2, 
+        in.local_transform_col_3
     );
 
-    let transform: mat4x4<f32> = mat4x4<f32>(
-        in.transform_col_0,
-        in.transform_col_1,
-        in.transform_col_2,
-        in.transform_col_3,
+    let global_transform = mat4x4<f32>(
+        in.global_transform_col_0, 
+        in.global_transform_col_1, 
+        in.global_transform_col_2, 
+        in.global_transform_col_3
     );
 
     var out: VertexOutput;
-    out.clip_position = transform * translation * vec4<f32>(position, 1.0);
+    let local_position = (local_transform * vec4<f32>(position, 1.0)) + vec4<f32>(x, y, 0.0, 0.0);
+    out.clip_position = global_transform * local_position;
     out.texcoord = texcoord;
     out.color = in.color;
     return out;

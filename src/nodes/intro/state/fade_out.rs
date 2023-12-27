@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     game_err,
-    components::{ui::brush::UiBrush, camera::GameCamera},
+    components::{ui::UiBrush, camera::GameCamera},
     nodes::{
         intro::IntroScene, 
         title::TitleLoading, 

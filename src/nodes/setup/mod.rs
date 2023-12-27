@@ -15,11 +15,12 @@ use crate::{
             brush::Text2dBrush, 
             font::{FontSet, FontDecoder}
         },
-        ui::brush::UiBrush,
+        ui::UiBrush,
         lights::PointLights,
         camera::{Viewport, GameCamera},
         script::{Script, ScriptDecoder},
         sprite::SpriteBrush,
+        map::TileBrush, 
         transform::{Transform, Projection},
         user::{
             Language, 
@@ -31,6 +32,7 @@ use crate::{
     nodes::{
         path, 
         consts, 
+        in_game,
         first_time::FirstTimeSetupLoading, 
         intro::IntroLoading,
     },
@@ -113,6 +115,7 @@ impl SceneNode for SetupScene {
         let text_brush = setup_text_brush(device, &camera_bind_group_layout, config.format, asset_bundle)?;
         let point_lights = setup_point_lights(device);
         let sprite_brush = setup_sprite_brush(device, &camera_bind_group_layout, &point_lights.buffer_layout, config.format, asset_bundle)?;
+        let tile_brush = setup_tile_brush(device, &camera_bind_group_layout, &point_lights.buffer_layout, config.format, asset_bundle)?;
         let (settings, script) = setup_window(window, asset_bundle)?;
         let camera = setup_main_camera(window, device, &camera_bind_group_layout);        
 
@@ -126,6 +129,7 @@ impl SceneNode for SetupScene {
         shared.push(ui_brush);
         shared.push(point_lights);
         shared.push(sprite_brush);
+        shared.push(tile_brush);
         shared.push(settings);
         shared.push(camera);
         if let Some(script) = script {
@@ -344,6 +348,39 @@ fn setup_sprite_brush(
         wgpu::MultisampleState::default(), 
         None,
         asset_bundle
+    )
+}
+
+
+/// #### 한국어 </br>
+/// 타일 그리기 도구를 설정합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Sets tile drawing tools. </br>
+/// 
+fn setup_tile_brush(
+    device: &wgpu::Device, 
+    camera_layout: &wgpu::BindGroupLayout, 
+    light_layout: &wgpu::BindGroupLayout, 
+    render_format: wgpu::TextureFormat, 
+    asset_bundle: &AssetBundle
+) -> AppResult<Arc<TileBrush>> {
+    TileBrush::new(
+        device, 
+        camera_layout, 
+        light_layout, 
+        render_format, 
+        Some(wgpu::DepthStencilState {
+            format: wgpu::TextureFormat::Depth32Float,
+            depth_write_enabled: true,
+            depth_compare:wgpu::CompareFunction::LessEqual,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        }), 
+        wgpu::MultisampleState::default(), 
+        None,
+        asset_bundle,
+        in_game::NUM_TILES
     )
 }
 

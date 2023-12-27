@@ -13,7 +13,7 @@ use crate::{
     game_err,
     components::{
         text2d::brush::Text2dBrush, 
-        ui::brush::UiBrush, 
+        ui::UiBrush, 
         camera::GameCamera,
     },
     nodes::{
@@ -68,9 +68,7 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
     let scale = INIT_BUTTON_SCALE + (MAX_BUTTON_SCALE - INIT_BUTTON_SCALE) * delta;
     if let Some((ui, text)) = this.buttons.get_mut(&this.language) {
         ui.update(queue, |data| {
-            data.transform.x_axis.x = scale.x;
-            data.transform.y_axis.y = scale.y;
-            data.transform.z_axis.z = scale.z;
+            data.global_scale = scale;
         });
         text.update(queue, |data| {
             data.transform.x_axis.x = scale.x;

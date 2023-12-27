@@ -24,6 +24,7 @@ pub mod path {
     pub const UI_SHADER_PATH: &'static str = "shaders/ui.wgsl";
     pub const UI_TEXT_SHADER_PATH: &'static str = "shaders/text.wgsl";
     pub const SPRITE_SHADER_PATH: &'static str = "shaders/sprite.wgsl";
+    pub const TILE_SPRITE_SHADER_PATH: &'static str = "shaders/tile.wgsl";
 
     // Textures ---------------------------------------------------------------
     pub const LOGO_TEXTURE_PATH: &'static str = "textures/ui/logo.dds";
@@ -42,10 +43,14 @@ pub mod path {
     pub const MIDORI_STANDING_TEXTURE_PATH: &'static str = "textures/midori_standing.dds";
     pub const YUZU_STANDING_TEXTURE_PATH: &'static str = "textures/yuzu_standing.dds";
 
-    pub const TILE_TEXTURE_PATH: &'static str = "textures/tile.dds";
+    pub const TEMP_STAGE_TEXTURE_PATH: &'static str = "textures/temp.dds";
+    // pub const ARIS_STAGE_TEXTURE_PATH: &'static str = "textures/aris_stage.dds";
     pub const ARIS_PLAYER_TEXTURE_PATH: &'static str = "textures/aris_player.dds";
+    // pub const MOMOI_STAGE_TEXTURE_PATH: &'static str = "textures/momoi_stage.dds";
     pub const MOMOI_PLAYER_TEXTURE_PATH: &'static str = "textures/momoi_player.dds";
+    // pub const MIDORI_STAGE_TEXTURE_PATH: &'static str = "textures/midori_stage.dds";
     pub const MIDORI_PLAYER_TEXTURE_PATH: &'static str = "textures/midori_player.dds";
+    // pub const YUZU_STAGE_TEXTURE_PATH: &'static str = "textures/yuzu_stage.dds";
     pub const YUZU_PLAYER_TEXTURE_PATH: &'static str = "textures/yuzu_player.dds";
 
     // Sounds -----------------------------------------------------------------

@@ -12,7 +12,7 @@ use crate::{
     assets::bundle::AssetBundle, 
     components::{
         text2d::brush::Text2dBrush,
-        ui::brush::UiBrush,
+        ui::UiBrush,
         camera::GameCamera,
         transform::{Transform, Projection},
         script::Script,
@@ -275,7 +275,9 @@ pub fn create_title_scene<F: Font>(
             queue, 
         })?;
     let start_btn_texture_view = texture.create_view(
-        &wgpu::TextureViewDescriptor::default()
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        }
     );
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
@@ -302,7 +304,10 @@ pub fn create_title_scene<F: Font>(
             device,
             queue, 
         })?;
-    let setting_btn_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let setting_btn_texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
@@ -328,7 +333,10 @@ pub fn create_title_scene<F: Font>(
             device,
             queue, 
         })?;
-    let exit_btn_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let exit_btn_texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
@@ -374,7 +382,9 @@ pub fn create_title_scene<F: Font>(
             queue, 
         })?;
     let return_btn_texture_view = texture.create_view(
-        &wgpu::TextureViewDescriptor::default()
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        }
     );
 
     // (한국어) 사용을 완료한 에셋을 해제합니다.
@@ -418,7 +428,10 @@ pub fn create_title_scene<F: Font>(
             device,
             queue,
         })?;
-    let window_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let window_texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
@@ -429,7 +442,7 @@ pub fn create_title_scene<F: Font>(
     // (English Translation) Create a button texture from a `dds`image file. 
     let texture = asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?
         .read(&DdsTextureDecoder {
-            name: Some("Button"),
+            name: Some("MediumButton"),
             size: wgpu::Extent3d {
                 width: 768,
                 height: 256,
@@ -444,7 +457,10 @@ pub fn create_title_scene<F: Font>(
             device,
             queue,
         })?;
-    let btn_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let btn_texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
     
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
@@ -454,7 +470,7 @@ pub fn create_title_scene<F: Font>(
     // (English Translation) Create a button texture from a `dds`image file. 
     let texture = asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?
         .read(&DdsTextureDecoder {
-            name: Some("General"),
+            name: Some("WideButton"),
             size: wgpu::Extent3d {
                 width:1024,
                 height:192,
@@ -469,7 +485,10 @@ pub fn create_title_scene<F: Font>(
             device: &device,
             queue: &queue,
         })?;
-    let wide_btn_texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let wide_btn_texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
     
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.

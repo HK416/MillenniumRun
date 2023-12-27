@@ -1,12 +1,16 @@
 use serde::{Serialize, Deserialize};
 use winit::{
     window::Window,
-    dpi::{PhysicalPosition, PhysicalSize, LogicalSize},
+    dpi::{
+        PhysicalPosition, 
+        PhysicalSize, 
+        LogicalSize,
+    },
 };
 
 use crate::{
     game_err,
-    components::sound::Volume,
+    components::{sound::Volume, control::Control},
     assets::interface::{AssetDecoder, AssetEncoder},
     system::error::{AppResult, GameError},
 };
@@ -20,7 +24,8 @@ use crate::{
 /// This is a list of application languages. </br>
 /// 
 #[repr(u8)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Language {
     #[default]
     Unknown,
@@ -36,7 +41,8 @@ pub enum Language {
 /// This is a list of application screen modes. </br>
 /// 
 #[repr(u8)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ScreenMode {
     #[default]
     Windowed,
@@ -52,7 +58,8 @@ pub enum ScreenMode {
 /// This is a list of resolutions for application window. </br>
 /// 
 #[repr(u8)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Resolution {
     #[default]
     W800H600,
@@ -100,9 +107,10 @@ impl Into<LogicalSize<u32>> for Resolution {
 /// Contains application settings. </br>
 /// 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Settings {
-    pub beginner: bool,
+    pub control: Control, 
     pub language: Language,
     pub screen_mode: ScreenMode,
     pub resolution: Resolution,
@@ -115,10 +123,10 @@ impl Default for Settings {
     #[inline]
     fn default() -> Self {
         Self { 
-            beginner: true, 
+            control: Control::default(), 
             language: Language::default(), 
             screen_mode: ScreenMode::default(), 
-            resolution: Resolution::default(),
+            resolution: Resolution::default(), 
             background_volume: Volume::new(80),
             effect_volume: Volume::new(100),
             voice_volume: Volume::new(85),

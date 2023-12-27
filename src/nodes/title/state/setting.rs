@@ -12,7 +12,7 @@ use crate::{
     components::{
         collider2d::Collider2d,
         text2d::brush::Text2dBrush,
-        ui::brush::UiBrush,
+        ui::UiBrush,
         camera::GameCamera, 
         lights::PointLights, 
         sprite::SpriteBrush,

@@ -9,10 +9,7 @@ use crate::{
             brush::Text2dBrush, 
             section::{Section2d, Section2dBuilder},
         },
-        ui::{
-            brush::UiBrush, 
-            objects::{UiObject, UiObjectBuilder},
-        },
+        ui::{UiBrush, UiObject, UiObjectBuilder},
         anchor::Anchor, 
         margin::Margin,
         script::{Script, ScriptTags},
@@ -108,7 +105,7 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(UI_COLOR)
-        .with_translation(UI_TRANSLATION)
+        .with_global_translation(UI_TRANSLATION)
         .build(device)),
         vec![
             Arc::new(Section2dBuilder::new(
@@ -140,7 +137,7 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(UI_COLOR)
-        .with_translation(UI_TRANSLATION)
+        .with_global_translation(UI_TRANSLATION)
         .build(device)),
         vec![
             Arc::new(Section2dBuilder::new(
@@ -172,7 +169,7 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(UI_COLOR)
-        .with_translation(UI_TRANSLATION)
+        .with_global_translation(UI_TRANSLATION)
         .build(device)),
         vec![
             Arc::new(Section2dBuilder::new(
@@ -264,7 +261,7 @@ pub(super) fn create_system_buttons<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(color)
-        .with_translation(translation)
+        .with_global_translation(translation)
         .build(device)),
         vec![],
     );

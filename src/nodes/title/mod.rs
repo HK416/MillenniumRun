@@ -14,7 +14,7 @@ use crate::{
         collider2d::shape::AABB,
         sprite::{Sprite, SpriteBrush},
         text2d::{font::FontSet, brush::Text2dBrush, section::Section2d},
-        ui::{brush::UiBrush, objects::UiObject},
+        ui::{UiBrush, UiObject},
         camera::GameCamera,
         lights::{PointLight, PointLights}, 
         sound::SoundDecoder,

@@ -5,6 +5,7 @@ pub mod ui;
 
 pub mod anchor;
 pub mod camera;
+pub mod control;
 pub mod lights;
 pub mod margin;
 pub mod script;

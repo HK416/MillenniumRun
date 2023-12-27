@@ -5,7 +5,7 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        ui::{brush::UiBrush, objects::UiObject}, 
+        ui::{UiBrush, UiObject}, 
         text2d::{brush::Text2dBrush, section::Section2d}, 
         camera::GameCamera, 
         lights::PointLights,

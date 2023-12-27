@@ -9,10 +9,7 @@ use crate::{
             brush::Text2dBrush,
             section::{Section2d, Section2dBuilder},
         },
-        ui::{
-            brush::UiBrush,
-            objects::{UiObject, UiObjectBuilder},
-        },
+        ui::{UiBrush, UiObject, UiObjectBuilder},
         anchor::Anchor,
         margin::Margin,
         script::{Script, ScriptTags},
@@ -114,7 +111,7 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(wnd_margin)
         .with_color(WND_COLOR)
-        .with_translation(WND_TRANSLATION)
+        .with_global_translation(WND_TRANSLATION)
         .build(device)),
         vec![
             Arc::new(Section2dBuilder::new(
@@ -151,7 +148,7 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(YES_BTN_COLOR)
-        .with_translation(BTN_TRANSLATION)
+        .with_global_translation(BTN_TRANSLATION)
         .build(device)),
         vec![
             Arc::new(Section2dBuilder::new(
@@ -188,7 +185,7 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(NO_BTN_COLOR)
-        .with_translation(BTN_TRANSLATION)
+        .with_global_translation(BTN_TRANSLATION)
         .build(device)),
         vec![
             Arc::new(Section2dBuilder::new(
@@ -290,7 +287,7 @@ pub(super) fn create_setting_window<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(ui_color)
-        .with_translation(ui_translation)
+        .with_global_translation(ui_translation)
         .build(device)),
         vec![
             // TODO 
@@ -313,7 +310,7 @@ pub(super) fn create_setting_window<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(ui_color)
-        .with_translation(ui_translation)
+        .with_global_translation(ui_translation)
         .build(device)),
         vec![
             Arc::new(Section2dBuilder::new(
@@ -347,7 +344,7 @@ pub(super) fn create_setting_window<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(ui_color)
-        .with_translation(ui_translation)
+        .with_global_translation(ui_translation)
         .build(device)),
         vec![
             Arc::new(Section2dBuilder::new(
@@ -450,7 +447,7 @@ pub(super) fn create_stage_window<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(ui_color)
-        .with_translation(ui_translation)
+        .with_global_translation(ui_translation)
         .build(device)),
         vec![
             // TODO 
@@ -479,7 +476,7 @@ pub(super) fn create_stage_window<'a, F: Font>(
         .with_anchor(anchor)
         .with_margin(margin)
         .with_color(ui_color)
-        .with_translation(ui_translation)
+        .with_global_translation(ui_translation)
         .build(device)),
         vec![
             Arc::new(Section2dBuilder::new(

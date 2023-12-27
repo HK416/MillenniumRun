@@ -14,10 +14,7 @@ use crate::{
             brush::Text2dBrush, font::FontSet,
             section::{Section2d, Section2dBuilder},
         },
-        ui::{
-            brush::UiBrush,
-            objects::{UiObject, UiObjectBuilder},
-        },
+        ui::{UiBrush, UiObject, UiObjectBuilder},
         camera::GameCamera,
         anchor::Anchor,
         margin::Margin,
@@ -334,7 +331,11 @@ fn create_logo_image(
             device,
             queue
         })?;
-    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor { 
+            ..Default::default()
+        }
+    );
 
     // (한국어) 로고 이미지 사용자 인터페이스를 생성합니다.
     // (English Translation) Create logo image user interface.

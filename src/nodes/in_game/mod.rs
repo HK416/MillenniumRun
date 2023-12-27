@@ -3,21 +3,31 @@ mod utils;
 
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+use std::collections::VecDeque;
 
+use glam::Vec4;
 use winit::event::Event;
+use rand::seq::SliceRandom;
 
 use crate::{
     game_err,
     assets::bundle::AssetBundle,
     components::{
-        ui::{brush::UiBrush, objects::UiObject},
+        text2d::{
+            font::FontSet,
+            brush::Text2dBrush, 
+            section::{Section2d, Section2dBuilder},
+        }, 
+        ui::{UiBrush, UiObject},
+        anchor::Anchor, 
         camera::GameCamera,
         lights::PointLights,
         transform::{Transform, Projection},
         sprite::SpriteBrush,
-        map::TileMap,
+        map::{Table, TileBrush}, 
         player::{Actor, Player},
     },
+    nodes::{path, consts::PIXEL_PER_METER}, 
     scene::{node::SceneNode, state::SceneState},
     system::{
         error::{AppResult, GameError},
@@ -26,6 +36,30 @@ use crate::{
     },
 };
 
+pub const INIT_RANGE: usize = 6;
+pub const NUM_TILE_ROWS: usize = 101;
+pub const NUM_TILE_COLS: usize = 101;
+pub const NUM_TILES: usize = NUM_TILE_ROWS * NUM_TILE_COLS;
+pub const SPAWN_POSITIONS: [(usize, usize); 8] = [
+    (25, 25), (25, 50), (25, 75),
+    (50, 25), (50, 75),
+    (75, 25), (75, 50), (75, 75)
+];
+
+pub const CAMERA_VIEW_WIDTH: f32 = 80.0 * PIXEL_PER_METER;
+pub const CAMERA_VIEW_HEIGHT: f32 = 60.0 * PIXEL_PER_METER;
+pub const PROJECTION_MAT: Projection = Projection::new_ortho(
+    0.5 * CAMERA_VIEW_HEIGHT, 
+    -0.5 * CAMERA_VIEW_WIDTH, 
+    -0.5 * CAMERA_VIEW_HEIGHT, 
+    0.5 * CAMERA_VIEW_WIDTH, 
+    0.0 * PIXEL_PER_METER, 
+    1000.0 * PIXEL_PER_METER
+);
+
+pub const EDGE_COLOR: Vec4 = Vec4::new(137.0 / 255.0, 207.0 / 255.0, 243.0 / 255.0, 1.0);
+pub const FILL_COLOR: Vec4 = Vec4::new(160.0 / 255.0, 233.0 / 255.0, 255.0 / 255.0, 1.0);
+pub const LINE_COLOR: Vec4 = Vec4::new(1.0, 0.0, 0.0, 1.0);
 
 
 #[derive(Debug)]
@@ -35,23 +69,28 @@ pub struct InGameLoading {
 
 impl SceneNode for InGameLoading {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
-        use crate::nodes::consts::PIXEL_PER_METER;
-
         // (한국어) 사용할 공유 객체 가져오기.
         // (English Translation) Get shared object to use.
+        let font_set = shared.get::<FontSet>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap().clone();
         let tex_sampler = shared.get::<Arc<wgpu::Sampler>>().unwrap().clone();
+        let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap().clone();
         let ui_brush = shared.get::<Arc<UiBrush>>().unwrap().clone();
         let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap().clone();
+        let tile_brush = shared.get::<Arc<TileBrush>>().unwrap().clone();
         let asset_bundle = shared.get::<AssetBundle>().unwrap().clone();
         let actor = shared.get::<Actor>().cloned().unwrap_or_default();
 
+        let nexon_lv2_gothic_medium = font_set.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
+            .expect("Registered font not found!")
+            .clone();
 
         // (한국어) 다른 스레드에서 `InGame` 게임 장면을 준비합니다.
         // (English Translation) Prepare the `InGame` game scene in another thread. 
         self.loading = Some(thread::spawn(move || {
             let background = utils::create_background(
+                actor, 
                 &device, 
                 &queue, 
                 &tex_sampler, 
@@ -59,20 +98,29 @@ impl SceneNode for InGameLoading {
                 &asset_bundle
             )?;
 
-            let tile_map = TileMap::new(
-                &device, 
-                &queue, 
-                &tex_sampler, 
-                &sprite_brush, 
-                &asset_bundle, 
-                std::num::NonZeroUsize::new(50).unwrap(), 
-                std::num::NonZeroUsize::new(50).unwrap(), 
-                (152.0 / 255.0, 223.0 / 255.0, 255.0 / 255.0, 1.0).into(), 
-                (-35.0 * PIXEL_PER_METER, -25.0 * PIXEL_PER_METER, -1.0 * PIXEL_PER_METER).into(), 
-                (1.0 * PIXEL_PER_METER, 1.0 * PIXEL_PER_METER).into()
-            )?;
 
-            let map = tile_map.clone();
+            let timer = Section2dBuilder::new(
+                Some("Timer"),
+                &nexon_lv2_gothic_medium, 
+                "-:--",
+                &text_brush
+            )
+            .with_anchor(Anchor::new(0.75, 0.85, 0.55, 0.85))
+            .build(&device, &queue);
+
+
+            let mut table = Table::new(
+                NUM_TILE_ROWS.try_into().unwrap(), 
+                NUM_TILE_COLS.try_into().unwrap(), 
+                EDGE_COLOR, 
+                FILL_COLOR, 
+                (-35.0 * PIXEL_PER_METER, -25.0 * PIXEL_PER_METER, -1.0 * PIXEL_PER_METER).into(), 
+                (0.5 * PIXEL_PER_METER, 0.5 * PIXEL_PER_METER).into()
+            );
+
+            let mut arr = [0, 1, 2, 3, 4, 5, 6, 7];
+            arr.shuffle(&mut rand::thread_rng());
+            let (row, col) = SPAWN_POSITIONS[arr[0]];
             let player = Player::new(
                 &device, 
                 &queue, 
@@ -80,18 +128,41 @@ impl SceneNode for InGameLoading {
                 &sprite_brush, 
                 &asset_bundle, 
                 actor, 
-                map, 
-                49,
-                0,
+                &table, 
+                row,
+                col,
                 0.0 * PIXEL_PER_METER,
                 (3.0 * PIXEL_PER_METER, 3.0 * PIXEL_PER_METER).into()
             )?;
+            for r in row - INIT_RANGE..=row + INIT_RANGE {
+                for c in col - INIT_RANGE..=col + INIT_RANGE {
+                    if r == row - INIT_RANGE || r == row + INIT_RANGE || c == col - INIT_RANGE || c == col + INIT_RANGE {
+                        table.tiles[r][c].color = EDGE_COLOR;
+                    } else {
+                        table.tiles[r][c].visited = true;
+                        table.tiles[r][c].color = (160.0 / 255.0, 233.0 / 255.0, 255.0 / 255.0, 0.0).into();
+                    }
+                }
+            }
 
-            Ok(InGameScene { 
-                scene_timer: 0.0,
-                state: state::InGameState::default(),
+            tile_brush.update(&queue, |instances| {
+                for (instance, tile) in instances.iter_mut().zip(table.tiles.iter().flatten()) {
+                    instance.transform = tile.transform;
+                    instance.color = tile.color;
+                    instance.size = table.size;
+                }
+            });
+
+
+            Ok(InGameScene {  
+                remaining_time: 120.0, 
+                timer_ui: timer, 
+                num_total_tiles: NUM_TILES as u32,
+                num_owned_tiles: 0, 
+                owned_tiles: VecDeque::new(), 
+                state: state::InGameState::default(), 
                 background, 
-                tile_map, 
+                table, 
                 player, 
             })
         }));
@@ -106,14 +177,7 @@ impl SceneNode for InGameLoading {
         // (English Translation) Set up the camera.
         camera.update(queue, |data| {
             data.transform = Transform::default();
-            data.projection = Projection::new_ortho(
-                30.0 * PIXEL_PER_METER, 
-                -40.0 * PIXEL_PER_METER, 
-                -30.0 * PIXEL_PER_METER, 
-                40.0 * PIXEL_PER_METER, 
-                0.0 * PIXEL_PER_METER, 
-                1000.0 * PIXEL_PER_METER
-            );
+            data.projection = PROJECTION_MAT;
         });
 
         // (한국어) 조명을 설정합니다.
@@ -210,10 +274,16 @@ impl Default for InGameLoading {
 
 #[derive(Debug)]
 pub struct InGameScene {
-    scene_timer: f64,
+    pub remaining_time: f64, 
+    pub timer_ui: Section2d, 
+    
+    pub num_total_tiles: u32,
+    pub num_owned_tiles: u32,
+    pub owned_tiles: VecDeque<(f64, Vec<(usize, usize)>)>, 
+
     pub state: state::InGameState,
-    pub background: UiObject, 
-    pub tile_map: Arc<TileMap>, 
+    pub background: Vec<UiObject>, 
+    pub table: Table, 
     pub player: Player, 
 }
 

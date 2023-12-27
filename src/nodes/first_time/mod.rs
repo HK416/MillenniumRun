@@ -17,10 +17,7 @@ use crate::{
             brush::Text2dBrush, 
             section::{Section2d, Section2dBuilder},
         },
-        ui::{
-            brush::UiBrush,
-            objects::{UiObject, UiObjectBuilder},
-        },
+        ui::{UiBrush, UiObject, UiObjectBuilder},
         camera::GameCamera,
         anchor::Anchor, margin::Margin, script::Script,
         user::{Language, Settings, SettingsEncoder}, 
@@ -103,7 +100,11 @@ impl SceneNode for FirstTimeSetupLoading {
                     device: &device,
                     queue: &queue,
                 })?;
-            let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let texture_view = texture.create_view(
+                &wgpu::TextureViewDescriptor {
+                    ..Default::default()
+                }
+            );
 
 
             // (한국어)한국어 선택 버튼을 생성합니다.
@@ -304,8 +305,8 @@ fn setup_korean_button<F: Font>(
     .with_anchor(anchor)
     .with_margin(margin)
     .with_color(UI_COLOR)
-    .with_scale(INIT_BUTTON_SCALE)
-    .with_translation(UI_TRANSLATION)
+    .with_global_scale(INIT_BUTTON_SCALE)
+    .with_global_translation(UI_TRANSLATION)
     .build(device);
     let text = Section2dBuilder::new(
         Some("Text(Korean)"),

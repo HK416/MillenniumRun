@@ -6,7 +6,7 @@ use crate::{
     game_err,
     components::{
         text2d::{brush::Text2dBrush, section::Section2d},
-        ui::{brush::UiBrush, objects::UiObject},
+        ui::{UiBrush, UiObject},
         camera::GameCamera,
         lights::PointLights, 
         sprite::SpriteBrush,
@@ -238,9 +238,7 @@ fn update_ui_scale<'a, Iter>(iter: Iter, queue: &wgpu::Queue, scale: f32)
 where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
     for (ui, sections) in iter {
         ui.update(queue, |data| {
-            data.transform.x_axis.x = scale;
-            data.transform.y_axis.y = scale;
-            data.transform.z_axis.z = scale;
+            data.global_scale = (scale, scale, scale).into();
         });
         for section in sections.iter_mut() {
             section.update(queue, |data| {

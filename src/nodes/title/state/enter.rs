@@ -6,7 +6,7 @@ use crate::{
     game_err,
     components::{
         text2d::brush::Text2dBrush,
-        ui::brush::UiBrush,
+        ui::UiBrush,
         lights::PointLights,
         sprite::SpriteBrush,
         camera::GameCamera,

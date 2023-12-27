@@ -43,6 +43,7 @@ scripts/kor.ron Static
 shaders/ui.wgsl Static
 shaders/text.wgsl Static
 shaders/sprite.wgsl Static
+shaders/tile.wgsl Static
 
 #--------#
 # Sprite #
@@ -57,8 +58,6 @@ textures/midori_player.dds Static
 textures/yuzu_standing.dds Static
 textures/yuzu_player.dds Static
 
-textures/tile.dds Static 
-
 #----------------#
 # User Interface #
 #----------------#
@@ -71,6 +70,8 @@ textures/ui/title_button_exit.dds Static
 textures/ui/title_button_return.dds Static
 textures/ui/window_ratio_4_3.dds Static
 textures/ui/background.dds Static
+
+textures/temp.dds Static
 
 sounds/ui/click.ogg Static 
 sounds/ui/cancel.ogg Static 
