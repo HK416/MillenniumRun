@@ -1,24 +1,33 @@
 use std::sync::Arc;
 use std::collections::VecDeque;
 
+use glam::Vec4Swizzles;
+use rand::prelude::*;
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, WindowEvent, MouseButton},
     keyboard::PhysicalKey,
+    dpi::PhysicalPosition, 
 };
 
 use crate::{
     game_err,
+    assets::bundle::AssetBundle, 
     components::{
-        text2d::{brush::Text2dBrush, font::FontSet, section::Section2dBuilder},
+        text::TextBrush,
         ui::UiBrush,
         camera::GameCamera,
-        lights::PointLights,
         sprite::SpriteBrush,
         user::Settings,
-        map::TileBrush,
-        player::{self, ControlState}, anchor::Anchor, 
+        table::TileBrush,
+        bullet::BulletBrush, 
+        player::{self, Actor, ControlState}, 
+        sound::SoundDecoder, 
+        interpolation, 
     },
-    nodes::{path, in_game::{self, InGameScene}},
+    nodes::{
+        consts::PIXEL_PER_METER, 
+        in_game::{utils, InGameScene}
+    },
     render::depth::DepthBuffer,
     system::{
         error::{AppResult, GameError},
@@ -30,14 +39,20 @@ use crate::{
 
 
 pub fn handle_events(this: &mut InGameScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
+    handle_player_mouse_events(this, shared, &event)?;
     handle_player_keyboard_events(this, shared, &event)?;
     Ok(())
 }
 
 pub fn update(this: &mut InGameScene, shared: &mut Shared, total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    update_percent_text(this, shared, total_time, elapsed_time)?;
     update_timer(this, shared, total_time, elapsed_time)?;
+    update_lost_hearts(this, shared, total_time, elapsed_time)?;
     player_update(this, shared, total_time, elapsed_time)?;
     update_owned_tiles(this, shared, total_time, elapsed_time)?;
+
+    update_bullets(this, shared, total_time, elapsed_time)?;
+
     Ok(())
 }
 
@@ -49,11 +64,11 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
-    let point_lights = shared.get::<Arc<PointLights>>().unwrap();
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
-    let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let tile_brush = shared.get::<Arc<TileBrush>>().unwrap();
+    let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
+    let bullet_brush = shared.get::<Arc<BulletBrush>>().unwrap();
 
     // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
     // (English Translation) Wait until the previous operation is finished.
@@ -106,11 +121,51 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 카메라를 바인드 합니다.
         // (English Translation) Bind the camera. 
         camera.bind(&mut rpass);
+        ui_brush.draw(
+            &mut rpass, 
+            [
+                &this.background, 
+                &this.stage_image, 
+                &this.player_faces[&this.player.face_state], 
+            ].into_iter()
+        );
+        ui_brush.draw(&mut rpass, this.owned_hearts.iter());
+        ui_brush.draw(&mut rpass, this.lost_hearts.iter().map(|(_, it)| it));
+        tile_brush.draw(&mut rpass);
+    }
 
-        // (한국어) 배경을 화면에 그립니다.
-        // (English Translation) Draws a background to the screen. 
-        ui_brush.draw(&mut rpass, this.background.iter());
-        text_brush.draw(&mut rpass, [&this.timer_ui].into_iter());
+    {
+        let mut rpass = encoder.begin_render_pass(
+            &wgpu::RenderPassDescriptor {
+                label: Some("RenderPass(InGameScene(Run(Ui)))"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment { 
+                    view: depth.view(), 
+                    depth_ops: Some(wgpu::Operations { 
+                        load: wgpu::LoadOp::Clear(1.0), 
+                        store: wgpu::StoreOp::Store 
+                    }), 
+                    stencil_ops: None 
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            },
+        );
+
+        // (한국어) 카메라를 바인드 합니다.
+        // (English Translation) Bind the camera. 
+        camera.bind(&mut rpass);
+        ui_brush.draw(&mut rpass, [&this.menu_button, &this.remaining_timer_bg].into_iter());
+        text_brush.draw(&mut rpass, [&this.remaining_timer_text, &this.percent].into_iter());
     }
 
     {
@@ -143,11 +198,8 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 카메라를 바인드 합니다.
         // (English Translation) Bind the camera. 
         camera.bind(&mut rpass);
-
-        // (한국어) 스프라이트를 화면에 그립니다.
-        // (English Translation) Draws a sprite to the screen. 
-        tile_brush.draw(point_lights, &mut rpass);
-        sprite_brush.draw(point_lights, &mut rpass, [&this.player.sprite].into_iter());
+        sprite_brush.draw(&mut rpass, [&this.player.sprite].into_iter());
+        bullet_brush.draw(&mut rpass, [&this.player_bullet].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -159,6 +211,28 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
 }
 
 
+
+/// #### 한국어 </br>
+/// 플레이어의 마우스 입력 이벤트를 처리합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Handles the player's mouse input events. </br>
+/// 
+fn handle_player_mouse_events(this: &mut InGameScene, _shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
+    match event {
+        Event::WindowEvent { event, .. } => match event {
+            WindowEvent::MouseInput { state, button, .. } => 
+            if MouseButton::Left == *button && state.is_pressed() {
+                this.mouse_pressed = true;
+            } else if MouseButton::Left == *button && !state.is_pressed() {
+                this.mouse_pressed = false;
+            }
+            _ => { /* empty */ }
+        }, 
+        _ => { /* empty */ }
+    }
+    Ok(())
+}
 
 /// #### 한국어 </br>
 /// 플레이어의 키보드 입력 이벤트를 처리합니다. </br>
@@ -183,7 +257,7 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                     if !this.player.path.is_empty() && this.player.control_state == ControlState::Down {
                         return Ok(());
                     }
-                    this.player.keyboard_pressed = true;
+                    this.keyboard_pressed = true;
                     this.player.control_state = ControlState::Up;
                 }
 
@@ -191,7 +265,7 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 // (English Translation) When the user releases the `Up` key.
                 if control.up.to_keycode() == code && !event.state.is_pressed() && !event.repeat 
                 && this.player.control_state == ControlState::Up {
-                    this.player.keyboard_pressed = false;
+                    this.keyboard_pressed = false;
 
                     if this.player.path.is_empty() {
                         this.player.control_state = ControlState::Idle;
@@ -205,7 +279,7 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                     if !this.player.path.is_empty() && this.player.control_state == ControlState::Up {
                         return Ok(());
                     }
-                    this.player.keyboard_pressed = true;
+                    this.keyboard_pressed = true;
                     this.player.control_state = ControlState::Down;
                 }
 
@@ -213,7 +287,7 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 // (English Translation) When the user releases the `Down` key.
                 if control.down.to_keycode() == code && !event.state.is_pressed() && !event.repeat 
                 && this.player.control_state == ControlState::Down {
-                    this.player.keyboard_pressed = false;
+                    this.keyboard_pressed = false;
 
                     if this.player.path.is_empty() {
                         this.player.control_state = ControlState::Idle;
@@ -227,7 +301,7 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                     if !this.player.path.is_empty() && this.player.control_state == ControlState::Right {
                         return Ok(());
                     }
-                    this.player.keyboard_pressed = true;
+                    this.keyboard_pressed = true;
                     this.player.control_state = ControlState::Left;
                 }
 
@@ -235,7 +309,7 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 // (English Translation) When the user releases the `Left` key.
                 if control.left.to_keycode() == code && !event.state.is_pressed() && !event.repeat 
                 && this.player.control_state == ControlState::Left {
-                    this.player.keyboard_pressed = false; 
+                    this.keyboard_pressed = false; 
 
                     if this.player.path.is_empty() { 
                         this.player.control_state = ControlState::Idle;
@@ -249,7 +323,7 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                     if !this.player.path.is_empty() && this.player.control_state == ControlState::Left {
                         return Ok(());
                     }
-                    this.player.keyboard_pressed = true;
+                    this.keyboard_pressed = true;
                     this.player.control_state = ControlState::Right;
                 }
 
@@ -257,7 +331,7 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 // (English Translation) When the user releases the `Right` key.
                 if control.right.to_keycode() == code && !event.state.is_pressed() && !event.repeat 
                 && this.player.control_state == ControlState::Right {
-                    this.player.keyboard_pressed = false; 
+                    this.keyboard_pressed = false; 
 
                     if this.player.path.is_empty() {
                         this.player.control_state = ControlState::Idle;
@@ -271,38 +345,37 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
     Ok(())
 }
 
-
-
-
+/// #### 한국어 </br>
+/// 남은 시간을 표시하는 사용자 인터페이스를 갱신합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Update the user interface to display time remaining. </br>
+/// 
 fn update_timer(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 사용할 공유 객체를 가져옵니다.
     // (English Translation) Get the shared object to use.
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    let font_set = shared.get::<FontSet>().unwrap();
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
-    let nexon_lv2_gothic_medium = font_set.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
-        .expect("Registered font not found!");
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
 
     // (한국어) 타이머를 갱신합니다.
     // (English Translation) Updates the timer.
     this.remaining_time = (this.remaining_time - elapsed_time).max(0.0);
-    let min = ((this.remaining_time / 60.0) as u32).min(9);
-    let sec0 = ((this.remaining_time % 60.0) / 10.0) as u32; 
-    let sec1 = (this.remaining_time % 10.0) as u32;
-
-    this.timer_ui = Section2dBuilder::new(
-        Some("Timer"), 
-        &nexon_lv2_gothic_medium, 
-        &format!("{}:{}{}", min, sec0, sec1), 
-        text_brush
-    )
-    .with_anchor(Anchor::new(0.75, 0.85, 0.55, 0.85))
-    .build(device, queue);
-
+    
+    // (한국어) 사용자 인터페이스를 새로 생성합니다. 
+    // (English Translation) Create a new user interface. 
+    let min = (this.remaining_time / 60.0) as u32;
+    let sec = (this.remaining_time % 60.0) as u32;
+    this.remaining_timer_text.change(
+        &format!("{}:{:0>2}", min, sec), 
+        device, 
+        queue, 
+        &text_brush.tex_sampler, 
+        &text_brush.texture_layout
+    );
+    
     Ok(())
 }
-
 
 /// #### 한국어 </br>
 /// 소유한 타일을 갱신합니다. </br>
@@ -311,7 +384,7 @@ fn update_timer(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, e
 /// Updates owned tiles. </br>
 /// 
 fn update_owned_tiles(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
-    const DURATION: f64 = 0.3;
+    const DURATION: f64 = 0.4;
 
     // (한국어) 사용할 공유 객체를 가져옵니다.
     // (English Translation) Get the shared object to use.
@@ -326,7 +399,7 @@ fn update_owned_tiles(this: &mut InGameScene, shared: &mut Shared, _total_time: 
 
         // (한국어) 타일의 투명도를 갱신합니다.
         // (English Translation) Updates the transparency of the tile. 
-        let delta = smooth_step(timer, DURATION);
+        let delta = interpolation::f64::smooth_step(timer, DURATION) as f32;
         let alpha = 1.0 - 1.0 * delta;
 
         for &(row, col) in tiles.iter() {
@@ -349,7 +422,41 @@ fn update_owned_tiles(this: &mut InGameScene, shared: &mut Shared, _total_time: 
     Ok(())
 }
 
+/// #### 한국어 </br>
+/// 잃어버린 체력 하트 오브젝트를 갱신합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Updates lost health heart objects. </br>
+/// 
+fn update_lost_hearts(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    const DURATION: f64 = 0.4;
 
+    // (한국어) 사용할 공유 객체를 가져옵니다.
+    // (English Translation) Get the shared object to use.
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+
+    let mut next = VecDeque::with_capacity(player::MAX_PLAYER_HEARTS);
+    while let Some((mut timer, heart)) = this.lost_hearts.pop_front() {
+        // (한국어) 타이머를 갱신합니다.
+        // (English Translation) Updates the timer.
+        timer += elapsed_time;
+
+        // (한국어) 하트의 크기를 갱신합니다.
+        // (English Translation) Update the size of heart.
+        let delta = interpolation::f64::smooth_step(timer, DURATION) as f32;
+        let scale = 1.0 - 1.0 * delta;
+        heart.update(queue, |data| {
+            data.local_scale = (scale, scale, scale).into();
+        });
+
+        if timer < DURATION {
+            next.push_back((timer, heart));
+        }
+    }
+
+    this.lost_hearts = next;
+    Ok(())
+}
 
 /// #### 한국어 </br>
 /// 플레이어를 갱신하는 함수입니다. </br>
@@ -367,44 +474,107 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
 
     player::translation_player(
         elapsed_time, 
-        this.table.origin.x, 
-        this.table.origin.y, 
-        this.table.size.x, 
-        this.table.size.y, 
+        &this.table, 
         &mut this.player, 
         &queue
     );
 
-    player::check_current_pos(
-        this.table.origin.x, 
-        this.table.origin.y, 
-        this.table.size.x, 
-        this.table.size.y, 
-        in_game::NUM_TILE_ROWS, 
-        in_game::NUM_TILE_COLS, 
-        in_game::LINE_COLOR, 
-        in_game::EDGE_COLOR, 
-        in_game::FILL_COLOR, 
-        tile_brush, 
-        &mut this.table.tiles, 
+    if let Some(flag) = player::check_current_pos(
+        &mut this.table, 
         &mut this.player, 
-        &mut this.num_owned_tiles, 
+        this.keyboard_pressed, 
+        &mut this.num_owned_tiles,
         &mut this.owned_tiles, 
+        &mut this.owned_hearts, 
+        &mut this.lost_hearts, 
+        tile_brush, 
         queue
-    );
+    ) {
+        if flag {
+
+            // (한국어) 퍼센트 인터페이스를 갱신합니다.
+            // (English Translation) Updates the percent interface. 
+            this.percent_timer = 0.0;
+            
+            // (한국어) 무작위로 캐릭터 목소리를 재생합니다.
+            // (English Translation) Plays character voices randomly. 
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
+            let mut rng = rand::thread_rng();
+            if rng.gen_bool(0.3) && audio.voice.empty() {
+                let rel_path = this.player_smile_sounds.choose(&mut rng).unwrap();
+                let source = asset_bundle.get(rel_path)?
+                .read(&SoundDecoder)?;
+                audio.voice.append(source)
+            }
+        } else {
+            // (한국어) 무작위로 캐릭터 목소리를 재생합니다.
+            // (English Translation) Plays character voices randomly. 
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
+            let mut rng = rand::thread_rng();
+            if audio.voice.empty() {
+                let rel_path = this.player_damage_sounds.choose(&mut rng).unwrap();
+                let source = asset_bundle.get(rel_path)?
+                .read(&SoundDecoder)?;
+                audio.voice.append(source)
+            }
+        }
+    };
 
     player::set_player_next_position(
-        this.table.num_rows, 
-        this.table.num_cols, 
+        &this.table, 
         &mut this.player
     );
 
     Ok(())
 }
 
+fn update_percent_text(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer.
+    this.percent_timer += elapsed_time;
 
-#[inline]
-fn smooth_step(elapsed_time: f64, duration: f64) -> f32 {
-    let t = (elapsed_time / duration).clamp(0.0, 1.0) as f32;
-    return 3.0 * t * t - 2.0 * t * t * t;
+    let per = this.num_owned_tiles as f32 /  this.num_total_tiles as f32 * 100.0;
+    let s = 1.0 + 0.5 - 0.5 * interpolation::f64::smooth_step(this.percent_timer, 0.25) as f32;
+    let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    this.percent.change(
+        &format!("{}%", per.floor() as u32), 
+        device, 
+        queue, 
+        &text_brush.tex_sampler, 
+        &text_brush.texture_layout
+    );
+    this.percent.update(queue, |data| {
+        data.scale = (s, s, s).into();
+    });
+    Ok(())
+}
+
+
+fn update_bullets(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    // (한국어) 사용할 공유 객체들을 가져옵니다.
+    // (English Translation) Get shared objects to use. 
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let camera = shared.get::<Arc<GameCamera>>().unwrap();
+    let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
+
+    let cursor_pos_world = camera.to_world_coordinates(cursor_pos).into();
+    
+    if this.mouse_pressed {
+        this.player.fire();
+    }
+
+    player::update_player_bullet(
+        queue, 
+        &this.table, 
+        &this.player_bullet, 
+        &mut this.player, 
+        elapsed_time, 
+        cursor_pos_world
+    );
+
+    Ok(())
 }

@@ -20,7 +20,7 @@ use crate::{
     assets::bundle::AssetBundle, 
     components::{
         collider2d::Collider2d,
-        text2d::brush::Text2dBrush, 
+        text::TextBrush,
         ui::UiBrush,
         script::ScriptDecoder,
         camera::GameCamera,
@@ -147,7 +147,7 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
                         }));
                         this.state = FirstTimeSetupSceneState::Exit;
                         this.language = language;
-                        this.elapsed_time = 0.0;
+                        this.timer = 0.0;
                     }
                 }
             }
@@ -166,7 +166,7 @@ pub fn update(_this: &mut FirstTimeSetupScene, _shared: &mut Shared, _total_time
 pub fn draw(this: &FirstTimeSetupScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();

@@ -5,10 +5,9 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        text2d::{brush::Text2dBrush, section::Section2d},
+        text::{TextBrush, Text}, 
         ui::{UiBrush, UiObject},
         camera::GameCamera, 
-        lights::PointLights,
         sprite::SpriteBrush,
     },
     nodes::title::{
@@ -69,9 +68,8 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
 pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let point_lights = shared.get::<Arc<PointLights>>().unwrap();
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -127,7 +125,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         
         // (한국어) 배경 오브젝트 그리기.
         // (English Translation) Drawing background objects.
-        sprite_brush.draw(&point_lights, &mut rpass, [this.background.as_ref()].into_iter());
+        sprite_brush.draw(&mut rpass, [&this.background].into_iter());
     }
 
     {
@@ -160,14 +158,14 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         ui_brush.draw(
             &mut rpass, 
             this.menu_buttons.iter()
-            .map(|(ui, _)| ui.as_ref())
+            .map(|(ui, _)| ui)
         );
         text_brush.draw(
             &mut rpass, 
             this.menu_buttons.iter()
             .map(|(_, it)| it)
             .flatten()
-            .map(|it| it.as_ref())
+            .map(|it| it)
         );
     }
 
@@ -201,14 +199,14 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         ui_brush.draw(
             &mut rpass, 
             this.exit_msg_box.iter()
-            .map(|(ui, _)| ui.as_ref())
+            .map(|(ui, _)| ui)
         );
         text_brush.draw(
             &mut rpass, 
             this.exit_msg_box.iter()
             .map(|(_, it)| it)
             .flatten()
-            .map(|it| it.as_ref())
+            .map(|it| it)
         );
     }
 
@@ -234,17 +232,15 @@ fn smooth_step(elapsed_time: f64, duration: f64) -> f32 {
 /// #### English (Translation) </br>
 /// Updates the scale value of the user interface object.
 /// 
-fn update_ui_scale<'a, Iter>(iter: Iter, queue: &wgpu::Queue, scale: f32) 
-where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
+fn update_ui_scale<'a, Iter>(iter: Iter, queue: &wgpu::Queue, s: f32) 
+where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
     for (ui, texts) in iter {
         ui.update(queue, |data| {
-            data.global_scale = (scale, scale, scale).into();
+            data.global_scale = (s, s, s).into();
         });
         for text in texts.iter_mut() {
             text.update(queue, |data| {
-                data.transform.x_axis.x = scale;
-                data.transform.y_axis.y = scale;
-                data.transform.z_axis.z = scale;
+                data.scale = (s, s, s).into();
             });
         }
     }
@@ -257,7 +253,7 @@ where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
 /// Updates the alpha value of the user interface object.
 /// 
 fn update_ui_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
-where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
+where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
     for (ui, texts) in iter {
         ui.update(queue, |data| {
             data.color.w = alpha;

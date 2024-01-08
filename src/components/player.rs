@@ -1,16 +1,102 @@
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 
-use glam::{Mat4, Vec4, Vec2};
+use glam::{Vec4, Vec2, Vec3};
+use lazy_static::lazy_static;
 
 use crate::{
-    assets::bundle::AssetBundle,
     components::{
-        map::{self, Table, TileBrush, Tile}, 
-        sprite::{InstanceData, Sprite, SpriteBrush}, 
-    },
-    render::texture::DdsTextureDecoder,
-    system::error::AppResult,
+        collider2d::Collider2d, 
+        ui::UiObject, 
+        sprite::{Sprite, SpriteBrush, Instance as SpriteData}, 
+        table::{self, Table, Tile, TileBrush}, 
+        bullet::{Bullet, Instance as BulletData}, 
+    }, 
+    nodes::consts::PIXEL_PER_METER, 
 };
+
+pub const MAX_PLAYER_HEARTS: usize = 3;
+pub const BULLET_LIFE_TIME: f64 = 5.0;
+
+lazy_static! {
+    /// #### 한국어 </br>
+    /// 발사할 때 총알의 최대 개수입니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// Maximum number of bullets when firing. </br>
+    /// 
+    static ref MAX_SHOT_NUM: HashMap<Actor, u32> = HashMap::from_iter([
+        (Actor::Aris, 1),
+        (Actor::Momoi, 3), 
+        (Actor::Midori, 1), 
+        (Actor::Yuzu, 1), 
+    ]);
+
+    /// #### 한국어 </br>
+    /// 다음 총알이 발포될 때까지의 시간입니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// This is the time until the next bullet is fired. </br>
+    /// 
+    static ref SHOT_TIME: HashMap<Actor, f64> = HashMap::from_iter([
+        (Actor::Aris, 0.0), 
+        (Actor::Momoi, 0.1), 
+        (Actor::Midori, 0.0), 
+        (Actor::Yuzu, 0.0), 
+    ]);
+
+    /// #### 한국어 </br>
+    /// 다음 마우스 입력을 받을 때까지의 시간입니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// This is the time until the next mouse input is received. </br>
+    /// 
+    static ref COOL_TIME: HashMap<Actor, f64> = HashMap::from_iter([
+        (Actor::Aris, 2.25), 
+        (Actor::Momoi, 1.0), 
+        (Actor::Midori, 0.5), 
+        (Actor::Yuzu, 1.0), 
+    ]);
+
+    /// #### 한국어 </br>
+    /// 발사되는 총알의 속도 입니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// This is the speed of the fired bullet. </br>
+    /// 
+    static ref BULLET_SPEED: HashMap<Actor, f32> = HashMap::from_iter([
+        (Actor::Aris, 0.5 * PIXEL_PER_METER), 
+        (Actor::Momoi, 0.7 * PIXEL_PER_METER), 
+        (Actor::Midori, 0.7 * PIXEL_PER_METER), 
+        (Actor::Yuzu, 0.6 * PIXEL_PER_METER), 
+    ]);
+
+    /// #### 한국어 </br>
+    /// 발사되는 총알의 크기입니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// This is the size of the fired bullet. </br>
+    /// 
+    static ref BULLET_SIZE: HashMap<Actor, Vec2> = HashMap::from_iter([
+        (Actor::Aris, Vec2::new(8.0, 4.0) * PIXEL_PER_METER), 
+        (Actor::Momoi, Vec2::new(1.5, 1.5) * PIXEL_PER_METER), 
+        (Actor::Midori, Vec2::new(1.5, 1.5) * PIXEL_PER_METER),
+        (Actor::Yuzu, Vec2::new(2.0, 2.0) * PIXEL_PER_METER),  
+    ]);
+
+    static ref COLLIDE_OFFSET: HashMap<Actor, Vec2> = HashMap::from_iter([
+        (Actor::Aris, Vec2::new(0.0, 0.0)), 
+        (Actor::Momoi, Vec2::new(0.0, 0.0)), 
+        (Actor::Midori, Vec2::new(0.0, 0.0)), 
+        (Actor::Yuzu, Vec2::new(0.0, 0.0)), 
+    ]);
+
+    static ref COLLIDE_SIZE: HashMap<Actor, Vec2> = HashMap::from_iter([
+        (Actor::Aris, Vec2::new(1.0, 1.0)), 
+        (Actor::Momoi, Vec2::new(1.0, 1.0)), 
+        (Actor::Midori, Vec2::new(1.0, 1.0)), 
+        (Actor::Yuzu, Vec2::new(1.0, 1.0)), 
+    ]);
+}
 
 
 
@@ -28,6 +114,7 @@ pub enum Actor {
     Midori = 2,
     Yuzu = 3,
 }
+
 
 
 /// #### 한국어 </br>
@@ -72,17 +159,27 @@ pub enum ControlState {
 
 
 
+/// #### 한국어 </br>
+/// 플레이어 데이터를 담고있는 구조체 입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a structure that contains player data. </br>
+/// 
 #[derive(Debug)]
 pub struct Player {
+    actor: Actor, 
+
+    pub shot_count: u32, 
+    pub shot_time: f64,
+    pub shot_cool_time: f64, 
+
     pub face_timer: f64, 
     pub face_state: FaceState, 
+
     pub moving_timer: f64, 
     pub control_state: ControlState,
 
-    pub keyboard_pressed: bool, 
-    pub life_count: u32, 
-
-    pub spawn: (usize, usize), 
+    pub depth: f32, 
     pub curr: (usize, usize),
     pub next: Option<(usize, usize)>,
     pub path: VecDeque<(usize, usize)>,
@@ -92,96 +189,64 @@ pub struct Player {
 
 impl Player {
     pub fn new(
-        device: &wgpu::Device, 
-        queue: &wgpu::Queue, 
-        tex_sampler: &wgpu::Sampler, 
-        sprite_brush: &SpriteBrush, 
-        asset_bundle: &AssetBundle, 
         actor: Actor, 
-        tile_set: &Table,
-        row: usize,
-        col: usize,
-        depth: f32,
-        size: Vec2
-    ) -> AppResult<Self> {
-        use crate::nodes::path;
-
-        assert!(row <= tile_set.num_rows && col <= tile_set.num_cols, "The given row and column are out of range!");
-        assert!(size.x > 0.0 && size.y > 0.0, "The given size must be greater than zero!");
-
-        let rel_path = match actor {
-            Actor::Aris => path::ARIS_PLAYER_TEXTURE_PATH,
-            Actor::Momoi => path::MOMOI_PLAYER_TEXTURE_PATH,
-            Actor::Midori => path::MIDORI_PLAYER_TEXTURE_PATH,
-            Actor::Yuzu => path::YUZU_PLAYER_TEXTURE_PATH
-        };
-
-        // (한국어) 텍스처를 생성하고, 텍스처 뷰를 생성합니다.
-        // (English Translation) Create a texture and create a texture view.
-        let texture = asset_bundle.get(rel_path)?
-            .read(&DdsTextureDecoder {
-                name: Some("Player"),
-                size: wgpu::Extent3d {
-                    width: 256,
-                    height: 256,
-                    depth_or_array_layers: 3,
-                },
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Bgra8Unorm,
-                mip_level_count: 9,
-                sample_count: 1,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-                device,
-                queue
-            })?;
-        let texture_view = texture.create_view(
-            &wgpu::TextureViewDescriptor {
-                label: Some("TextureView(Player)"),
-                dimension: Some(wgpu::TextureViewDimension::D2Array),
-                ..Default::default()
-            }
-        );
-
-        // (한국어) 사용한 에셋을 정리합니다.
-        // (English Translation) Release used assets.
-        asset_bundle.release(rel_path);
-
-        // (한국어) 플레이어 스프라이트를 생성합니다.
-        // (English Translation) Create a player sprite.
-        let x = map::position(tile_set.origin.x, tile_set.size.x, col);
-        let y = map::position(tile_set.origin.y, tile_set.size.y, row);
-        let z = depth;
-        let instance = vec![
-            InstanceData {
-                transform: Mat4::from_translation((x, y, z).into()).into(),
-                size,
-                ..Default::default()
-            },
-        ];
+        row: usize, 
+        col: usize, 
+        depth: f32, 
+        table: &Table, 
+        device: &wgpu::Device, 
+        tex_sampler: &wgpu::Sampler, 
+        texture_view: &wgpu::TextureView, 
+        sprite_brush: &SpriteBrush
+    ) -> Self {
+        let x = table::position(table.origin.x, table.size.x, col);
+        let y = table::position(table.origin.y, table.size.y, row);
+        let instances = vec![SpriteData {
+            scale: Vec3 { x: 0.0, y: 0.0, z: 0.0 }, 
+            translation: Vec3 { x, y, z: depth },
+            size: table.size * 6.0, 
+            ..Default::default()
+        }];
         let sprite = Sprite::new(
             device, 
             tex_sampler, 
-            &texture_view, 
+            texture_view, 
             sprite_brush, 
-            instance
+            instances
         );
 
-        Ok(Self {
+        Self { 
+            actor, 
+            shot_count: MAX_SHOT_NUM[&actor], 
+            shot_time: SHOT_TIME[&actor], 
+            shot_cool_time: COOL_TIME[&actor], 
             face_timer: 0.0, 
             face_state: FaceState::Idle, 
             moving_timer: 0.0, 
             control_state: ControlState::Idle, 
-            keyboard_pressed: false, 
-            life_count: 3, 
-            spawn: (row, col), 
+            depth, 
             curr: (row, col), 
             next: None, 
             path: VecDeque::with_capacity(64), 
-            sprite, 
-        })
+            sprite 
+        }
+    }
+
+    /// #### 한국어 </br>
+    /// 총알을 발사합니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// Fires a bullet. </br>
+    /// 
+    pub fn fire(&mut self) {
+        if self.shot_cool_time >= COOL_TIME[&self.actor] {
+            self.shot_count = 0;
+            self.shot_time = 0.0;
+            self.shot_cool_time = 0.0;
+        }
     }
 }
+
 
 
 /// #### 한국어 </br>
@@ -266,16 +331,11 @@ fn update_player_hit_face(elapsed_time: f64, queue: &wgpu::Queue, player: &mut P
 /// 
 pub fn translation_player(
     elapsed_time: f64,
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
+    table: &Table, 
     player: &mut Player, 
     queue: &wgpu::Queue
 ) {
     const DURATION: f64 = 0.05;
-
-    debug_assert!(width > 0.0 && height > 0.0, "The given size must be greater than zero!");
 
     // (한국어) 플레이어 타이머를 갱신합니다.
     // (English Translation) Updates the player timer.
@@ -283,10 +343,10 @@ pub fn translation_player(
 
     if let Some(next) = player.next.take() {
         let delta = (player.moving_timer / DURATION).min(1.0) as f32;
-        let beg_x = map::position(x, width, player.curr.1);
-        let beg_y = map::position(y, height, player.curr.0);
-        let end_x = map::position(x, width, next.1);
-        let end_y = map::position(y, height, next.0);
+        let beg_x = table::position(table.origin.x, table.size.x, player.curr.1);
+        let beg_y = table::position(table.origin.y, table.size.y, player.curr.0);
+        let end_x = table::position(table.origin.x, table.size.x, next.1);
+        let end_y = table::position(table.origin.y, table.size.y, next.0);
 
         // (한국어) 현재 플레이어의 위치를 계산합니다.
         // (English Translation) Calculates the current player's position.
@@ -294,8 +354,8 @@ pub fn translation_player(
         let y = beg_y + (end_y - beg_y) * delta;
 
         player.sprite.update(queue, |instances| {
-            let z = instances[0].transform.get_position().z;
-            instances[0].transform.set_position((x, y, z).into());
+            instances[0].translation.x = x;
+            instances[0].translation.y = y;
         });
 
         if player.moving_timer >= DURATION {
@@ -315,20 +375,20 @@ pub fn translation_player(
 /// #### English (Translation) </br>
 /// This function specifies the player's next position. </br>
 /// 
-pub fn set_player_next_position(max_rows: usize, max_cols: usize, player: &mut Player) {
+pub fn set_player_next_position(table: &Table, player: &mut Player) {
     if player.next.is_none() {
         player.next = match player.control_state {
             ControlState::Idle => None,
             ControlState::Left => (player.curr.1 > 0).then(|| {
                 (player.curr.0, player.curr.1 - 1)
             }),
-            ControlState::Right => (player.curr.1 + 1 < max_cols).then(|| {
+            ControlState::Right => (player.curr.1 + 1 < table.num_cols).then(|| {
                 (player.curr.0, player.curr.1 + 1)
             }),
             ControlState::Down => (player.curr.0 > 0).then(|| {
                 (player.curr.0 - 1, player.curr.1)
             }), 
-            ControlState::Up => (player.curr.0 + 1 < max_rows).then(|| {
+            ControlState::Up => (player.curr.0 + 1 < table.num_rows).then(|| {
                 (player.curr.0 + 1, player.curr.1)
             })
         }
@@ -338,40 +398,36 @@ pub fn set_player_next_position(max_rows: usize, max_cols: usize, player: &mut P
 
 /// #### 한국어 </br>
 /// 현재 플레이어의 위치가 경로에 포함되는지, 닫힌 공간이 만들어 졌는지 확인합니다. </br>
+/// 플레이어가 영역을 획득했을 경우 `true`를 반환합니다. </br>
 /// 
 /// #### English (Translation) </br>
 /// Checks whether the current player's positiohn is included in the path </br>
 /// or whether an enclosed space has been created. </br>
+/// Returns `true` if the plyaer has acquired the tiles. </br>
 /// 
 pub fn check_current_pos(
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32, 
-    max_rows: usize, 
-    max_cols: usize,
-    line_color: Vec4, 
-    edge_color: Vec4, 
-    fill_color: Vec4, 
-    tile_brush: &TileBrush, 
-    tiles: &mut Vec<Vec<Tile>>, 
+    table: &mut Table, 
     player: &mut Player, 
+    keyboard_pressed: bool, 
     num_owned_tiles: &mut u32, 
     owned_tiles: &mut VecDeque<(f64, Vec<(usize, usize)>)>, 
+    owned_hearts: &mut VecDeque<UiObject>, 
+    lost_hearts: &mut VecDeque<(f64, UiObject)>,   
+    tile_brush: &TileBrush,
     queue: &wgpu::Queue
-) {
+) -> Option<bool> {
     if player.next.is_none() {
-        if !tiles[player.curr.0][player.curr.1].visited {
+        if !table.tiles[player.curr.0][player.curr.1].visited {
             // (한국어) 
             // 현재 타일에 방문하지 않았을 경우 경로에 추가한다.
             // 
             // (English Translation) 
             // If the tile is not currently visited, it is added to the path.
             // 
-            tiles[player.curr.0][player.curr.1].visited = true;
+            table.tiles[player.curr.0][player.curr.1].visited = true;
             player.path.push_back(player.curr);
             tile_brush.update(queue, |instances| {
-                instances[player.curr.0 * max_cols + player.curr.1].color = line_color;
+                instances[player.curr.0 * table.num_cols + player.curr.1].color = table.line_color;
             })
         } else if player.path.back().is_some_and(|&(r, c)| {
             r == player.curr.0 && c == player.curr.1
@@ -403,18 +459,18 @@ pub fn check_current_pos(
                     // (한국어) 안쪽 영역의 타일들을 구한다.
                     // (English Translation) Finds the tiles in the inner area. 
                     let mut inside_tiles = search_inside_tiles(
-                        max_rows, 
-                        max_cols, 
-                        tiles, 
+                        table.num_rows, 
+                        table.num_cols, 
+                        &table.tiles, 
                         &player.path, 
                     );
                     
                     // (한국어) 선분 영역의 타일들을 구한다.
                     // (English Translation) Finds the tiles in edge area.
                     let mut edge_tiles = search_edge_tiles(
-                        max_rows, 
-                        max_cols, 
-                        tiles,
+                        table.num_rows, 
+                        table.num_cols, 
+                        &table.tiles,
                         &player.path, 
                         &inside_tiles
                     );
@@ -429,24 +485,24 @@ pub fn check_current_pos(
                         // (한국어) 선분 영역의 타일을 갱신합니다.
                         // (English Translation) Updates the tiles in the edge area.
                         for &(r, c) in edge_tiles.iter() {
-                            instances[r * max_cols + c].color = edge_color;
+                            instances[r * table.num_cols + c].color = table.edge_color;
                         }
                         
                         // (한국어) 안쪽 영역의 타일을 갱신합니다.
                         // (English Translation) Updates the tiles in the inner area.
                         for &(r, c) in inside_tiles.iter() {
-                            instances[r * max_cols + c].color = fill_color;
+                            instances[r * table.num_cols + c].color = table.fill_color;
                         }
                     });
                     
                     // (한국어) 타일을 재설정 합니다.
                     // (English Translation) Reset the tile.
                     while let Some((r, c)) = edge_tiles.pop() {
-                        tiles[r][c].color = edge_color;
+                        table.tiles[r][c].color = table.edge_color;
                     }
                     for &(r, c) in inside_tiles.iter() {
-                        tiles[r][c].color = fill_color;
-                        tiles[r][c].visited = true;
+                        table.tiles[r][c].color = table.fill_color;
+                        table.tiles[r][c].visited = true;
                     }
                     
                     // (한국어) 소유 타일 목록에 추가합니다.
@@ -454,11 +510,12 @@ pub fn check_current_pos(
                     *num_owned_tiles += inside_tiles.len() as u32;
                     owned_tiles.push_back((0.0, inside_tiles));
 
-                    if !player.keyboard_pressed {
+                    if !keyboard_pressed {
                         player.control_state = ControlState::Idle;
                     }
 
                     change_player_face_state(FaceState::Smile, queue, player);
+                    return Some(true);
                 } 
             } else {
                 // (한국어) 
@@ -475,33 +532,41 @@ pub fn check_current_pos(
                 // 
                 tile_brush.update(queue, |instances| {
                     for &(r, c) in player.path.iter() {
-                        instances[r * max_cols + c].color = tiles[r][c].color;
+                        instances[r * table.num_cols + c].color = table.tiles[r][c].color;
                     }
                 });
                 while let Some((r, c)) = player.path.pop_front() {
-                    tiles[r][c].visited = false;
+                    table.tiles[r][c].visited = false;
                 }
                 
-                player.life_count -= 1;
-                if player.life_count == 0 {
+
+                if let Some(heart) = owned_hearts.pop_back() {
+                    lost_hearts.push_back((0.0, heart));
+                    if owned_hearts.len() == 0 {
+                        todo!("Game Over!")
+                    }
+                } else {
                     todo!("Game Over!");
                 }
                 
-                player.curr = player.spawn;
+                player.curr = table.player_spawn_pos;
                 player.moving_timer = 0.0;
                 player.control_state = ControlState::Idle;
 
-                let x = map::position(x, width, player.curr.1);
-                let y = map::position(y, height, player.curr.0);
-                player.sprite.update(queue, |instance| {
-                    let z = instance[0].transform.get_position().z;
-                    instance[0].transform.set_position((x, y, z).into());
+                let x = table::position(table.origin.x, table.size.x, player.curr.1);
+                let y = table::position(table.origin.y, table.size.y, player.curr.0);
+                player.sprite.update(queue, |instances| {
+                    instances[0].translation.x = x;
+                    instances[0].translation.y = y;
                 });
 
                 change_player_face_state(FaceState::Hit, queue, player);
+                return Some(false);
             }
         }
     }
+
+    return None;
 }
 
 
@@ -697,4 +762,84 @@ fn search_edge_tiles(
     }
     
     return edge_tiles;
+}
+
+pub fn update_player_bullet(
+    queue: &wgpu::Queue, 
+    table: &Table,
+    bullet: &Bullet, 
+    player: &mut Player, 
+    elapsed_time: f64, 
+    cursor_pos_world: Vec2
+) {
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer. 
+    player.shot_time += elapsed_time;
+    player.shot_cool_time += elapsed_time;
+
+    // (한국어) 플레이어의 총알을 추가해야 하는지 확인합니다.
+    // (English Translation) Check if the player's bullets need to be added. 
+    let flag = if player.shot_count < MAX_SHOT_NUM[&player.actor] 
+    && player.shot_time >= SHOT_TIME[&player.actor] {
+        player.shot_count += 1;
+        player.shot_time -= SHOT_TIME[&player.actor];
+        true
+    } else {
+        false
+    };
+
+    // (한국어) 총알을 갱신합니다.
+    // (English Translation) Updates the bullets.
+    bullet.update(queue, |instances| {
+        if flag {
+            instances.push(create_bullet(table, player, cursor_pos_world))
+        }
+
+        let mut next = Vec::with_capacity(instances.capacity());
+        while let Some(mut bullet) = instances.pop() {
+            // (한국어) 총알의 타이머를 갱신합니다. 
+            // (English Translation) Updates the bullet's timer. 
+            bullet.timer += elapsed_time;
+            
+            // (한국어) 총알이 생명주기를 초과한 경우 건너뜁니다. 
+            // (English Translation) If the bullet has exceeded its life cycle, it is skipped. 
+            if bullet.timer >= BULLET_LIFE_TIME {
+                continue;
+            }
+
+            // (한국어) 총알이 타일을 벗어난 경우 건너뜁니다.
+            // (English Translation) If the bullet leaves the tile, it is skipped.
+            if !table.aabb.test(&bullet.collider()) {
+                continue;
+            }
+
+            // (한국어) 총알의 위치를 갱신합니다. 
+            // (English Translation) Updates the bullet's position. 
+            let distance = bullet.direction.normalize() * BULLET_SPEED[&player.actor];
+            bullet.translation += distance;
+
+            next.push(bullet);
+        }
+        instances.append(&mut next);
+    });
+}
+
+fn create_bullet(
+    table: &Table,
+    player: &Player, 
+    cursor_pos_world: Vec2
+) -> BulletData {
+    let x = table::position(table.origin.x, table.size.x, player.curr.1);
+    let y = table::position(table.origin.y, table.size.y, player.curr.0);
+    let dir = (cursor_pos_world - Vec2::new(x, y)).normalize();
+    let direction = Vec3::new(dir.x, dir.y, 0.0);
+    let translation = Vec3::new(x, y, player.depth);
+    BulletData {
+        size: BULLET_SIZE[&player.actor], 
+        direction, 
+        translation, 
+        box_offset: COLLIDE_OFFSET[&player.actor], 
+        box_size: COLLIDE_SIZE[&player.actor], 
+        ..Default::default()
+    }
 }

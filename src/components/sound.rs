@@ -92,6 +92,18 @@ impl AssetDecoder for SoundDecoder {
 
 
 
+#[inline]
+pub fn create_sink(stream: &OutputStreamHandle) -> AppResult<Sink> {
+    Sink::try_new(stream)
+        .map_err(|err| game_err!(
+            "Sound player creation failed",
+            "Sound player creation failed for following reasons: {}",
+            err.to_string()
+        ))
+}
+
+
+
 /// #### 한국어 </br>
 /// 주어진 소리를 재생합니다. </br>
 /// 
@@ -109,12 +121,7 @@ where
     f32: FromSample<S::Item>,
     S::Item: Sample + Send,
 {
-    let sink = Sink::try_new(stream)
-        .map_err(|err| game_err!(
-            "Sound player creation failed",
-            "Sound player creation failed for following reasons: {}",
-            err.to_string()
-        ))?;
+    let sink = create_sink(stream)?;
     sink.set_volume(volume.norm());
     sink.append(source);
     return Ok(sink);

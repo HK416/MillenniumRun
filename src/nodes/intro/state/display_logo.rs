@@ -36,10 +36,10 @@ pub fn update(this: &mut IntroScene, _shared: &mut Shared, _total_time: f64, ela
     // Updates the elapsed time 
     // and changes to the next state if it is greater than the duration.
     // 
-    this.elapsed_time += elapsed_time;
-    if this.elapsed_time >= DURATION {
+    this.timer += elapsed_time;
+    if this.timer >= DURATION {
         this.state = IntroState::WaitLoading;
-        this.elapsed_time = 0.0;
+        this.timer = 0.0;
         return Ok(());
     }
 

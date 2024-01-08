@@ -3,7 +3,9 @@ mod parser;
 
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+use std::collections::HashMap;
 
+use ab_glyph::FontArc;
 use winit::window::Window;
 use rodio::{OutputStream, OutputStreamHandle};
 
@@ -11,31 +13,20 @@ use crate::{
     game_err,
     assets::bundle::AssetBundle,
     components::{
-        text2d::{
-            brush::Text2dBrush, 
-            font::{FontSet, FontDecoder}
-        },
         ui::UiBrush,
-        lights::PointLights,
-        camera::{Viewport, GameCamera},
-        script::{Script, ScriptDecoder},
+        text::TextBrush,
         sprite::SpriteBrush,
-        map::TileBrush, 
-        transform::{Transform, Projection},
-        user::{
-            Language, 
-            Settings, 
-            SettingsEncoder, 
-            SettingsDecoder
-        },
+        camera::CameraCreator,
+        font::FontDecoder,
+        script::{Script, ScriptDecoder},
+        user::{Language, Settings, SettingsEncoder, SettingsDecoder},
     },
     nodes::{
         path, 
-        consts, 
-        in_game,
-        first_time::FirstTimeSetupLoading, 
         intro::IntroLoading,
+        first_time::FirstTimeSetupLoading, 
     },
+    render::texture::DdsTextureDecoder, 
     scene::{node::SceneNode, state::SceneState},
     system::{
         error::{AppResult, GameError},
@@ -62,21 +53,28 @@ impl SceneNode for SetupScene {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 사용할 공유 객체 가져오기.
         // (English Translation) Get shared object to use.
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap().clone();
     
         // (한국어) 게임에서 사용되는 에셋 파일들을 로드합니다. 
         // (English Translation) Load asset files used in the game. 
-        let asset_bundle_cloned = asset_bundle.clone();
         self.loading = Some(thread::spawn(move || {
-            asset_bundle_cloned.get(path::SETTINGS_PATH)?;
-            asset_bundle_cloned.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)?;
-            asset_bundle_cloned.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)?;
-            asset_bundle_cloned.get(path::NEXON_LV2_GOTHIC_PATH)?;
-            asset_bundle_cloned.get(path::UI_SHADER_PATH)?;
-            asset_bundle_cloned.get(path::UI_TEXT_SHADER_PATH)?;
-            asset_bundle_cloned.get(path::SPRITE_SHADER_PATH)?;
-            asset_bundle_cloned.get(path::CLICK_SOUND_PATH)?;
-            asset_bundle_cloned.get(path::CANCEL_SOUND_PATH)?;
+            asset_bundle.get(path::SETTINGS_PATH)?;
+
+            asset_bundle.get(path::LOGO_TEXTURE_PATH)?;
+            asset_bundle.get(path::DUMMY_TEXTURE_PATH)?;
+
+            asset_bundle.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)?;
+            asset_bundle.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)?;
+            asset_bundle.get(path::NEXON_LV2_GOTHIC_PATH)?;
+
+            asset_bundle.get(path::UI_SHADER_PATH)?;
+            asset_bundle.get(path::UI_TEXT_SHADER_PATH)?;
+            asset_bundle.get(path::SPRITE_SHADER_PATH)?;
+            asset_bundle.get(path::TILE_SPRITE_SHADER_PATH)?;
+
+            asset_bundle.get(path::CLICK_SOUND_PATH)?;
+            asset_bundle.get(path::CANCEL_SOUND_PATH)?;
+
             Ok(())
         }));
 
@@ -84,13 +82,12 @@ impl SceneNode for SetupScene {
     }
 
     fn exit(&mut self, shared: &mut Shared) -> AppResult<()> {
-        use crate::components::camera::create_camera_bind_group_layout;
-
         // (한국어) 사용할 공유 객체 가져오기.
         // (English Translation) Get shared object to use.
         let asset_bundle = shared.get::<AssetBundle>().unwrap();
         let window = shared.get::<Arc<Window>>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
         let config = shared.get::<wgpu::SurfaceConfiguration>().unwrap();
 
         // (한국어) 공용으로 사용하는 텍스처 샘플러를 생성합니다.
@@ -108,30 +105,27 @@ impl SceneNode for SetupScene {
             }
         ));
 
-        let font_set = setup_fonts(asset_bundle)?;
+        let fonts = setup_fonts(asset_bundle)?;
         let (stream, handle) = setup_sound_engine()?;
-        let camera_bind_group_layout = create_camera_bind_group_layout(device);
-        let ui_brush = setup_ui_brush(device, &camera_bind_group_layout, config.format, asset_bundle)?;
-        let text_brush = setup_text_brush(device, &camera_bind_group_layout, config.format, asset_bundle)?;
-        let point_lights = setup_point_lights(device);
-        let sprite_brush = setup_sprite_brush(device, &camera_bind_group_layout, &point_lights.buffer_layout, config.format, asset_bundle)?;
-        let tile_brush = setup_tile_brush(device, &camera_bind_group_layout, &point_lights.buffer_layout, config.format, asset_bundle)?;
+        let camera_creator = CameraCreator::new(device.clone(), window.clone());
+        let ui_brush = setup_ui_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
+        let text_brush = setup_text_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
+        let sprite_brush = setup_sprite_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
+        let textures = setup_texture_map(device, queue, asset_bundle)?;
         let (settings, script) = setup_window(window, asset_bundle)?;
-        let camera = setup_main_camera(window, device, &camera_bind_group_layout);        
 
         // (한국어) 공유할 객체들을 공유 객체에 등록합니다.
         // (English Translation) Register objects to be shared as shared objects.
         shared.push(tex_sampler);
-        shared.push(font_set);
+        shared.push(fonts);
         shared.push(stream);
         shared.push(handle);
+        shared.push(camera_creator);
         shared.push(text_brush);
         shared.push(ui_brush);
-        shared.push(point_lights);
         shared.push(sprite_brush);
-        shared.push(tile_brush);
+        shared.push(textures);
         shared.push(settings);
-        shared.push(camera);
         if let Some(script) = script {
             shared.push(Arc::new(script));
         };
@@ -139,7 +133,6 @@ impl SceneNode for SetupScene {
         Ok(())
     }
 
-    #[allow(unreachable_code)]
     fn update(&mut self, shared: &mut Shared, _: f64, _: f64) -> AppResult<()> {
         // (한국어) 모든 에셋 파일의 로드가 완료되었는지 확인합니다.
         // (English Translation) Verify that all asset files have completed loading.
@@ -194,48 +187,12 @@ impl Default for SetupScene {
 
 
 /// #### 한국어 </br>
-/// 메인 카메라를 설정합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Set up the main camera. </br>
-/// 
-fn setup_main_camera(
-    window: &Window,
-    device: &wgpu::Device, 
-    layout: &wgpu::BindGroupLayout
-) -> Arc<GameCamera> {
-    let scale_factor = window.current_monitor()
-        .map_or(1.0, |handle| handle.scale_factor() as f32);
-    GameCamera::new(
-        Some("Main"), 
-        Viewport {
-            width: window.inner_size().width as f32,
-            height: window.inner_size().height as f32,
-            ..Default::default()
-        }, 
-        Transform::default(), 
-        Projection::new_ortho(
-            3.0 * consts::PIXEL_PER_METER, 
-            -4.0 * consts::PIXEL_PER_METER, 
-            -3.0 * consts::PIXEL_PER_METER, 
-            4.0 * consts::PIXEL_PER_METER, 
-            0.0 * consts::PIXEL_PER_METER, 
-            1000.0 * consts::PIXEL_PER_METER 
-        ),
-        scale_factor, 
-        device, 
-        layout
-    )
-}
-
-
-/// #### 한국어 </br>
 /// 게임에서 사용할 폰트를 설정합니다. </br>
 /// 
 /// #### English (Translation) </br>
 /// Set the font to use in the game. </br>
 /// 
-fn setup_fonts(asset_bundle: &AssetBundle) -> AppResult<FontSet> {
+fn setup_fonts(asset_bundle: &AssetBundle) -> AppResult<Arc<HashMap<String, FontArc>>> {
     // (한국어) 폰트 에셋 가져오기.
     // (English Translation) Gets the font assets.
     let nexon_lv2_gothic_bold = asset_bundle.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)?
@@ -244,11 +201,6 @@ fn setup_fonts(asset_bundle: &AssetBundle) -> AppResult<FontSet> {
         .read(&FontDecoder)?;
     let nexon_lv2_gothic = asset_bundle.get(path::NEXON_LV2_GOTHIC_PATH)?
         .read(&FontDecoder)?;
-    let font_set = FontSet::from([
-        (path::NEXON_LV2_GOTHIC_BOLD_PATH.to_string(), nexon_lv2_gothic_bold),
-        (path::NEXON_LV2_GOTHIC_MEDIUM_PATH.to_string(), nexon_lv2_gothic_medium),
-        (path::NEXON_LV2_GOTHIC_PATH.to_string(), nexon_lv2_gothic),
-    ]);
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
@@ -256,7 +208,11 @@ fn setup_fonts(asset_bundle: &AssetBundle) -> AppResult<FontSet> {
     asset_bundle.release(path::NEXON_LV2_GOTHIC_MEDIUM_PATH);
     asset_bundle.release(path::NEXON_LV2_GOTHIC_BOLD_PATH);
 
-    return Ok(font_set);
+    return Ok(HashMap::from_iter([
+        (path::NEXON_LV2_GOTHIC_BOLD_PATH.to_string(), nexon_lv2_gothic_bold),
+        (path::NEXON_LV2_GOTHIC_MEDIUM_PATH.to_string(), nexon_lv2_gothic_medium),
+        (path::NEXON_LV2_GOTHIC_PATH.to_string(), nexon_lv2_gothic),
+    ]).into());
 }
 
 
@@ -301,8 +257,8 @@ fn setup_text_brush(
     camera_layout: &wgpu::BindGroupLayout,
     render_format: wgpu::TextureFormat,
     asset_bundle: &AssetBundle
-) -> AppResult<Arc<Text2dBrush>> {
-    Text2dBrush::new(
+) -> AppResult<Arc<TextBrush>> {
+    TextBrush::new(
         device, 
         &camera_layout,
         render_format, 
@@ -329,14 +285,12 @@ fn setup_text_brush(
 fn setup_sprite_brush(
     device: &wgpu::Device, 
     camera_layout: &wgpu::BindGroupLayout, 
-    light_layout: &wgpu::BindGroupLayout, 
     render_format: wgpu::TextureFormat, 
     asset_bundle: &AssetBundle
 ) -> AppResult<Arc<SpriteBrush>> {
-    SpriteBrush::new(
+    let sprite_brush = SpriteBrush::new(
         device, 
         camera_layout, 
-        light_layout, 
         render_format, 
         Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
@@ -348,52 +302,72 @@ fn setup_sprite_brush(
         wgpu::MultisampleState::default(), 
         None,
         asset_bundle
-    )
+    )?;
+
+    return Ok(sprite_brush.into());
 }
 
 
 /// #### 한국어 </br>
-/// 타일 그리기 도구를 설정합니다. </br>
+/// 텍스처 캐시를 설정합니다. </br>
 /// 
 /// #### English (Translation) </br>
-/// Sets tile drawing tools. </br>
+/// Set up the texture cache. </br>
 /// 
-fn setup_tile_brush(
+fn setup_texture_map(
     device: &wgpu::Device, 
-    camera_layout: &wgpu::BindGroupLayout, 
-    light_layout: &wgpu::BindGroupLayout, 
-    render_format: wgpu::TextureFormat, 
+    queue: &wgpu::Queue, 
     asset_bundle: &AssetBundle
-) -> AppResult<Arc<TileBrush>> {
-    TileBrush::new(
-        device, 
-        camera_layout, 
-        light_layout, 
-        render_format, 
-        Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: true,
-            depth_compare:wgpu::CompareFunction::LessEqual,
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }), 
-        wgpu::MultisampleState::default(), 
-        None,
-        asset_bundle,
-        in_game::NUM_TILES
-    )
-}
+) -> AppResult<Arc<HashMap<String, wgpu::Texture>>> {
+    // (한국어) 로고 텍스처를 생성합니다.
+    // (English Translation) Create a logo texture. 
+    let logo = asset_bundle.get(path::LOGO_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("Logo"), 
+            size: wgpu::Extent3d {
+                width: 512, 
+                height: 512, 
+                depth_or_array_layers: 1, 
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bgra8Unorm, 
+            mip_level_count: 10, 
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue
+        })?;
 
+    // (한국어) 더미 텍스처를 생성합니다.
+    // (English Translation) Create a dummy texture.
+    let dummy = asset_bundle.get(path::DUMMY_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("Dummy"), 
+            size: wgpu::Extent3d {
+                width: 1, 
+                height: 1, 
+                depth_or_array_layers: 1, 
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bgra8Unorm, 
+            mip_level_count: 1, 
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue
+        })?;
 
-/// #### 한국어 </br>
-/// 점 조명 집합을 설정합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Set up the point light set. </br>
-/// 
-#[inline]
-fn setup_point_lights(device: &wgpu::Device) -> Arc<PointLights> {
-    PointLights::new(device)
+    // (한국어) 사용완료한 에셋을 해제합니다.
+    // (English Translation)  Release assets that have been used. 
+    asset_bundle.release(path::LOGO_TEXTURE_PATH);
+    asset_bundle.release(path::DUMMY_TEXTURE_PATH);
+
+    return Ok(HashMap::from_iter([
+        (path::LOGO_TEXTURE_PATH.to_string(), logo),
+        (path::DUMMY_TEXTURE_PATH.to_string(), dummy), 
+    ]).into());
 }
 
 

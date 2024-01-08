@@ -12,8 +12,9 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        text2d::brush::Text2dBrush, 
+        text::TextBrush,
         ui::UiBrush, 
+        interpolation,
         camera::GameCamera,
     },
     nodes::{
@@ -44,8 +45,8 @@ pub fn handle_events(_this: &mut FirstTimeSetupScene, _shared: &mut Shared, _eve
 pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 경과 시간을 갱신합니다.
     // (English Translation) Updates the elapsed time.
-    this.elapsed_time += elapsed_time;
-    let delta = smooth_step(this.elapsed_time, ANIMATION_TIME);
+    this.timer += elapsed_time;
+    let delta = interpolation::f64::smooth_step(this.timer, ANIMATION_TIME) as f32;
 
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
@@ -71,9 +72,7 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
             data.global_scale = scale;
         });
         text.update(queue, |data| {
-            data.transform.x_axis.x = scale.x;
-            data.transform.y_axis.y = scale.y;
-            data.transform.z_axis.z = scale.z;
+            data.scale = scale;
         });
     }
 
@@ -86,7 +85,7 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
     // if it is greater than the duration 
     // and the script for the selected language has been loaded.
     //
-    if this.elapsed_time >= TOTAL_DURATION 
+    if this.timer >= TOTAL_DURATION 
     && this.loading.as_ref().is_some_and(|it| it.is_finished()) {
         shared.push(this.loading.take().unwrap().join().unwrap()?);
         *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(IntroLoading::default()));
@@ -99,7 +98,7 @@ pub fn update(this: &mut FirstTimeSetupScene, shared: &mut Shared, _total_time: 
 pub fn draw(this: &FirstTimeSetupScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -171,11 +170,4 @@ pub fn draw(this: &FirstTimeSetupScene, shared: &mut Shared) -> AppResult<()> {
     frame.present();
 
     Ok(())
-}
-
-
-#[inline]
-fn smooth_step(elapsed_time: f64, duration: f64) -> f32 {
-    let t = (elapsed_time / duration).clamp(0.0, 1.0) as f32;
-    return 3.0 * t * t - 2.0 * t * t * t;
 }

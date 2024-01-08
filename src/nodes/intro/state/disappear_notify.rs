@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     game_err,
     components::{
-        text2d::brush::Text2dBrush, 
+        text::TextBrush, 
         camera::GameCamera,
     },
     nodes::intro::{IntroScene, state::IntroState}, 
@@ -33,7 +33,7 @@ const DURATION: f64 = 0.5;
 pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 경과한 시간을 갱신합니다.
     // (English Translation) Updates the elapsed time.
-    this.elapsed_time += elapsed_time;
+    this.timer += elapsed_time;
 
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
@@ -41,7 +41,7 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elap
     
     // (한국어) 알림 텍스트의 알파 값을 시간에 따라 갱신합니다.
     // (English Translation) Updates the alpha value of the notification text over time.
-    let delta_time = (this.elapsed_time / DURATION).min(1.0) as f32;
+    let delta_time = (this.timer / DURATION).min(1.0) as f32;
     let alpha = 1.0 - 1.0 * delta_time;
     for section in this.notifications.iter_mut() {
         section.update(queue, |data| {
@@ -51,9 +51,9 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elap
     
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) Changes to the next state if it is greater than the duration.
-    if this.elapsed_time >= DURATION {
+    if this.timer >= DURATION {
         this.state = IntroState::PlayTitleVoice;
-        this.elapsed_time = 0.0;
+        this.timer = 0.0;
         return Ok(());
     }
 
@@ -74,7 +74,7 @@ pub fn draw(
 ) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();

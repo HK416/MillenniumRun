@@ -1,14 +1,9 @@
-use std::sync::Arc;
-
-use ab_glyph::Font;
+use ab_glyph::FontArc;
 use glam::{Vec4, Vec3};
 
 use crate::{
     components::{
-        text2d::{
-            brush::Text2dBrush,
-            section::{Section2d, Section2dBuilder},
-        },
+        text::{TextBrush, Text, TextBuilder},
         ui::{UiBrush, UiObject, UiObjectBuilder},
         anchor::Anchor,
         margin::Margin,
@@ -65,16 +60,16 @@ pub(super) struct ExitMsgBoxTextureViews<'a> {
 /// #### English (Translation) </br>
 /// Create a exit message box. </br>
 /// 
-pub(super) fn create_exit_message_box<'a, F: Font>(
-    font: &'a F, 
+pub(super) fn create_exit_message_box<'a>(
+    font: &'a FontArc, 
     device: &'a wgpu::Device, 
     queue: &'a wgpu::Queue, 
     tex_sampler: &'a wgpu::Sampler, 
     texture_views: ExitMsgBoxTextureViews<'a>,
     script: &'a Script, 
     ui_brush: &'a UiBrush, 
-    text_brush: &'a Text2dBrush, 
-) -> AppResult<Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>> {
+    text_brush: &'a TextBrush, 
+) -> AppResult<Vec<(UiObject, Vec<Text>)>> {
     const ANCHOR_TOP: f32 = 0.5;
     const ANCHOR_LEFT: f32 = 0.5;
     const ANCHOR_BOTTOM: f32 = 0.5;
@@ -102,7 +97,7 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
     let wnd_margin = Margin::new(WND_HEIGHT / 2, -WND_WIDTH / 2, -WND_HEIGHT / 2, WND_WIDTH / 2);
     let text_margin = Margin::new(WND_HEIGHT / 5, -WND_WIDTH / 2, 0, WND_WIDTH / 2);
     let background = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("ExitMessageBoxBackground"),
             tex_sampler,
             texture_views.window_texture_view,
@@ -112,9 +107,9 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
         .with_margin(wnd_margin)
         .with_color(WND_COLOR)
         .with_global_translation(WND_TRANSLATION)
-        .build(device)),
+        .build(device),
         vec![
-            Arc::new(Section2dBuilder::new(
+            TextBuilder::new(
                 Some("ExitMessageBoxBackground"),
                 font,
                 script.get(ScriptTags::ExitMessage)?,
@@ -124,7 +119,7 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
             .with_margin(text_margin)
             .with_color(TEXT_COLOR)
             .with_translation(TEXT_TRANSLATION)
-            .build(device, queue)),
+            .build(device, queue),
         ]
     );
 
@@ -139,7 +134,7 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
         BTN_WIDTH / 2 - WND_WIDTH / 5
     );
     let yes_button = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("YesButton"),
             tex_sampler,
             texture_views.yes_btn_texture_view,
@@ -149,9 +144,9 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
         .with_margin(margin)
         .with_color(YES_BTN_COLOR)
         .with_global_translation(BTN_TRANSLATION)
-        .build(device)),
+        .build(device),
         vec![
-            Arc::new(Section2dBuilder::new(
+            TextBuilder::new(
                 Some("YesButton"),
                 font,
                 script.get(ScriptTags::ExitButton)?,
@@ -161,7 +156,7 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
             .with_margin(margin)
             .with_color(TEXT_COLOR)
             .with_translation(TEXT_TRANSLATION)
-            .build(device, queue)),
+            .build(device, queue),
         ]
     );
 
@@ -176,7 +171,7 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
         BTN_WIDTH / 2 + WND_WIDTH / 5
     );
     let no_button = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("NoButton"),
             tex_sampler,
             texture_views.no_btn_texture_view,
@@ -186,9 +181,9 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
         .with_margin(margin)
         .with_color(NO_BTN_COLOR)
         .with_global_translation(BTN_TRANSLATION)
-        .build(device)),
+        .build(device),
         vec![
-            Arc::new(Section2dBuilder::new(
+            TextBuilder::new(
                 Some("NoButton"),
                 font,
                 script.get(ScriptTags::NoExitButton)?,
@@ -198,7 +193,7 @@ pub(super) fn create_exit_message_box<'a, F: Font>(
             .with_margin(margin)
             .with_color(TEXT_COLOR)
             .with_translation(TEXT_TRANSLATION)
-            .build(device, queue)),
+            .build(device, queue),
         ]
     );
 
@@ -261,16 +256,16 @@ pub(super) struct SettingWindowTextureView<'a> {
 /// #### English (Translation) </br>
 /// Create a setting window. </br>
 /// 
-pub(super) fn create_setting_window<'a, F: Font>(
-    font: &'a F, 
+pub(super) fn create_setting_window<'a>(
+    font: &'a FontArc, 
     device: &'a wgpu::Device, 
     queue: &'a wgpu::Queue, 
     tex_sampler: &'a wgpu::Sampler, 
     texture_views: SettingWindowTextureView<'a>, 
     script: &'a Script, 
     ui_brush: &'a UiBrush, 
-    text_brush: &'a Text2dBrush
-) -> AppResult<Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>> {
+    text_brush: &'a TextBrush
+) -> AppResult<Vec<(UiObject, Vec<Text>)>> {
     let anchor = Anchor::new(0.5, 0.5, 0.5, 0.5);
     let margin = Margin::new(300, -400, -300, 400);
     let ui_color = Vec4::new(1.0, 1.0, 1.0, 1.0);
@@ -278,7 +273,7 @@ pub(super) fn create_setting_window<'a, F: Font>(
     // let text_color = Vec4::new(0.0, 0.0, 0.0, 1.0);
     // let text_translation = Vec3::new(0.0, 0.0, 0.25);
     let background = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("SettingWindow"), 
             tex_sampler, 
             texture_views.window_texture_view, 
@@ -288,7 +283,7 @@ pub(super) fn create_setting_window<'a, F: Font>(
         .with_margin(margin)
         .with_color(ui_color)
         .with_global_translation(ui_translation)
-        .build(device)),
+        .build(device),
         vec![
             // TODO 
         ]
@@ -301,7 +296,7 @@ pub(super) fn create_setting_window<'a, F: Font>(
     let text_color = Vec4::new(0.0, 0.0, 0.0, 1.0);
     let text_translation = Vec3::new(0.0, 0.0, 0.25);
     let store_button = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("StoreButton"),
             tex_sampler,
             texture_views.store_btn_texture_view, 
@@ -311,9 +306,9 @@ pub(super) fn create_setting_window<'a, F: Font>(
         .with_margin(margin)
         .with_color(ui_color)
         .with_global_translation(ui_translation)
-        .build(device)),
+        .build(device),
         vec![
-            Arc::new(Section2dBuilder::new(
+            TextBuilder::new(
                 Some("StoreButton"), 
                 font, 
                 script.get(ScriptTags::StoreButton)?, 
@@ -323,7 +318,7 @@ pub(super) fn create_setting_window<'a, F: Font>(
             .with_margin(margin)
             .with_color(text_color)
             .with_translation(text_translation)
-            .build(device, queue)),
+            .build(device, queue),
         ]
     );
 
@@ -335,7 +330,7 @@ pub(super) fn create_setting_window<'a, F: Font>(
     let text_color = Vec4::new(0.0, 0.0, 0.0, 1.0);
     let text_translation = Vec3::new(0.0, 0.0, 0.25);
     let exit_button = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("ExitButton"),
             tex_sampler, 
             texture_views.exit_btn_texture_view, 
@@ -345,9 +340,9 @@ pub(super) fn create_setting_window<'a, F: Font>(
         .with_margin(margin)
         .with_color(ui_color)
         .with_global_translation(ui_translation)
-        .build(device)),
+        .build(device),
         vec![
-            Arc::new(Section2dBuilder::new(
+            TextBuilder::new(
                 Some("ExitButton"), 
                 font, 
                 script.get(ScriptTags::ExitButton)?, 
@@ -357,7 +352,7 @@ pub(super) fn create_setting_window<'a, F: Font>(
             .with_margin(margin)
             .with_color(text_color)
             .with_translation(text_translation)
-            .build(device, queue)),
+            .build(device, queue),
         ]
     );
     
@@ -418,16 +413,16 @@ pub(super) struct StageWindowTextureView<'a> {
 /// #### English (Translation) </br>
 /// Create a stage window. </br>
 /// 
-pub(super) fn create_stage_window<'a, F: Font>(
-    font: &'a F, 
+pub(super) fn create_stage_window<'a>(
+    font: &'a FontArc, 
     device: &'a wgpu::Device, 
     queue: &'a wgpu::Queue, 
     tex_sampler: &'a wgpu::Sampler, 
     texture_views: StageWindowTextureView<'a>, 
     script: &'a Script, 
     ui_brush: &'a UiBrush, 
-    text_brush: &'a Text2dBrush
-) -> AppResult<Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>> {
+    text_brush: &'a TextBrush
+) -> AppResult<Vec<(UiObject, Vec<Text>)>> {
     let anchor = Anchor::new(
         1.0 - 0.01, 
         0.5 - 0.25, 
@@ -438,7 +433,7 @@ pub(super) fn create_stage_window<'a, F: Font>(
     let ui_color = Vec4::new(1.0, 1.0, 1.0, 0.0);
     let ui_translation = Vec3::new(0.0, 0.0, 0.75);
     let background = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("StageWindow"),
             tex_sampler,
             texture_views.window_texture_view,
@@ -448,7 +443,7 @@ pub(super) fn create_stage_window<'a, F: Font>(
         .with_margin(margin)
         .with_color(ui_color)
         .with_global_translation(ui_translation)
-        .build(device)),
+        .build(device),
         vec![
             // TODO 
         ]
@@ -467,7 +462,7 @@ pub(super) fn create_stage_window<'a, F: Font>(
     let text_color = Vec4::new(0.0, 0.0, 0.0, 0.0);
     let text_translation = Vec3::new(0.0, 0.0, 0.25);
     let enter_button = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("ReturnButton"),
             tex_sampler,
             texture_views.enter_btn_texture_view,
@@ -477,9 +472,9 @@ pub(super) fn create_stage_window<'a, F: Font>(
         .with_margin(margin)
         .with_color(ui_color)
         .with_global_translation(ui_translation)
-        .build(device)),
+        .build(device),
         vec![
-            Arc::new(Section2dBuilder::new(
+            TextBuilder::new(
                 Some("ReturnButton"),
                 font, 
                 script.get(ScriptTags::EnterStageButton)?, 
@@ -489,7 +484,7 @@ pub(super) fn create_stage_window<'a, F: Font>(
             .with_margin(margin)
             .with_color(text_color)
             .with_translation(text_translation)
-            .build(device, queue)),
+            .build(device, queue),
         ]
     );
 

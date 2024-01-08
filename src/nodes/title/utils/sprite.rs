@@ -5,8 +5,7 @@ use glam::{Mat4, Vec4, Vec3, Vec2};
 use crate::{
     components::{
         collider2d::shape::AABB,
-        sprite::{Sprite, SpriteBrush, InstanceData},
-        transform::Transform,
+        sprite::{Sprite, SpriteBrush, Instance},
     },
     nodes::consts::PIXEL_PER_METER,
     system::error::AppResult,
@@ -25,19 +24,17 @@ pub(super) fn create_background_sprite(
     tex_sampler: &wgpu::Sampler, 
     texture_view: &wgpu::TextureView, 
     sprite_brush: &SpriteBrush
-) -> AppResult<Arc<Sprite>> {
-    Ok(Arc::new(Sprite::new(
+) -> AppResult<Sprite> {
+    Ok(Sprite::new(
         device,
         tex_sampler, 
         texture_view, 
         sprite_brush, 
-        [InstanceData {
-            transform: Transform::default(),
-            color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 0.0 },
+        [Instance {
             size: Vec2 { x: 8.0, y: 8.0 } * PIXEL_PER_METER,
-            texture_index: 0,
+            ..Default::default()
         }]
-    )))
+    ))
 }
 
 
@@ -151,22 +148,22 @@ pub(super) fn create_character_sprites<'a>(
     tex_sampler: &'a wgpu::Sampler, 
     texture_views: CharactorSpriteTextureViews<'a>, 
     sprite_brush: &'a SpriteBrush, 
-) -> AppResult<Vec<(Arc<Sprite>, AABB)>> {
+) -> AppResult<Vec<(Sprite, AABB)>> {
     // (한국어) `Aris` 스프라이트를 생성합니다. 
     // (English Translation) Create the `Aris` sprite.
     let aris = (
-        Arc::new(Sprite::new(
+        Sprite::new(
             device,
             tex_sampler, 
             texture_views.aris_texture_view,
             sprite_brush, 
-            [InstanceData {
-                transform: Mat4::from_translation(ARIS_TRANSLATION).into(),
+            [Instance {
+                translation: ARIS_TRANSLATION, 
                 color: SPRITE_COLOR,
                 size: ARIS_SIZE,
-                texture_index: 0,
+                ..Default::default()
             }]
-        )),
+        ),
         AABB {
             x: ARIS_X + 0.0,
             y: ARIS_Y + 0.0,
@@ -179,18 +176,18 @@ pub(super) fn create_character_sprites<'a>(
     // (한국어) `Momoi` 스프라이트를 생성합니다. 
     // (English Translation) Create the `Momoi` sprite.
     let momoi = (
-        Arc::new(Sprite::new(
+        Sprite::new(
             device,
             tex_sampler, 
             texture_views.momoi_texture_view, 
             sprite_brush, 
-            [InstanceData {
-                transform: Mat4::from_translation(MOMOI_TRANSLATION).into(),
+            [Instance {
+                translation: MOMOI_TRANSLATION, 
                 color: SPRITE_COLOR,
                 size: MOMOI_SIZE,
-                texture_index: 0,
+                ..Default::default()
             }]
-        )),
+        ),
         AABB {
             x: MOMOI_X + 0.25 * MOMOI_WIDTH,
             y: MOMOI_Y + 0.0,
@@ -203,18 +200,18 @@ pub(super) fn create_character_sprites<'a>(
     // (한국어) `Midori` 스프라이트를 생성합니다. 
     // (English Translation) Create the `Midori` sprite.
     let midori = (
-        Arc::new(Sprite::new(
+        Sprite::new(
             device,
             tex_sampler, 
             texture_views.midori_texture_view, 
             sprite_brush, 
-            [InstanceData {
-                transform: Mat4::from_translation(MIDORI_TRANSLATION).into(),
+            [Instance {
+                translation: MIDORI_TRANSLATION, 
                 color: SPRITE_COLOR,
                 size: MIDORI_SIZE,
-                texture_index: 0,
+                ..Default::default()
             }]
-        )),
+        ),
         AABB {
             x: MIDORI_X - 0.25 * MIDORI_WIDTH,
             y: MIDORI_Y + 0.0,
@@ -227,18 +224,18 @@ pub(super) fn create_character_sprites<'a>(
     // (한국어) `Midori` 스프라이트를 생성합니다. 
     // (English Translation) Create the `Midori` sprite.
     let yuzu = (
-        Arc::new(Sprite::new(
+        Sprite::new(
             device,
             tex_sampler, 
             texture_views.yuzu_texture_view, 
             sprite_brush, 
-            [InstanceData {
-                transform: Mat4::from_translation(YUZU_TRANSLATION).into(),
+            [Instance {
+                translation: YUZU_TRANSLATION, 
                 color: SPRITE_COLOR,
                 size: YUZU_SIZE,
-                texture_index: 0,
+                ..Default::default()
             }]
-        )),
+        ),
         AABB {
             x: YUZU_X + 0.3 * YUZU_WIDTH,
             y: YUZU_Y + 0.0,

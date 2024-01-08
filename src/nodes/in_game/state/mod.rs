@@ -1,4 +1,7 @@
-mod run;
+mod enter; 
+mod spawn; 
+mod ready;
+mod run; 
 
 use winit::event::Event;
 
@@ -22,6 +25,9 @@ use crate::{
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum InGameState {
     #[default]
+    Enter, 
+    Spawn, 
+    Ready, 
     Run,
 }
 
@@ -29,14 +35,23 @@ type HandleEventsFn = dyn Fn(&mut InGameScene, &mut Shared, Event<AppEvent>) -> 
 type UpdateFn = dyn Fn(&mut InGameScene, &mut Shared, f64, f64) -> AppResult<()>;
 type DrawFn = dyn Fn(&InGameScene, &mut Shared) -> AppResult<()>;
 
-pub const HANDLE_EVENTS: [&'static HandleEventsFn; 1] = [
+pub const HANDLE_EVENTS: [&'static HandleEventsFn; 4] = [
+    &enter::handle_events, 
+    &spawn::handle_events, 
+    &ready::handle_events, 
     &run::handle_events,
 ];
 
-pub const UPDATES: [&'static UpdateFn; 1] = [
+pub const UPDATES: [&'static UpdateFn; 4] = [
+    &enter::update, 
+    &spawn::update, 
+    &ready::update, 
     &run::update,
 ];
 
-pub const DRAWS: [&'static DrawFn; 1] = [
+pub const DRAWS: [&'static DrawFn; 4] = [
+    &enter::draw, 
+    &spawn::draw, 
+    &ready::draw, 
     &run::draw,
 ];

@@ -7,18 +7,43 @@
 use std::mem::size_of;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use glam::{Mat4, Vec4, Vec2};
+use glam::{Mat4, Quat, Vec4, Vec3, Vec2};
 use bytemuck::{Pod, Zeroable, offset_of};
 
 use crate::{
     assets::bundle::AssetBundle,
-    components::{
-        lights::PointLights, 
-        transform::Transform, 
-    },
     render::shader::WgslDecoder,
     system::error::AppResult,
 };
+
+
+
+/// #### 한국어 </br>
+/// 스프라이트 객체를 렌더링하는데 사용되는 인스턴스 데이터 구조체 입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is an instance data structure used to render sprite objects. </br.
+/// 
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
+struct Data {
+    transform: Mat4,
+    color: Vec4,
+    size: Vec2,
+    texture_index: u32,
+}
+
+impl Default for Data {
+    #[inline]
+    fn default() -> Self {
+        Self { 
+            transform: Mat4::IDENTITY, 
+            color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 }, 
+            size: Vec2 { x: 0.0, y: 0.0 }, 
+            texture_index: 0, 
+        }
+    }
+}
 
 
 
@@ -28,26 +53,46 @@ use crate::{
 /// #### English (Translation) </br>
 /// Contains instance data used for rendering sprite objects. </br>
 /// 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Pod, Zeroable)]
-pub struct InstanceData {
-    pub transform: Transform,
-    pub color: Vec4,
-    pub size: Vec2,
-    pub texture_index: u32,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Instance {
+    pub scale: Vec3, 
+    pub rotation: Quat, 
+    pub translation: Vec3, 
+    pub color: Vec4, 
+    pub size: Vec2, 
+    pub texture_index: u32, 
 }
 
-impl Default for InstanceData {
+impl Instance {
+    #[inline]
+    fn to_data(&self) -> Data {
+        Data {
+            transform: Mat4::from_scale_rotation_translation(
+                self.scale, 
+                self.rotation, 
+                self.translation
+            ),
+            color: self.color, 
+            size: self.size, 
+            texture_index: self.texture_index, 
+        }
+    }
+}
+
+impl Default for Instance {
     #[inline]
     fn default() -> Self {
-        Self { 
-            transform: Transform::default(), 
+        Self {
+            scale: Vec3 { x: 1.0, y: 1.0, z: 1.0 }, 
+            rotation: Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }, 
+            translation: Vec3 { x: 0.0, y: 0.0, z: 0.0 }, 
             color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 }, 
             size: Vec2 { x: 0.0, y: 0.0 }, 
             texture_index: 0, 
         }
     }
 }
+
 
 
 
@@ -61,7 +106,7 @@ impl Default for InstanceData {
 pub struct Sprite {
     buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    pub instances: Mutex<Vec<InstanceData>>,
+    pub instances: Mutex<Vec<Instance>>,
 }
 
 impl Sprite {
@@ -73,18 +118,19 @@ impl Sprite {
         iter: Iter
     ) -> Self 
     where 
-        Iter: IntoIterator<Item = InstanceData>, 
+        Iter: IntoIterator<Item = Instance>, 
         Iter::IntoIter: ExactSizeIterator, 
     {
         use wgpu::util::DeviceExt;
 
         // (한국어) 인스턴스 데이터 버퍼를 생성합니다.
         // (English Translation) Create a instance data buffer.
-        let instances: Vec<InstanceData> = iter.into_iter().collect();
+        let instances: Vec<Instance> = iter.into_iter().collect();
+        let data: Vec<Data> = instances.iter().map(|it| it.to_data()).collect();
         let buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex(InstanceData(LightSprite))"),
-                contents: bytemuck::cast_slice(&instances),
+                contents: bytemuck::cast_slice(&data),
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             },
         );
@@ -126,10 +172,11 @@ impl Sprite {
     /// Updates the instance data buffer. </br>
     /// 
     pub fn update<F>(&self, queue: &wgpu::Queue, mapping_func: F)
-    where F: Fn(&mut MutexGuard<'_, Vec<InstanceData>>) {
+    where F: Fn(&mut MutexGuard<'_, Vec<Instance>>) {
         let mut guard = self.instances.lock().expect("Failed to access variable.");
         mapping_func(&mut guard);
-        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&*guard));
+        let data: Vec<Data> = guard.iter().map(|it| it.to_data()).collect();
+        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&data));
     }
 
     #[inline]
@@ -139,7 +186,7 @@ impl Sprite {
 
     #[inline]
     fn bind<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
-        rpass.set_bind_group(2, &self.bind_group, &[]);
+        rpass.set_bind_group(1, &self.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.buffer.slice(..));
     }
 
@@ -167,8 +214,7 @@ pub struct SpriteBrush {
 impl SpriteBrush {
     pub fn new(
         device: &wgpu::Device, 
-        camera_layout: &wgpu::BindGroupLayout, 
-        light_layout: &wgpu::BindGroupLayout, 
+        camera_layout: &wgpu::BindGroupLayout,
         render_format: wgpu::TextureFormat, 
         depth_stencil: Option<wgpu::DepthStencilState>, 
         multisample: wgpu::MultisampleState, 
@@ -177,7 +223,7 @@ impl SpriteBrush {
     ) -> AppResult<Arc<Self>> {
         let module = create_shader_module(device, asset_bundle)?;
         let texture_layout = create_texture_layout(device);
-        let bind_group_layouts = &[camera_layout, &light_layout, &texture_layout];
+        let bind_group_layouts = &[camera_layout, &texture_layout];
         let pipeline = create_pipeline(
             device, 
             &module, 
@@ -202,12 +248,10 @@ impl SpriteBrush {
     /// 
     pub fn draw<'pass, Iter>(
         &'pass self, 
-        light: &'pass PointLights, 
         rpass: &mut wgpu::RenderPass<'pass>, 
         iter: Iter
     ) where Iter: Iterator<Item = &'pass Sprite> {
         rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(1, &light.bind_group, &[]);
         for sprite in iter {
             sprite.bind(rpass);
             sprite.draw(rpass);
@@ -310,43 +354,43 @@ fn create_pipeline(
                 entry_point: "vs_main",
                 buffers: &[
                     wgpu::VertexBufferLayout { 
-                        array_stride: size_of::<InstanceData>() as wgpu::BufferAddress, 
+                        array_stride: size_of::<Data>() as wgpu::BufferAddress, 
                         step_mode: wgpu::VertexStepMode::Instance, 
                         attributes: &[
                             wgpu::VertexAttribute {
                                 shader_location: 0,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(InstanceData, transform) + offset_of!(Mat4, x_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(Data, transform) + offset_of!(Mat4, x_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 1,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(InstanceData, transform) + offset_of!(Mat4, y_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(Data, transform) + offset_of!(Mat4, y_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 2,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(InstanceData, transform) + offset_of!(Mat4, z_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(Data, transform) + offset_of!(Mat4, z_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 3,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: (offset_of!(InstanceData, transform) + offset_of!(Mat4, w_axis)) as wgpu::BufferAddress,
+                                offset: (offset_of!(Data, transform) + offset_of!(Mat4, w_axis)) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 4,
                                 format: wgpu::VertexFormat::Float32x4,
-                                offset: offset_of!(InstanceData, color) as wgpu::BufferAddress,
+                                offset: offset_of!(Data, color) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 5,
                                 format: wgpu::VertexFormat::Float32x2,
-                                offset: offset_of!(InstanceData, size) as wgpu::BufferAddress,
+                                offset: offset_of!(Data, size) as wgpu::BufferAddress,
                             },
                             wgpu::VertexAttribute {
                                 shader_location: 6,
                                 format: wgpu::VertexFormat::Uint32,
-                                offset: offset_of!(InstanceData, texture_index) as wgpu::BufferAddress,
+                                offset: offset_of!(Data, texture_index) as wgpu::BufferAddress,
                             },
                         ],
                     },

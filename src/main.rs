@@ -350,7 +350,8 @@ fn main() {
     event_loop.run(move |event, elwt| {
         // (한국어) 현재 게임 스레드가 작동하고 있는지 확인합니다.
         // (English Translation) Verify that the current game thread is working.
-        if handle.as_ref().is_some_and(|it| it.is_finished()) {
+        if RUNNING_FLAG.load(MemOrdering::Acquire) 
+        && handle.as_ref().is_some_and(|it| it.is_finished()) {
             // (한국어) 현재 게임 스레드가 작동하고 있지 않는 경우 스레드를 join 합니다.
             // (English Translation) Joins a thread if the current game thread is not working.
             //
@@ -392,13 +393,6 @@ fn main() {
             if window_id == window.id() && (event == WindowEvent::CloseRequested || event == WindowEvent::Destroyed) {
                 RUNNING_FLAG.store(false, MemOrdering::Release);
                 elwt.exit();
-
-                // (한국어) 게임 스레드 핸들이 있는 경우 게임 스레드 핸들을 join 합니다.
-                // (English Translation) Joins the game thread handle, if it exists.
-                if let Some(th) = handle.take() {
-                    _ = th.join().unwrap();
-                }
-
                 return;
             } else if window_id != window.id() {
                 return;

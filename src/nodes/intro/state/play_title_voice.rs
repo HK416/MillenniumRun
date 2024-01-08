@@ -57,12 +57,14 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, _ela
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
-    for rel_path in VOICES { asset_bundle.release(rel_path) };
+    for rel_path in VOICES { 
+        asset_bundle.release(rel_path) 
+    };
 
     // (한국어) 다음 상태로 변경합니다.
     // (English Translation) Change to the next state.
     this.state = IntroState::AppearLogo;
-    this.elapsed_time = 0.0;
+    this.timer = 0.0;
     Ok(())
 }
 

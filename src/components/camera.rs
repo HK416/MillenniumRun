@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use glam::{Mat4, Vec3};
 use bytemuck::{Pod, Zeroable};
-use winit::dpi::PhysicalPosition;
+use winit::{window::Window, dpi::PhysicalPosition};
 
 use crate::components::transform::{
     Transform, 
@@ -88,6 +88,8 @@ pub struct CameraData {
     pub scale_factor: f32, 
 }
 
+
+
 /// #### 한국어 </br>
 /// 월드 좌표상에 존재하는 게임 카메라 오브젝트 입니다. </br>
 /// 
@@ -103,82 +105,6 @@ pub struct GameCamera {
 }
 
 impl GameCamera {
-    pub fn new(
-        name: Option<&str>,
-        viewport: Viewport,
-        transform: Transform, 
-        projection: Projection,
-        scale_factor: f32,
-        device: &wgpu::Device,
-        layout: &wgpu::BindGroupLayout
-    ) -> Arc<Self> {
-        // (한국어) 라벨 데이터를 생성합니다.
-        // (English Translation) Create a label data.
-        let label = format!("GameCamera({})", name.unwrap_or("Unknown"));
-        
-        // (한국어) 카메라 데이터 유니폼 버퍼를 생성합니다.
-        // (English Translation) Create a camera data uniform buffer.
-        use wgpu::util::DeviceExt;
-        let data = CameraData {
-            viewport,
-            transform,
-            projection,
-            scale_factor,
-        };
-        let camera_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("Uniform(CameraData({}))", label)),
-                contents: bytemuck::bytes_of(&CameraUniform {
-                    camera: data.transform.camera_transform(), 
-                    projection: data.projection.projection_transform(), 
-                    position: data.transform.get_position(), 
-                    scale_factor: data.scale_factor
-                }),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }
-        );
-
-        // (한국어) 뷰포트 데이터 유니폼 버퍼를 생성합니다.
-        // (English Translation) Create a viewport data uniform buffer.
-        let viewport_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("Uniform(Viewport({}))", label)),
-                contents: bytemuck::bytes_of(&data.viewport),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            }
-        );
-
-        // (한국어) 카메라 바인드 그룹을 생성합니다.
-        // (English Translation) Create a camera data bind group.
-        let bind_group = device.create_bind_group(
-            &wgpu::BindGroupDescriptor {
-                label: Some(&format!("BindGroup({})", label)),
-                layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer(
-                            camera_buffer.as_entire_buffer_binding()
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Buffer(
-                            viewport_buffer.as_entire_buffer_binding()
-                        ),
-                    },
-                ],
-            }
-        );
-
-        Self { 
-            bind_group,
-            camera_buffer,
-            viewport_buffer,
-            data: data.into(), 
-        }.into()
-    }   
-
     /// #### 한국어 </br>
     /// 카메라의 유니폼 버퍼를 갱신합니다. </br>
     /// 버퍼의 내용이 바로 갱신되지 않습니다. (상세: [wgpu::Queue]) </br>
@@ -187,7 +113,6 @@ impl GameCamera {
     /// Updates the camera's uniform buffer. </br>
     /// The contents of the buffer are not updated immediately. (see also: [wgpu::Queue]) </br>
     /// 
-    #[inline]
     pub fn update<F>(&self, queue: &wgpu::Queue, mapping_func: F) 
     where F: Fn(&mut MutexGuard<'_, CameraData>) {
         let mut guard = self.data.lock().expect("Failed to access variable.");
@@ -239,12 +164,131 @@ impl GameCamera {
 
 
 /// #### 한국어 </br>
+/// 카메라를 생성하는 구조체 입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a structure that creates a camera. </br>
+/// 
+#[derive(Debug)]
+pub struct CameraCreator {
+    window: Arc<Window>, 
+    device: Arc<wgpu::Device>, 
+    pub camera_layout: wgpu::BindGroupLayout, 
+}
+
+impl CameraCreator {
+    #[inline]
+    pub fn new(device: Arc<wgpu::Device>, window: Arc<Window>) -> Arc<Self> {
+        let camera_layout = create_camera_layout(&device);
+        Self { window, device, camera_layout }.into()
+    }
+
+    /// #### 한국어 </br>
+    /// 주어진 파라미터를 가지고 카메라를 생성합니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// Creates a camera with given parameters. </br>
+    /// 
+    pub fn create(
+        &self, 
+        name: Option<&str>, 
+        viewport: Option<Viewport>, 
+        transform: Option<Transform>, 
+        projection: Option<Projection>,
+        scale_factor: Option<f32>
+    ) -> GameCamera {
+        use wgpu::util::DeviceExt;
+
+        // (한국어) 카메라 데이터를 생성합니다.
+        // (English Translation) Create the camera data.
+        let data = CameraData {
+            viewport: viewport.unwrap_or_else(|| Viewport { 
+                x: 0.0, 
+                y: 0.0, 
+                width: self.window.inner_size().width as f32, 
+                height: self.window.inner_size().height as f32, 
+                min_z: 0.0, 
+                max_z: 1.0, 
+                ..Default::default()
+            }),
+            transform: transform.unwrap_or_default(), 
+            projection: projection.unwrap_or_else(|| Projection::new_ortho(
+                1.0, 
+                -1.0, 
+                -1.0, 
+                1.0, 
+                0.0, 
+                1000.0
+            )), 
+            scale_factor: scale_factor.unwrap_or_else(|| self.window.scale_factor() as f32),
+        };
+
+        // (한국어) 카메라 데이터 유니폼 버퍼를 생성합니다.
+        // (English Translation) Create a camera data uniform buffer.
+        let camera_buffer = self.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("Uniform(CameraData({}))", name.unwrap_or_else(|| "Unknown"))),
+                contents: bytemuck::bytes_of(&CameraUniform {
+                    camera: data.transform.camera_transform(), 
+                    projection: data.projection.projection_transform(), 
+                    position: data.transform.get_position(), 
+                    scale_factor: data.scale_factor, 
+                }),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            },
+        );
+
+        // (한국어) 뷰포트 데이터 유니폼 버퍼를 생성합니다.
+        // (English Translation) Create a viewport data uniform buffer. 
+        let viewport_buffer = self.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("Uniform(ViewportData({}))", name.unwrap_or_else(|| "Unknown"))),
+                contents: bytemuck::bytes_of(&data.viewport),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, 
+            },
+        );
+
+        // (한국어) 카메라 바인드 그룹을 생성합니다.
+        // (English Translation) Create a camera bind group. 
+        let bind_group = self.device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                label: Some(&format!("BindGroup(Camera({}))", name.unwrap_or_else(|| "Unknown"))),
+                layout: &self.camera_layout, 
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(
+                            camera_buffer.as_entire_buffer_binding()
+                        ),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Buffer(
+                            viewport_buffer.as_entire_buffer_binding()
+                        ),
+                    },
+                ],
+            }
+        );
+
+        return GameCamera { 
+            bind_group, 
+            camera_buffer, 
+            viewport_buffer, 
+            data: data.into() 
+        };
+    }
+}
+
+
+
+/// #### 한국어 </br>
 /// 카메라 데이터 바인드 그룹 레이아웃을 생성합니다. </br>
 /// 
 /// #### English (Translation) </br>
 /// Create a camera data bind group layout. </br>
 /// 
-pub fn create_camera_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+fn create_camera_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(
         &wgpu::BindGroupLayoutDescriptor {
             label: Some("BindGroupLayout(GameCamera)"),

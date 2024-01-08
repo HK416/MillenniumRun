@@ -128,8 +128,8 @@ impl Default for Settings {
             screen_mode: ScreenMode::default(), 
             resolution: Resolution::default(), 
             background_volume: Volume::new(80),
-            effect_volume: Volume::new(100),
-            voice_volume: Volume::new(85),
+            effect_volume: Volume::new(70),
+            voice_volume: Volume::new(70),
         }
     }
 }

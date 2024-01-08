@@ -2,26 +2,24 @@ mod state;
 
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+use std::collections::HashMap;
 
-use ab_glyph::Font;
+use ab_glyph::FontArc;
 
 use crate::scene::state::SceneState;
 use crate::{
     game_err,
     assets::bundle::AssetBundle,
     components::{
-        text2d::{
-            brush::Text2dBrush, font::FontSet,
-            section::{Section2d, Section2dBuilder},
-        },
+        text::{TextBrush, Text, TextBuilder},
         ui::{UiBrush, UiObject, UiObjectBuilder},
-        camera::GameCamera,
+        camera::CameraCreator,
+        transform::Projection, 
         anchor::Anchor,
         margin::Margin,
         script::{Script, ScriptTags},
     },
-    nodes::path,
-    render::texture::DdsTextureDecoder,
+    nodes::{path, consts::PIXEL_PER_METER},
     scene::node::SceneNode,
     system::{
         error::{AppResult, GameError},
@@ -46,70 +44,95 @@ impl SceneNode for IntroLoading {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 사용할 공유 객체 가져오기.
         // (English Translation) Get shared object to use.
-        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
-        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let tex_sampler = shared.get::<Arc<wgpu::Sampler>>().unwrap();
-        let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
-        let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
-        let font_set = shared.get::<FontSet>().unwrap();
-        let script = shared.get::<Arc<Script>>().unwrap();
+        let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
+        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap().clone();
+        let tex_sampler = shared.get::<Arc<wgpu::Sampler>>().unwrap().clone();
+        let ui_brush = shared.get::<Arc<UiBrush>>().unwrap().clone();
+        let text_brush = shared.get::<Arc<TextBrush>>().unwrap().clone();
+        let script = shared.get::<Arc<Script>>().unwrap().clone();
+        let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap().clone();
+        let textures = shared.get::<Arc<HashMap<String, wgpu::Texture>>>().unwrap().clone();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap().clone();
 
-        let nexon_lv2_gothic_bold = font_set.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)
-            .expect("A registered font could not be found.")
-            .clone();
-        let nexon_lv2_gothic_medium = font_set.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
-            .expect("A registered font could not be found.")
-            .clone();
-        let device_cloned = device.clone();
-        let queue_cloned = queue.clone();
-        let tex_sampler_cloned = tex_sampler.clone();
-        let ui_brush_cloned = ui_brush.clone();
-        let text_brush_cloned = text_brush.clone();
-        let asset_bundle_cloned = asset_bundle.clone();
-        let script_cloned = script.clone();
         self.loading = Some(thread::spawn(move || {
-            // (한국어) 게임 장면에서 사용할 에셋들을 로드합니다. 
-            // (English Translation) Loads assets to be used in the game scene.
-            asset_bundle_cloned.get(path::LOGO_TEXTURE_PATH)?;
-            asset_bundle_cloned.get(path::ARIS_TITLE_SOUND_PATH)?;
-            asset_bundle_cloned.get(path::MOMOI_TITLE_SOUND_PATH)?;
-            asset_bundle_cloned.get(path::MIDORI_TITLE_SOUND_PATH)?;
-            asset_bundle_cloned.get(path::YUZU_TITLE_SOUND_PATH)?;
+            // (한국어) 현재 게임 장면에서 사용할 에셋들을 로드합니다. 
+            // (English Translation) Loads assets to be used in the current game scene.
+            asset_bundle.get(path::ARIS_TITLE_SOUND_PATH)?;
+            asset_bundle.get(path::MOMOI_TITLE_SOUND_PATH)?;
+            asset_bundle.get(path::MIDORI_TITLE_SOUND_PATH)?;
+            asset_bundle.get(path::YUZU_TITLE_SOUND_PATH)?;
+
+            let logo_texture = textures.get(path::LOGO_TEXTURE_PATH) 
+                .expect("A registered texture could not be found.");
+            let dummy_texture = textures.get(path::DUMMY_TEXTURE_PATH)
+                .expect("A registered texture could not be found.");
+
+
+            let nexon_lv2_gothic_bold = fonts.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)
+                .expect("A registered font could not be found.");
+            let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
+                .expect("A registered font could not be found.");
 
             // (한국어) 게임 장면에서 사용할 객체들을 생성합니다.
             // (English Translation) Creates objects to be used in the game scene.
             let mut notifications = Vec::with_capacity(2);
             notifications.push(create_notify_title(
-                &device_cloned, 
-                &queue_cloned,
+                &device, 
+                &queue,
                 &nexon_lv2_gothic_bold, 
-                &script_cloned, 
-                &text_brush_cloned, 
+                &script, 
+                &text_brush, 
             )?);
             notifications.append(&mut create_notify_texts(
-                &device_cloned, 
-                &queue_cloned, 
+                &device, 
+                &queue, 
                 &nexon_lv2_gothic_medium, 
-                &script_cloned, 
-                &text_brush_cloned
+                &script, 
+                &text_brush
             )?);
+            let foreground = create_foreground(
+                &device, 
+                &tex_sampler, 
+                &dummy_texture, 
+                &ui_brush
+            );
             let logo = create_logo_image(
-                &device_cloned, 
-                &queue_cloned, 
-                &tex_sampler_cloned, 
-                &ui_brush_cloned, 
-                &asset_bundle_cloned
-            )?;
+                &device, 
+                &tex_sampler, 
+                &logo_texture, 
+                &ui_brush
+            );
 
             Ok(IntroScene { 
-                elapsed_time: 0.0, 
+                timer: 0.0, 
                 state: state::IntroState::default(), 
                 loading: None, 
                 notifications, 
+                foreground, 
                 logo 
             })
         }));
+
+
+        // (한국어) 게임 장면에서 사용할 카메라를 생성합니다.
+        // (English Translation) Creates a camera to use in the current game scene. 
+        let camera_creator = shared.get::<Arc<CameraCreator>>().unwrap().clone();
+        let camera = camera_creator.create(
+            Some("Intro"), 
+            None, 
+            None, 
+            Some(Projection::new_ortho(
+                3.0 * PIXEL_PER_METER, 
+                -4.0 * PIXEL_PER_METER, 
+                -3.0 * PIXEL_PER_METER, 
+                4.0 * PIXEL_PER_METER, 
+                0.0 * PIXEL_PER_METER, 
+                1000.0 * PIXEL_PER_METER
+            )), 
+            None
+        );
+        shared.push(Arc::new(camera));
+
         Ok(())
     }
 
@@ -128,7 +151,6 @@ impl SceneNode for IntroLoading {
         let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let camera= shared.get::<Arc<GameCamera>>().unwrap();
 
         // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
         // (English Translation) Wait until the previous operation is finished.
@@ -152,7 +174,7 @@ impl SceneNode for IntroLoading {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
         {
-            let mut rpass = encoder.begin_render_pass(
+            let mut _rpass = encoder.begin_render_pass(
                 &wgpu::RenderPassDescriptor {
                     label: Some("RenderPass(IntroLoading)"),
                     color_attachments: &[
@@ -170,10 +192,6 @@ impl SceneNode for IntroLoading {
                     occlusion_query_set: None,
                 }
             );
-
-            // (한국어) 카메라를 바인드 합니다.
-            // (English Translation) Bind the camera.
-            camera.bind(&mut rpass);
         }
 
         // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -202,10 +220,11 @@ impl Default for IntroLoading {
 /// 
 #[derive(Debug)]
 pub struct IntroScene {
-    elapsed_time: f64,
+    timer: f64,
     state: state::IntroState,
     loading: Option<JoinHandle<AppResult<()>>>,
-    notifications: Vec<Section2d>,
+    notifications: Vec<Text>,
+    foreground: UiObject, 
     logo: UiObject,
 }
 
@@ -219,7 +238,7 @@ impl SceneNode for IntroScene {
         self.loading = Some(thread::spawn(move || {
             // (한국어) `Title` 게임 장면에서 사용될 에셋들을 로드합니다.
             // (English Translation) Loads assets to be used in `Title` game scene. 
-            asset_bundle_cloned.get(path::BACKGROUND_TEXTURE_PATH)?;
+            asset_bundle_cloned.get(path::TITLE_BACKGROUND_TEXTURE_PATH)?;
             asset_bundle_cloned.get(path::ARIS_STANDING_TEXTURE_PATH)?;
             asset_bundle_cloned.get(path::MOMOI_STANDING_TEXTURE_PATH)?;
             asset_bundle_cloned.get(path::TITLE_BUTTON_START_TEXTURE_PATH)?;
@@ -249,15 +268,15 @@ impl SceneNode for IntroScene {
 /// #### English (Translation) </br>
 /// Creates notification title used in game scene. </br>
 /// 
-fn create_notify_title<F: Font>(
+fn create_notify_title(
     device: &wgpu::Device, 
     queue: &wgpu::Queue, 
-    font: &F, 
+    font: &FontArc, 
     script: &Script, 
-    text_brush: &Text2dBrush
-) -> AppResult<Section2d> {
+    text_brush: &TextBrush
+) -> AppResult<Text> {
     let text = script.get(ScriptTags::NotifyTitle)?;
-    let notify_title = Section2dBuilder::new(
+    let notify_title = TextBuilder::new(
         Some("Notify Title"), 
         font, 
         text, 
@@ -277,15 +296,15 @@ fn create_notify_title<F: Font>(
 /// #### English (Translation) </br>
 /// Creates notification text used in game scene. </br>
 /// 
-fn create_notify_texts<F: Font>(
+fn create_notify_texts(
     device: &wgpu::Device, 
     queue: &wgpu::Queue, 
-    font: &F, 
+    font: &FontArc, 
     script: &Script, 
-    text_brush: &Text2dBrush
-) -> AppResult<Vec<Section2d>> {
+    text_brush: &TextBrush
+) -> AppResult<Vec<Text>> {
     let text = script.get(ScriptTags::NotifyTextLine0)?;
-    let notify_line0 = Section2dBuilder::new(
+    let notify_line0 = TextBuilder::new(
         Some("Notify Text Line0"), 
         font, 
         text, 
@@ -307,31 +326,11 @@ fn create_notify_texts<F: Font>(
 /// 
 fn create_logo_image(
     device: &wgpu::Device, 
-    queue: &wgpu::Queue, 
     tex_sampler: &wgpu::Sampler, 
-    ui_brush: &UiBrush, 
-    asset_bundle: &AssetBundle
-) -> AppResult<UiObject> {
-    // (한국어) 로고 텍스처를 생성합니다.
-    // (English Translation) Create logo texture.
-    let texture = asset_bundle.get(path::LOGO_TEXTURE_PATH)?
-        .read(&DdsTextureDecoder {
-            name: Some("Logo"),
-            size: wgpu::Extent3d {
-                width: 512,
-                height: 512,
-                depth_or_array_layers: 1,
-            },
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
-            mip_level_count: 10,
-            sample_count: 1,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-            device,
-            queue
-        })?;
-    let texture_view = texture.create_view(
+    logo_texture: &wgpu::Texture, 
+    ui_brush: &UiBrush
+) -> UiObject {
+    let texture_view = logo_texture.create_view(
         &wgpu::TextureViewDescriptor { 
             ..Default::default()
         }
@@ -339,7 +338,7 @@ fn create_logo_image(
 
     // (한국어) 로고 이미지 사용자 인터페이스를 생성합니다.
     // (English Translation) Create logo image user interface.
-    let texture = UiObjectBuilder::new(
+    let logo = UiObjectBuilder::new(
         Some("Logo"),
         tex_sampler,
         &texture_view,
@@ -347,12 +346,43 @@ fn create_logo_image(
     )
     .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
     .with_margin(Margin::new(206, -206, -206, 206))
-    .with_color((1.0, 1.0, 1.0, 0.0).into())
+    .with_color((18.0 / 255.0, 23.0 / 255.0, 40.0 / 255.0, 0.0).into())
     .build(device);
 
-    // (한국어) 사용을 완료한 에셋을 정리합니다.
-    // (English Translation) Release assets that have been used.
-    asset_bundle.release(path::LOGO_TEXTURE_PATH);
+    return logo;
+}
 
-    return Ok(texture);
+
+
+/// #### 한국어 </br>
+/// 장면 전환에 사용할 전경 이미지를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a foreground image to use for scene transitions. </br>
+/// 
+fn create_foreground(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    dummy_texture: &wgpu::Texture, 
+    ui_brush: &UiBrush
+) -> UiObject {
+    let texture_view = dummy_texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        }
+    );
+
+    // (한국어) 전경 이미지 사용자 인터페이스를 생성합니다.
+    // (English Translation) Create a foreground image user interface. 
+    let foreground = UiObjectBuilder::new(
+        Some("Foreground"), 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(1.0, 0.0, 0.0, 1.0))
+    .with_color((0.0, 0.0, 0.0, 1.0).into())
+    .build(device);
+
+    return foreground;
 }

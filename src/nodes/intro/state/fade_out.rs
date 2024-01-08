@@ -34,7 +34,7 @@ const DURATION: f64 = 0.5;
 pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 경과 시간을 갱신합니다.
     // (English Translation) Updates the elapsed time.
-    this.elapsed_time += elapsed_time;
+    this.timer += elapsed_time;
 
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
@@ -42,7 +42,7 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elap
 
     // (한국어) 로고 이미지의 알파 값을 시간에 따라 갱신합니다.
     // (English Translation) Updates the alpha value of the logo image over time.
-    let delta_time = (this.elapsed_time / DURATION).min(1.0) as f32;
+    let delta_time = (this.timer / DURATION).min(1.0) as f32;
     let alpha = 1.0 - 1.0 * delta_time;
     this.logo.update(queue, |data| {
         data.color.w = alpha;
@@ -50,7 +50,7 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elap
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) Changes to the next state if it is greater than the duration.
-    if this.elapsed_time >= DURATION {
+    if this.timer >= DURATION {
         *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(TitleLoading::default()));
         return Ok(());
     }

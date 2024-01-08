@@ -20,10 +20,12 @@
 # 3>> temp/c.txt Optional
 #
 
-#---------#
-# Setting #
-#---------#
+#--------#
+# System #
+#--------#
 user.settings Optional
+textures/sys/logo.dds Static
+textures/sys/dummy.dds Static
 
 #-------#
 # Fonts #
@@ -45,49 +47,95 @@ shaders/text.wgsl Static
 shaders/sprite.wgsl Static
 shaders/tile.wgsl Static
 
-#--------#
-# Sprite #
-#--------#
-textures/background.dds Static
-textures/aris_standing.dds Static
-textures/aris_player.dds Static
-textures/momoi_standing.dds Static
-textures/momoi_player.dds Static
-textures/midori_standing.dds Static
-textures/midori_player.dds Static
-textures/yuzu_standing.dds Static
-textures/yuzu_player.dds Static
+shaders/bullet.wgsl Static 
+
+#-----------#
+# Character #
+#-----------#
+textures/character/aris_standing.dds Static
+textures/character/aris_player.dds Static
+textures/character/momoi_standing.dds Static
+textures/character/momoi_player.dds Static
+textures/character/midori_standing.dds Static
+textures/character/midori_player.dds Static
+textures/character/yuzu_standing.dds Static
+textures/character/yuzu_player.dds Static
 
 #----------------#
 # User Interface #
 #----------------#
-textures/ui/logo.dds Static
+textures/ui/heart.dds Static
+textures/ui/button_etc.dds Static
+textures/ui/button_return.dds Static
 textures/ui/button_medium.dds Static
 textures/ui/button_wide.dds Static
 textures/ui/title_button_start.dds Static
 textures/ui/title_button_setting.dds Static
 textures/ui/title_button_exit.dds Static
-textures/ui/title_button_return.dds Static
 textures/ui/window_ratio_4_3.dds Static
-textures/ui/background.dds Static
 
-textures/temp.dds Static
+#-------------#
+# Backgrounds #
+#-------------#
+textures/bg/title_background.dds Static
+textures/bg/ingame_background.dds Static
 
-sounds/ui/click.ogg Static 
-sounds/ui/cancel.ogg Static 
+#-----#
+# Etc #
+#-----#
+textures/etc/yuzu_bullet.dds Static 
+textures/etc/aris_bullet.dds Static 
+textures/etc/momoi_bullet.dds Static 
+textures/etc/midori_bullet.dds Static 
+
+#-------#
+# Image #
+#-------#
+textures/img/temp.dds Static
 
 #------------------#
 # Character Voices #
 #------------------#
-sounds/aris/aris_title.ogg Static
+sounds/aris/aris_title.ogg Static 
+sounds/aris/aris_stage_enter.ogg Static 
+sounds/aris/aris_stage_start.ogg Static 
+sounds/aris/aris_smile_0.ogg Static 
+sounds/aris/aris_smile_1.ogg Static 
+sounds/aris/aris_damage_0.ogg Static 
+sounds/aris/aris_damage_1.ogg Static 
+sounds/aris/aris_damage_2.ogg Static 
 
 sounds/momoi/momoi_title.ogg Static 
+sounds/momoi/momoi_stage_enter.ogg Static 
+sounds/momoi/momoi_stage_start.ogg Static 
+sounds/momoi/momoi_smile_0.ogg Static 
+sounds/momoi/momoi_smile_1.ogg Static 
+sounds/momoi/momoi_damage_0.ogg Static 
+sounds/momoi/momoi_damage_1.ogg Static 
+sounds/momoi/momoi_damage_2.ogg Static
 
 sounds/midori/midori_title.ogg Static 
+sounds/midori/midori_stage_enter.ogg Static 
+sounds/midori/midori_stage_start.ogg Static 
+sounds/midori/midori_smile_0.ogg Static 
+sounds/midori/midori_smile_1.ogg Static 
+sounds/midori/midori_damage_0.ogg Static 
+sounds/midori/midori_damage_1.ogg Static 
+sounds/midori/midori_damage_2.ogg Static
 
 sounds/yuzu/yuzu_title.ogg Static 
+sounds/yuzu/yuzu_stage_enter.ogg Static 
+sounds/yuzu/yuzu_stage_start.ogg Static 
+sounds/yuzu/yuzu_smile_0.ogg Static 
+sounds/yuzu/yuzu_smile_1.ogg Static 
+sounds/yuzu/yuzu_damage_0.ogg Static 
+sounds/yuzu/yuzu_damage_1.ogg Static 
+sounds/yuzu/yuzu_damage_2.ogg Static
 
-#-----#
-# BGM #
-#-----#
+#--------#
+# Sounds #
+#--------#
+sounds/ui/click.ogg Static 
+sounds/ui/cancel.ogg Static 
+
 sounds/bgm/theme64.ogg Static

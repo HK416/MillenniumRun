@@ -6,17 +6,18 @@ pub use buttons::*;
 pub use sprite::*;
 pub use window::*;
 
-use ab_glyph::Font;
+use std::collections::HashMap;
+
+use ab_glyph::FontArc;
 
 use crate::{
     assets::bundle::AssetBundle, 
     components::{
-        text2d::brush::Text2dBrush,
-        ui::UiBrush,
-        camera::GameCamera,
-        transform::{Transform, Projection},
+        text::TextBrush, 
+        ui::{UiBrush, UiObject, UiObjectBuilder},
         script::Script,
         sprite::SpriteBrush, 
+        anchor::Anchor, 
     },
     nodes::{
         path, 
@@ -42,42 +43,21 @@ pub const STAGE_RIGHT: f32 = 4.0 * PIXEL_PER_METER;
 
 
 
-/// #### 한국어 </br>
-/// 카메라를 초기 상태로 재설정 합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Reset the camera to its initial state. </br>
-/// 
-pub fn reset_camera(camera: &GameCamera, queue: &wgpu::Queue) {
-    camera.update(queue, |data| {
-        data.transform = Transform::new();
-        data.projection = Projection::new_ortho(
-            MENU_TOP, 
-            MENU_LEFT, 
-            MENU_BOTTOM, 
-            MENU_RIGHT, 
-            0.0, 
-            1000.0
-        );
-    });
-}
-
-
-
-pub fn create_title_scene<F: Font>(
-    nexon_lv2_gothic_medium: &F, 
+pub fn create_title_scene(
+    nexon_lv2_gothic_medium: &FontArc, 
     device: &wgpu::Device, 
     queue: &wgpu::Queue, 
     tex_sampler: &wgpu::Sampler, 
     script: &Script, 
     ui_brush: &UiBrush, 
-    text_brush: &Text2dBrush, 
+    text_brush: &TextBrush, 
     sprite_brush: &SpriteBrush, 
+    texture_map: &HashMap<String, wgpu::Texture>, 
     asset_bundle: &AssetBundle
 ) -> AppResult<TitleScene> {
     // (한국어) `dds`이미지 파일로부터 배경 텍스처를 생성합니다.
     // (English Translation) Create a background texture from a `dds`image file. 
-    let texture = asset_bundle.get(path::BACKGROUND_TEXTURE_PATH)?  
+    let texture = asset_bundle.get(path::TITLE_BACKGROUND_TEXTURE_PATH)?  
     .read(&DdsTextureDecoder {
         name: Some("Background"),
         size: wgpu::Extent3d {
@@ -103,7 +83,7 @@ pub fn create_title_scene<F: Font>(
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
-    asset_bundle.release(path::BACKGROUND_TEXTURE_PATH);
+    asset_bundle.release(path::TITLE_BACKGROUND_TEXTURE_PATH);
 
     // (한국어) 배경 스프라이트들을 생성합니다.
     // (English Translation) Create a background sprites. 
@@ -364,7 +344,7 @@ pub fn create_title_scene<F: Font>(
 
     // (한국어) `dds` 이미지 파일로부터 되돌아가기 버튼 텍스처를 생성합니다.
     // (English Translation) Create a return button texture from the `dds` image file. 
-    let texture = asset_bundle.get(path::TITLE_BUTTON_RETURN_TEXTURE_PATH)?
+    let texture = asset_bundle.get(path::BUTTON_RETURN_TEXTURE_PATH)?
         .read(&DdsTextureDecoder {
             name: Some("ReturnButton"),
             size: wgpu::Extent3d {
@@ -389,7 +369,7 @@ pub fn create_title_scene<F: Font>(
 
     // (한국어) 사용을 완료한 에셋을 해제합니다.
     // (English Translation) Release assets that have been used. 
-    asset_bundle.release(path::TITLE_BUTTON_RETURN_TEXTURE_PATH);
+    asset_bundle.release(path::BUTTON_RETURN_TEXTURE_PATH);
 
 
     // (한국어) 시스템 버튼들을 생성합니다.
@@ -548,10 +528,27 @@ pub fn create_title_scene<F: Font>(
         text_brush
     )?;
 
+
+    let texture = texture_map.get(path::DUMMY_TEXTURE_PATH)
+        .expect("A registered texture could not be found.");
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        }
+    );
+    let foreground = create_foreground(
+        device, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush
+    );
+
+
     return Ok(TitleScene {
         light_timer: 0.0, 
         elapsed_time: 0.0, 
         state: TitleState::Enter,
+        foreground, 
         background, 
         sprites,
         menu_buttons, 
@@ -560,4 +557,30 @@ pub fn create_title_scene<F: Font>(
         setting_window, 
         stage_window, 
     })
+}
+
+
+
+/// #### 한국어 </br>
+/// 게임 장면 전환에 사용되는 전경 사용자 인터페이스를 생성합니다.
+/// 
+/// #### English (Translation) </br>
+/// Creates a foreground user interface used for game transitions. </br>
+/// 
+#[inline] 
+fn create_foreground(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush
+) -> UiObject {
+    UiObjectBuilder::new(
+        Some("Foreground"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(1.0, 0.0, 0.0, 1.0))
+    .with_color((1.0, 1.0, 1.0, 1.0).into())
+    .build(device)
 }

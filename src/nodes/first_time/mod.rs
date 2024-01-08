@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::collections::HashMap;
 
-use ab_glyph::Font;
+use ab_glyph::FontArc;
 use glam::{Vec3, Vec4};
 use winit::{event::Event, window::Window};
 
@@ -12,17 +12,16 @@ use crate::{
     game_err,
     assets::bundle::AssetBundle,
     components::{
-        text2d::{
-            font::FontSet,
-            brush::Text2dBrush, 
-            section::{Section2d, Section2dBuilder},
-        },
+        text::{TextBrush, Text, TextBuilder},
         ui::{UiBrush, UiObject, UiObjectBuilder},
-        camera::GameCamera,
-        anchor::Anchor, margin::Margin, script::Script,
+        camera::CameraCreator,
+        transform::Projection, 
+        anchor::Anchor, 
+        margin::Margin, 
+        script::Script,
         user::{Language, Settings, SettingsEncoder}, 
     },
-    nodes::path,
+    nodes::{path, consts::PIXEL_PER_METER},
     render::texture::DdsTextureDecoder, 
     scene::{node::SceneNode, state::SceneState},
     system::{
@@ -73,19 +72,29 @@ impl SceneNode for FirstTimeSetupLoading {
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap().clone();
         let tex_sampler = shared.get::<Arc<wgpu::Sampler>>().unwrap().clone();
         let ui_brush= shared.get::<Arc<UiBrush>>().unwrap().clone();
-        let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap().clone();
+        let text_brush = shared.get::<Arc<TextBrush>>().unwrap().clone();
+        let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap().clone();
         let asset_bundle = shared.get::<AssetBundle>().unwrap().clone();
-        let font_set = shared.get::<FontSet>().unwrap();
-        let nexon_lv2_gothic_medium = font_set.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
-            .expect("A registered font could not be found.")
-            .clone();
+        
+
         self.loading = Some(thread::spawn(move || {
-            // (한국어) 버튼 텍스처를 생성합니다.
-            // (English Translation) Create a button texture.
+            // (한국어) 현재 게임 장면에서 사용할 에셋들을 불러옵니다.
+            // (English Translation) Loads assets to be used in the current game scene. 
+            asset_bundle.get(path::CLICK_SOUND_PATH)?;
+            asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
+
+            // (한국어) 
+            // 버튼 텍스처를 생성합니다.
+            // 다음 게임 장면에서 버튼 텍스처가 사용되므로 해제하지 않습니다.
+            // 
+            // (English Translation) 
+            // Create a button texture.
+            // Don't release the asset because the button texture will be used in the next game scene.
+            // 
             let texture = asset_bundle
                 .get(path::BUTTON_WIDE_TEXTURE_PATH)?
                 .read(&DdsTextureDecoder {
-                    name: Some("General"),
+                    name: Some("WideButton"),
                     size: wgpu::Extent3d {
                         width:1024,
                         height:192,
@@ -109,6 +118,8 @@ impl SceneNode for FirstTimeSetupLoading {
 
             // (한국어)한국어 선택 버튼을 생성합니다.
             // (English Translation) Create a Korean selection button.
+            let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
+                .expect("A registered font could not be found.");
             let mut buttons = HashMap::new();
             buttons.insert(
                 Language::Korean, 
@@ -124,13 +135,33 @@ impl SceneNode for FirstTimeSetupLoading {
             );
 
             Ok(FirstTimeSetupScene {
+                timer: 0.0, 
                 state: state::FirstTimeSetupSceneState::Wait,
-                elapsed_time: 0.0,
                 loading: None,
                 buttons,
                 language: Language::default(),
             })
         }));
+
+
+        // (한국어) 게임 장면에서 사용되는 카메라를 생성합니다.
+        // (English Translation) Creates a camera used in game scene. 
+        let camera_creator = shared.get::<Arc<CameraCreator>>().unwrap().clone();
+        let camera = camera_creator.create(
+            Some("FirstTimeSetup"), 
+            None, 
+            None, 
+            Some(Projection::new_ortho(
+                3.0 * PIXEL_PER_METER, 
+                -4.0 * PIXEL_PER_METER, 
+                -3.0 * PIXEL_PER_METER, 
+                4.0 * PIXEL_PER_METER, 
+                0.0 * PIXEL_PER_METER, 
+                1000.0 * PIXEL_PER_METER
+            )), 
+            None
+        );
+        shared.push(Arc::new(camera));
 
         Ok(())
     }
@@ -142,7 +173,6 @@ impl SceneNode for FirstTimeSetupLoading {
             let result = self.loading.take().unwrap().join().unwrap();
             *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(result?));
         }
-
         Ok(())
     }
 
@@ -152,8 +182,6 @@ impl SceneNode for FirstTimeSetupLoading {
         let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let camera= shared.get::<Arc<GameCamera>>().unwrap();
-
 
         // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
         // (English Translation) Wait until the previous operation is finished.
@@ -177,7 +205,7 @@ impl SceneNode for FirstTimeSetupLoading {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
         {
-            let mut rpass = encoder.begin_render_pass(
+            let mut _rpass = encoder.begin_render_pass(
                 &wgpu::RenderPassDescriptor {
                     label: Some("RenderPass(FirstTimeSetupLoading)"),
                     color_attachments: &[
@@ -195,10 +223,6 @@ impl SceneNode for FirstTimeSetupLoading {
                     occlusion_query_set: None,
                 }
             );
-
-            // (한국어) 카메라를 바인드 합니다.
-            // (English Translation) Bind the camera.
-            camera.bind(&mut rpass);
         }
 
         // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -227,10 +251,10 @@ impl Default for FirstTimeSetupLoading {
 /// 
 #[derive(Debug)]
 pub struct FirstTimeSetupScene { 
+    timer: f64,
     state: state::FirstTimeSetupSceneState,
-    elapsed_time: f64,
     loading: Option<JoinHandle<AppResult<Arc<Script>>>>,
-    buttons: HashMap<Language, (UiObject, Section2d)>,
+    buttons: HashMap<Language, (UiObject, Text)>,
     language: Language,
 }
 
@@ -285,15 +309,15 @@ impl SceneNode for FirstTimeSetupScene {
 /// #### English (Translation) </br>
 /// Create a user interface for the Korean selection button. </br>
 /// 
-fn setup_korean_button<F: Font>(
-    font: &F,
+fn setup_korean_button(
+    font: &FontArc,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     tex_sampler: &wgpu::Sampler,
     texture_view: &wgpu::TextureView,
     ui_brush: &UiBrush,
-    text_brush: &Text2dBrush,
-) -> AppResult<(UiObject, Section2d)> {
+    text_brush: &TextBrush,
+) -> AppResult<(UiObject, Text)> {
     let anchor = Anchor::new(ANCHOR_TOP, ANCHOR_LEFT, ANCHOR_BOTTOM, ANCHOR_RIGHT);
     let margin = Margin::new(BTN_TOP + 0 * BTN_GAP, BTN_LEFT, BTN_BOTTOM + 0 * BTN_GAP, BTN_RIGHT);
     let ui = UiObjectBuilder::new(
@@ -308,7 +332,7 @@ fn setup_korean_button<F: Font>(
     .with_global_scale(INIT_BUTTON_SCALE)
     .with_global_translation(UI_TRANSLATION)
     .build(device);
-    let text = Section2dBuilder::new(
+    let text = TextBuilder::new(
         Some("Text(Korean)"),
         font,
         "한국어",

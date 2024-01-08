@@ -3,8 +3,10 @@ use std::sync::Arc;
 use crate::{
     game_err,
     components::{
-        text2d::brush::Text2dBrush, 
+        text::TextBrush, 
+        ui::UiBrush, 
         camera::GameCamera,
+        interpolation, 
     },
     nodes::intro::{IntroScene, state::IntroState},
     render::depth::DepthBuffer,
@@ -30,19 +32,24 @@ const DURATION: f64 = 0.5;
 /// #### English (Translation) </br>
 /// This is an update function when the `intro` game scene is in the `FadeIn` state. </br>
 /// 
-pub fn update(this: &mut IntroScene, _shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
-    // (한국어) 
-    // 경과한 시간을 갱신하고, 
-    // 지속 시간보다 클 경우 다음 상태로 변경합니다.
-    // 
-    // (English Translation) 
-    // Updates the elapsed time 
-    // and changes to the next state if it is greater than the duration.
-    // 
-    this.elapsed_time += elapsed_time;
-    if this.elapsed_time >= DURATION {
+pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    // (한국어) 경과한 시간을 갱신합니다.
+    // (English Translation) Updates the elapsed time.
+    this.timer += elapsed_time;
+
+    // (한국어) 전경의 알파 값을 갱신합니다.
+    // (English Translation) Updates the alpha value of the foreground.
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let alpha = 1.0 - 1.0 * interpolation::f64::linear(this.timer, DURATION) as f32;
+    this.foreground.update(queue, |data| {
+        data.color.w = alpha;
+    });
+
+    // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
+    // (English Translation) Changes to the next state if it is greater than the duration. 
+    if this.timer >= DURATION {
         this.state = IntroState::DisplayNotify;
-        this.elapsed_time = 0.0;
+        this.timer = 0.0;
         return Ok(());
     }
     Ok(())
@@ -59,7 +66,8 @@ pub fn update(this: &mut IntroScene, _shared: &mut Shared, _total_time: f64, ela
 pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -87,6 +95,7 @@ pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 커맨드 버퍼를 생성합니다.
     // (English Translation) Creates a command buffer.
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
     {
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("RenderPass(IntroScene(FadeIn(Ui)))"),
@@ -94,12 +103,7 @@ pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
                 view: &view, 
                 resolve_target: None, 
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 1.0 * this.elapsed_time / DURATION,
-                        g: 1.0 * this.elapsed_time / DURATION,
-                        b: 1.0 * this.elapsed_time / DURATION,
-                        a: 1.0,
-                    }),
+                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                     store: wgpu::StoreOp::Store,
                 }
             })],
@@ -118,6 +122,34 @@ pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
         camera.bind(&mut rpass);
         text_brush.draw(&mut rpass, this.notifications.iter());
     }
+
+    {
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("RenderPass(IntroScene(FadeIn(Foreground)))"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment { 
+                view: &view, 
+                resolve_target: None, 
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                }
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth.view(),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        camera.bind(&mut rpass);
+        ui_brush.draw(&mut rpass, [&this.foreground].into_iter());
+    }
+
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
     // (English Translation) Submit command buffers to the queue and output to the framebuffer.

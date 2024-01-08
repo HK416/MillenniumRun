@@ -293,10 +293,10 @@ impl Collider2d<AABB> for OBB {
     fn test(&self, other: &AABB) -> bool {
         let rotation = glam::Quat::from_rotation_z(self.radian);
         let a = [
-            (-0.5 * self.width, self.y + 0.5 * self.height),
-            (-0.5 * self.width, self.y - 0.5 * self.height),
-            (0.5 * self.width, self.y - 0.5 * self.height),
-            (0.5 * self.width, self.y + 0.5 * self.height),
+            (-0.5 * self.width, 0.5 * self.height),
+            (-0.5 * self.width, - 0.5 * self.height),
+            (0.5 * self.width, - 0.5 * self.height),
+            (0.5 * self.width, 0.5 * self.height),
         ].map(|p| {
             let v = rotation.mul_vec3((p.0, p.1, 0.0).into());
             (v.x + self.x, v.y + self.y)

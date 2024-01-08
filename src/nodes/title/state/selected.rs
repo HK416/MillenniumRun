@@ -11,9 +11,8 @@ use crate::{
     game_err,
     components::{
         collider2d::Collider2d, 
-        text2d::brush::Text2dBrush, 
+        text::TextBrush, 
         ui::UiBrush, 
-        lights::PointLights,
         camera::GameCamera, 
         sprite::SpriteBrush, 
     },
@@ -61,10 +60,9 @@ pub fn update(_this: &mut TitleScene, _shared: &mut Shared, _total_time: f64, _e
 pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let point_lights = shared.get::<Arc<PointLights>>().unwrap();
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -119,7 +117,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 배경 오브젝트들 그리기.
         // (English Translation) Drawing background objects.
-        sprite_brush.draw(point_lights, &mut rpass, [this.background.as_ref()].into_iter());
+        sprite_brush.draw(&mut rpass, [&this.background].into_iter());
     }
 
     {
@@ -149,7 +147,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 배경 오브젝트들 그리기.
         // (English Translation) Drawing background objects.
-        sprite_brush.draw(point_lights, &mut rpass, this.sprites.iter().map(|(it, _)| it.as_ref()));
+        sprite_brush.draw(&mut rpass, this.sprites.iter().map(|(it, _)| it));
     }
 
     {
@@ -182,14 +180,14 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         ui_brush.draw(
             &mut rpass, 
             this.system_buttons.iter()
-            .map(|(it, _)| it.as_ref())
+            .map(|(it, _)| it)
         );
         text_brush.draw(
             &mut rpass, 
             this.system_buttons.iter()
             .map(|(_, it)| it)
             .flatten()
-            .map(|it| it.as_ref())
+            .map(|it| it)
         );
     }
 
@@ -223,14 +221,14 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         ui_brush.draw(
             &mut rpass, 
             this.stage_window.iter()
-            .map(|(it, _)| it.as_ref())
+            .map(|(it, _)| it)
         );
         text_brush.draw(
             &mut rpass, 
             this.stage_window.iter()
             .map(|(_, it)| it)
             .flatten()
-            .map(|it| it.as_ref())
+            .map(|it| it)
         );
     }
 

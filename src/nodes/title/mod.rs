@@ -3,7 +3,9 @@ mod utils;
 
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+use std::collections::HashMap;
 
+use ab_glyph::FontArc;
 use winit::event::Event;
 use rodio::{OutputStreamHandle, Source, Sink};
 
@@ -13,10 +15,10 @@ use crate::{
     components::{
         collider2d::shape::AABB,
         sprite::{Sprite, SpriteBrush},
-        text2d::{font::FontSet, brush::Text2dBrush, section::Section2d},
+        text::{TextBrush, Text},
         ui::{UiBrush, UiObject},
-        camera::GameCamera,
-        lights::{PointLight, PointLights}, 
+        camera::CameraCreator,
+        transform::Projection, 
         sound::SoundDecoder,
         script::Script,
         user::Settings,
@@ -48,20 +50,38 @@ impl SceneNode for TitleLoading {
 
         // (한국어) 사용할 공유 객체를 가져옵니다.
         // (English Translation) Get shared object to use.
-        let font_set = shared.get::<FontSet>().unwrap();
-        let nexon_lv2_gothic_medium = font_set.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
-            .expect("A registered font could not be found.")
-            .clone();
-        
+        let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap().clone();
         let script = shared.get::<Arc<Script>>().unwrap().clone();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap().clone();
         let tex_sampler = shared.get::<Arc<wgpu::Sampler>>().unwrap().clone();
         let ui_brush = shared.get::<Arc<UiBrush>>().unwrap().clone();
-        let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap().clone();
+        let text_brush = shared.get::<Arc<TextBrush>>().unwrap().clone();
         let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap().clone();
+        let texture_map = shared.get::<Arc<HashMap<String, wgpu::Texture>>>().unwrap().clone();
         let asset_bundle = shared.get::<AssetBundle>().unwrap().clone();
+
         self.loading = Some(thread::spawn(move || {
+            // (한국어) 현재 장면에서 사용할 에셋들을 불러옵니다. 
+            // (English Translation) Loads assets to be used in the current game scene. 
+            asset_bundle.get(path::CLICK_SOUND_PATH)?;
+            asset_bundle.get(path::CANCEL_SOUND_PATH)?;
+            asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
+            asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?;
+            asset_bundle.get(path::BUTTON_RETURN_TEXTURE_PATH)?;
+            asset_bundle.get(path::TITLE_BUTTON_START_TEXTURE_PATH)?;
+            asset_bundle.get(path::TITLE_BUTTON_SETTING_TEXTURE_PATH)?;
+            asset_bundle.get(path::TITLE_BUTTON_EXIT_TEXTURE_PATH)?;
+            asset_bundle.get(path::TITLE_BACKGROUND_TEXTURE_PATH)?;
+            asset_bundle.get(path::WINDOW_RATIO_4_3_TEXTURE_PATH)?;
+            asset_bundle.get(path::ARIS_STANDING_TEXTURE_PATH)?;
+            asset_bundle.get(path::MOMOI_STANDING_TEXTURE_PATH)?;
+            asset_bundle.get(path::MIDORI_STANDING_TEXTURE_PATH)?;
+            asset_bundle.get(path::YUZU_STANDING_TEXTURE_PATH)?;
+        
+            let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
+            .expect("A registered font could not be found.");
+
             utils::create_title_scene(
                 &nexon_lv2_gothic_medium, 
                 &device, 
@@ -71,31 +91,29 @@ impl SceneNode for TitleLoading {
                 &ui_brush, 
                 &text_brush, 
                 &sprite_brush, 
+                &texture_map, 
                 &asset_bundle
             )
         }));
         
-        // (한국어) 사용할 공유 객체 가져오기.
-        // (English Translation) Get shared object to use.
-        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let camera = shared.get::<Arc<GameCamera>>().unwrap();
-        let lights = shared.get::<Arc<PointLights>>().unwrap();
-        
-        
-        // (한국어) 카메라를 설정 합니다.
-        // (English Translation) Set up the camera.
-        utils::reset_camera(camera, queue);
-
-        // (한국어) 조명을 설정합니다.
-        // (English Translation) Set up the light.
-        lights.update(queue, |data| {
-            data.num_points = 1;
-            data.point_lights[0] = PointLight {
-                position: (0.0, -5.0 * PIXEL_PER_METER, 0.0).into(),
-                color: (56.0 / 255.0, 65.0 / 255.0, 157.0 / 255.0).into(),
-                ..Default::default()
-            };
-        });
+        // (한국어) 현재 게임 장면에서 사용할 카메라를 생성합니다.
+        // (English Translation) Creates a camera to use in the current game scene. 
+        let camera_creator = shared.get::<Arc<CameraCreator>>().unwrap().clone();
+        let camera = camera_creator.create(
+            Some("Title"), 
+            None, 
+            None, 
+            Some(Projection::new_ortho(
+                utils::MENU_TOP, 
+                utils::MENU_LEFT, 
+                utils::MENU_BOTTOM, 
+                utils::MENU_RIGHT, 
+                0.0 * PIXEL_PER_METER, 
+                1000.0 * PIXEL_PER_METER
+            )), 
+            None
+        );
+        shared.push(Arc::new(camera));
 
         Ok(())
     }
@@ -114,7 +132,6 @@ impl SceneNode for TitleLoading {
         let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let camera= shared.get::<Arc<GameCamera>>().unwrap();
 
         // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
         // (English Translation) Wait until the previous operation is finished.
@@ -138,7 +155,7 @@ impl SceneNode for TitleLoading {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
         {
-            let mut rpass = encoder.begin_render_pass(
+            let mut _rpass = encoder.begin_render_pass(
                 &wgpu::RenderPassDescriptor {
                     label: Some("RenderPass(TitleLoading)"),
                     color_attachments: &[
@@ -156,10 +173,6 @@ impl SceneNode for TitleLoading {
                     occlusion_query_set: None,
                 }
             );
-
-            // (한국어) 카메라를 바인드 합니다.
-            // (English Translation) Bind the camera.
-            camera.bind(&mut rpass);
         }
 
         // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -191,13 +204,14 @@ pub struct TitleScene {
     pub light_timer: f64,
     pub elapsed_time: f64,
     pub state: state::TitleState,
-    pub background: Arc<Sprite>,
-    pub sprites: Vec<(Arc<Sprite>, AABB)>,
-    pub menu_buttons: Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>,
-    pub system_buttons: Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>,
-    pub exit_msg_box: Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>,
-    pub setting_window: Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>,
-    pub stage_window: Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>,
+    pub foreground: UiObject, 
+    pub background: Sprite,
+    pub sprites: Vec<(Sprite, AABB)>,
+    pub menu_buttons: Vec<(UiObject, Vec<Text>)>,
+    pub system_buttons: Vec<(UiObject, Vec<Text>)>,
+    pub exit_msg_box: Vec<(UiObject, Vec<Text>)>,
+    pub setting_window: Vec<(UiObject, Vec<Text>)>,
+    pub stage_window: Vec<(UiObject, Vec<Text>)>,
 }
 
 impl SceneNode for TitleScene {
@@ -232,15 +246,6 @@ impl SceneNode for TitleScene {
         // (한국어) 배경 음악을 제거합니다.
         // (English Translation) Detach background music.
         shared.pop::<Sink>().unwrap().detach();
-
-        // (한국어) 조명을 제거합니다.
-        // (English Translation) Detach the light.
-        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let lights = shared.get::<Arc<PointLights>>().unwrap();
-        lights.update(queue, |data| {
-            data.num_points = 0;
-        });
-
         Ok(())
     }
 
@@ -251,7 +256,6 @@ impl SceneNode for TitleScene {
 
     #[inline]
     fn update(&mut self, shared: &mut Shared, total_time: f64, elapsed_time: f64) -> AppResult<()> {
-        update_light(self, shared, total_time, elapsed_time)?;
         state::UPDATES[self.state as usize](self, shared, total_time, elapsed_time)
     }
 
@@ -259,27 +263,4 @@ impl SceneNode for TitleScene {
     fn draw(&self, shared: &mut Shared) -> AppResult<()> {
         state::DRAWS[self.state as usize](self, shared)
     }
-}
-
-
-fn update_light(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
-    use std::f32::consts::PI;
-    const PERIOD: f64 = 1.3;
-    
-    // (한국어) 타이머를 갱신합니다.
-    // (English Translation) Updates the timer.
-    this.light_timer = (this.light_timer + elapsed_time) % PERIOD;
-    let delta = (this.light_timer / (0.5 * PERIOD)) as f32 * PI;
-    
-    // (한국어) 조명을 갱신합니다.
-    // (English Translation) Updates the light.
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    let lights = shared.get::<Arc<PointLights>>().unwrap();
-    lights.update(queue, |data| {
-        data.point_lights[0].constant = 0.001 + 0.0005 * delta.sin();
-        data.point_lights[0].linear = 0.0007 + 0.0001 * delta.sin();
-        data.point_lights[0].quadratic = 0.000001 + 0.00005 * delta.sin();
-    });
-    
-    Ok(())
 }

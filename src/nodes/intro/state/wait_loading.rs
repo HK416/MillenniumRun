@@ -30,7 +30,7 @@ pub fn update(this: &mut IntroScene, _shared: &mut Shared, _total_time: f64, _el
     if this.loading.as_ref().unwrap().is_finished() {
         this.loading.take().unwrap().join().unwrap()?;
         this.state = IntroState::FadeOut;
-        this.elapsed_time = 0.0;
+        this.timer = 0.0;
         return Ok(());
     }
 

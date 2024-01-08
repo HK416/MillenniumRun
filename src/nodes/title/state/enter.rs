@@ -5,11 +5,11 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        text2d::brush::Text2dBrush,
+        text::TextBrush,
         ui::UiBrush,
-        lights::PointLights,
         sprite::SpriteBrush,
         camera::GameCamera,
+        interpolation, 
     },
     nodes::title::{
         TitleScene, 
@@ -44,29 +44,13 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     // (English Translation) Updates the elapsed time.
     this.elapsed_time += elapsed_time;
 
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use.
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-
     // (한국어) 스프라이트 객체의 알파 값을 시간에 따라 갱신합니다.
     // (English Translation) Updates the alpha value of the sprite object over time.
-    let delta_time = (this.elapsed_time / DURATION).min(1.0) as f32;
-    let alpha = 1.0 * delta_time;
-    this.background.update(queue, |instances| {
-        for data in instances.iter_mut() {
-            data.color.w= alpha;
-        }
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let alpha = 1.0 - 1.0 * interpolation::f64::linear(this.elapsed_time, DURATION) as f32;
+    this.foreground.update(queue, |data| {
+        data.color.w = alpha;
     });
-    for (ui, sections) in this.menu_buttons.iter() {
-        ui.update(queue, |data| {
-            data.color.w = alpha;
-        });
-        for section in sections {
-            section.update(queue, |data| {
-                data.color.w = alpha;
-            });
-        }
-    }
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) changes to the next state if it is greater than the duration.
@@ -82,9 +66,8 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
 pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let point_light = shared.get::<Arc<PointLights>>().unwrap();
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -120,7 +103,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
                 view: &view, 
                 resolve_target: None, 
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                     store: wgpu::StoreOp::Store,
                 }
             })],
@@ -140,7 +123,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 배경 오브젝트 그리기.
         // (English Translation) Drawing background objects.
-        sprite_brush.draw(&point_light, &mut rpass, [this.background.as_ref()].into_iter());
+        sprite_brush.draw(&mut rpass, [&this.background].into_iter());
     }
 
     {
@@ -173,15 +156,42 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         ui_brush.draw(
             &mut rpass, 
             this.menu_buttons.iter()
-            .map(|(ui, _)| ui.as_ref())
+            .map(|(ui, _)| ui)
         );
         text_brush.draw(
             &mut rpass, 
             this.menu_buttons.iter()
             .map(|(_, it)| it)
             .flatten()
-            .map(|it| it.as_ref())
+            .map(|it| it)
         );
+    }
+
+    {
+        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("RenderPass(TitleScene(EntryState(Foreground)))"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                }
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth.view(),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        camera.bind(&mut rpass);
+        ui_brush.draw(&mut rpass, [&this.foreground].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

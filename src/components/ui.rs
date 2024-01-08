@@ -2,7 +2,7 @@ use std::mem::size_of;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use winit::dpi::PhysicalPosition; 
-use glam::{Mat4, Mat3, Vec4, Vec3, Quat};
+use glam::{Mat4, Vec4, Vec3, Quat};
 use bytemuck::{Pod, Zeroable, offset_of};
 
 use crate::{

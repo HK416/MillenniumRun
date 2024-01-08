@@ -5,10 +5,9 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        text2d::{brush::Text2dBrush, section::Section2d},
+        text::{TextBrush, Text}, 
         ui::{UiBrush, UiObject},
         camera::GameCamera, 
-        lights::PointLights,
         transform::Projection,
         sprite::SpriteBrush,
     },
@@ -77,9 +76,8 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
 pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let point_lights = shared.get::<Arc<PointLights>>().unwrap();
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<Text2dBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -135,7 +133,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 배경 오브젝트들 그리기.
         // (English Translation) Drawing background objects.
-        sprite_brush.draw(point_lights, &mut rpass, [this.background.as_ref()].into_iter());
+        sprite_brush.draw(&mut rpass, [&this.background].into_iter());
     }
 
     {
@@ -165,7 +163,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 스프라이트 오브젝트들 그리기.
         // (English Translation) Drawing sprite objects.
-        sprite_brush.draw(point_lights, &mut rpass, this.sprites.iter().map(|(it, _)| it.as_ref()));
+        sprite_brush.draw(&mut rpass, this.sprites.iter().map(|(it, _)| it));
     }
 
     {
@@ -198,14 +196,14 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         ui_brush.draw(
             &mut rpass, 
             this.menu_buttons.iter()
-            .map(|(ui, _)| ui.as_ref())
+            .map(|(ui, _)| ui)
         );
         text_brush.draw(
             &mut rpass, 
             this.menu_buttons.iter()
             .map(|(_, it)| it)
             .flatten()
-            .map(|it| it.as_ref())
+            .map(|it| it)
         );
 
         // (한국어) 시스템 버튼 그리기.
@@ -213,14 +211,14 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         ui_brush.draw(
             &mut rpass, 
             this.system_buttons.iter()
-            .map(|(ui, _)| ui.as_ref())
+            .map(|(ui, _)| ui)
         );
         text_brush.draw(
             &mut rpass, 
             this.system_buttons.iter()
             .map(|(_, it)| it)
             .flatten()
-            .map(|it| it.as_ref())
+            .map(|it| it)
         );
     }
 
@@ -266,7 +264,7 @@ fn update_camera(camera: &GameCamera, queue: &wgpu::Queue, delta: f32) {
 /// Updates the alpha value of the user interface object. </br>
 /// 
 fn update_button_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
-where Iter: Iterator<Item = &'a mut (Arc<UiObject>, Vec<Arc<Section2d>>)> {
+where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
     for (ui, sections) in iter {
         ui.update(queue, |data| {
             data.color.w = alpha;

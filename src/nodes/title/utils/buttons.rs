@@ -1,14 +1,9 @@
-use std::sync::Arc;
-
-use ab_glyph::Font;
+use ab_glyph::FontArc;
 use glam::{Vec4, Vec3};
 
 use crate::{
     components::{
-        text2d::{
-            brush::Text2dBrush, 
-            section::{Section2d, Section2dBuilder},
-        },
+        text::{TextBrush, Text, TextBuilder},
         ui::{UiBrush, UiObject, UiObjectBuilder},
         anchor::Anchor, 
         margin::Margin,
@@ -65,16 +60,16 @@ pub(super) struct MenuButtonTextureViews<'a> {
 /// #### English (Translation) </br>
 /// Create a menu buttons. </br>
 /// 
-pub(super) fn create_menu_buttons<'a, F: Font>(
-    font: &'a F, 
+pub(super) fn create_menu_buttons<'a>(
+    font: &'a FontArc, 
     device: &'a wgpu::Device, 
     queue: &'a wgpu::Queue, 
     tex_sampler: &'a wgpu::Sampler, 
     texture_views: MenuButtonTextureViews<'a>, 
     script: &'a Script, 
     ui_brush: &'a UiBrush, 
-    text_brush: &'a Text2dBrush
-) -> AppResult<Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>> {
+    text_brush: &'a TextBrush
+) -> AppResult<Vec<(UiObject, Vec<Text>)>> {
     const ANCHOR_TOP: f32 = 0.4;
     const ANCHOR_LEFT: f32 = 0.5;
     const ANCHOR_BOTTOM: f32 = 0.4;
@@ -85,18 +80,17 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
     const GAP: i32 = HEIGHT + HEIGHT / 4;
 
     const UI_TRANSLATION: Vec3 = Vec3::new(0.0, 0.0, 0.5);
-    const UI_COLOR: Vec4 = Vec4::new(1.0, 1.0, 1.0, 0.0);
+    const UI_COLOR: Vec4 = Vec4::new(1.0, 1.0, 1.0, 1.0);
     
     const TEXT_TRANSLATION: Vec3 = Vec3::new(0.0, 0.0, 0.25);
-    const TEXT_COLOR: Vec4 = Vec4::new(0.0, 0.0, 0.0, 0.0);
+    const TEXT_COLOR: Vec4 = Vec4::new(0.0, 0.0, 0.0, 1.0);
 
     
     // (한국어) `시작` 버튼을 생성합니다.
     // (English Translation) Create a `start` button.
     let anchor = Anchor::new(ANCHOR_TOP, ANCHOR_LEFT, ANCHOR_BOTTOM, ANCHOR_RIGHT);
     let margin = Margin::new(1 * GAP + HEIGHT / 2, -WIDTH / 2, 1 * GAP - HEIGHT / 2, WIDTH / 2);
-    let start_button = (
-        Arc::new(UiObjectBuilder::new(
+    let start_button = (UiObjectBuilder::new(
             Some("StartButton"),
             tex_sampler,
             texture_views.start_btn_texture_view, 
@@ -106,9 +100,9 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
         .with_margin(margin)
         .with_color(UI_COLOR)
         .with_global_translation(UI_TRANSLATION)
-        .build(device)),
+        .build(device),
         vec![
-            Arc::new(Section2dBuilder::new(
+            TextBuilder::new(
                 Some("StartButton"),
                 font,
                 script.get(ScriptTags::StartMenuButton)?, 
@@ -118,7 +112,7 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
             .with_margin(margin)
             .with_color(TEXT_COLOR)
             .with_translation(TEXT_TRANSLATION)
-            .build(device, queue)),
+            .build(device, queue),
         ]
     );
 
@@ -128,7 +122,7 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
     let anchor = Anchor::new(ANCHOR_TOP, ANCHOR_LEFT, ANCHOR_BOTTOM, ANCHOR_RIGHT);
     let margin = Margin::new(0 * GAP + HEIGHT / 2, -WIDTH / 2, 0 * GAP - HEIGHT / 2, WIDTH / 2);
     let setting_button = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("SettingButton"),
             tex_sampler,
             texture_views.setting_btn_texture_view, 
@@ -138,9 +132,9 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
         .with_margin(margin)
         .with_color(UI_COLOR)
         .with_global_translation(UI_TRANSLATION)
-        .build(device)),
+        .build(device),
         vec![
-            Arc::new(Section2dBuilder::new(
+            TextBuilder::new(
                 Some("SettingButton"),
                 font,
                 script.get(ScriptTags::SettingMenuButton)?, 
@@ -150,7 +144,7 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
             .with_margin(margin)
             .with_color(TEXT_COLOR)
             .with_translation(TEXT_TRANSLATION)
-            .build(device, queue)),
+            .build(device, queue),
         ]
     );
 
@@ -160,7 +154,7 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
     let anchor = Anchor::new(ANCHOR_TOP, ANCHOR_LEFT, ANCHOR_BOTTOM, ANCHOR_RIGHT);
     let margin = Margin::new(-1 * GAP + HEIGHT / 2, -WIDTH / 2, -1 * GAP - HEIGHT / 2, WIDTH / 2);
     let exit_button = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("ExitButton"),
             tex_sampler,
             texture_views.exit_btn_texture_view, 
@@ -170,9 +164,9 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
         .with_margin(margin)
         .with_color(UI_COLOR)
         .with_global_translation(UI_TRANSLATION)
-        .build(device)),
+        .build(device),
         vec![
-            Arc::new(Section2dBuilder::new(
+            TextBuilder::new(
                 Some("ExitButton"),
                 font,
                 script.get(ScriptTags::ExitMenuButton)?, 
@@ -182,7 +176,7 @@ pub(super) fn create_menu_buttons<'a, F: Font>(
             .with_margin(margin)
             .with_color(TEXT_COLOR)
             .with_translation(TEXT_TRANSLATION)
-            .build(device, queue)),
+            .build(device, queue),
         ]
     );
     
@@ -234,16 +228,16 @@ pub(super) struct SystemButtonTextureViews<'a> {
 /// Create system buttons. </br>
 /// 
 #[allow(unused_variables)]
-pub(super) fn create_system_buttons<'a, F: Font>(
-    font: &'a F, 
+pub(super) fn create_system_buttons<'a>(
+    font: &'a FontArc, 
     device: &'a wgpu::Device, 
     queue: &'a wgpu::Queue, 
     tex_sampler: &'a wgpu::Sampler, 
     texture_views: SystemButtonTextureViews<'a>, 
     script: &'a Script, 
     ui_brush: &'a UiBrush, 
-    text_brush: &'a Text2dBrush
-) -> AppResult<Vec<(Arc<UiObject>, Vec<Arc<Section2d>>)>> {
+    text_brush: &'a TextBrush
+) -> AppResult<Vec<(UiObject, Vec<Text>)>> {
     
     // (한국어) `되돌아가기` 버튼을 생성합니다.
     // (English Translation) Create a `Return` button.
@@ -252,7 +246,7 @@ pub(super) fn create_system_buttons<'a, F: Font>(
     let color = Vec4::new(1.0, 1.0, 1.0, 0.0);
     let translation = Vec3::new(0.0, 0.0, 0.5);
     let return_button = (
-        Arc::new(UiObjectBuilder::new(
+        UiObjectBuilder::new(
             Some("ReturnButton"),
             tex_sampler,
             texture_views.return_btn_texture_view, 
@@ -262,7 +256,7 @@ pub(super) fn create_system_buttons<'a, F: Font>(
         .with_margin(margin)
         .with_color(color)
         .with_global_translation(translation)
-        .build(device)),
+        .build(device),
         vec![],
     );
 
