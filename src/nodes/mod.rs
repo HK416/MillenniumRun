@@ -68,6 +68,11 @@ pub mod path {
     pub const CLICK_SOUND_PATH: &'static str = "sounds/ui/click.ogg";
     pub const CANCEL_SOUND_PATH: &'static str = "sounds/ui/cancel.ogg";
 
+    pub const ARIS_FIRE_SOUND_PATH: &'static str = "sounds/effect/aris_fire_sound.ogg";
+    pub const MOMOI_FIRE_SOUND_PATH: &'static str = "sounds/effect/momoi_fire_sound.ogg";
+    pub const MIDORI_FIRE_SOUND_PATH: &'static str = "sounds/effect/midori_fire_sound.ogg";
+    pub const YUZU_FIRE_SOUND_PATH: &'static str = "sounds/effect/yuzu_fire_sound.ogg";
+
     pub const THEME64_SOUND_PATH: &'static str = "sounds/bgm/theme64.ogg";
 
     pub const ARIS_TITLE_SOUND_PATH: &'static str = "sounds/aris/aris_title.ogg";

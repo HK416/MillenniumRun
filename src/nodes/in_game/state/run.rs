@@ -1,8 +1,9 @@
+use std::thread;
 use std::sync::Arc;
 use std::collections::VecDeque;
 
-use glam::Vec4Swizzles;
 use rand::prelude::*;
+use rodio::OutputStreamHandle;
 use winit::{
     event::{Event, WindowEvent, MouseButton},
     keyboard::PhysicalKey,
@@ -85,7 +86,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
 
     // (한국어) 프레임 버퍼의 텍스처 뷰를 생성합니다.
     // (English Translation) Creates a texture view of the framebuffer.
-    let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let view = frame.texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
     // (한국어) 커맨드 버퍼를 생성합니다.
     // (English Translation) Creates a command buffer.
@@ -555,6 +556,8 @@ fn update_percent_text(this: &mut InGameScene, shared: &mut Shared, _total_time:
 
 
 fn update_bullets(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    use crate::components::sound;
+    
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared objects to use. 
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -563,8 +566,17 @@ fn update_bullets(this: &mut InGameScene, shared: &mut Shared, _total_time: f64,
 
     let cursor_pos_world = camera.to_world_coordinates(cursor_pos).into();
     
-    if this.mouse_pressed {
-        this.player.fire();
+    if this.mouse_pressed && this.player.try_fire() {
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let settings = shared.get::<Settings>().unwrap();
+        let stream = shared.get::<OutputStreamHandle>().unwrap();
+        let source = asset_bundle.get(this.player_fire_sound)?
+            .read(&sound::SoundDecoder)?;
+        let sink = sound::play_sound(settings.effect_volume, source, stream)?;
+        thread::spawn(move || {
+            sink.sleep_until_end();
+            sink.detach();
+        });
     }
 
     player::update_player_bullet(

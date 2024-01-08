@@ -1,6 +1,6 @@
 use std::collections::{VecDeque, HashMap};
 
-use glam::{Vec4, Vec2, Vec3};
+use glam::{Vec2, Vec3};
 use lazy_static::lazy_static;
 
 use crate::{
@@ -53,8 +53,8 @@ lazy_static! {
     static ref COOL_TIME: HashMap<Actor, f64> = HashMap::from_iter([
         (Actor::Aris, 2.25), 
         (Actor::Momoi, 1.0), 
-        (Actor::Midori, 0.5), 
-        (Actor::Yuzu, 1.0), 
+        (Actor::Midori, 0.7), 
+        (Actor::Yuzu, 1.75), 
     ]);
 
     /// #### 한국어 </br>
@@ -108,10 +108,10 @@ lazy_static! {
 /// 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Actor {
-    #[default]
     Aris = 0,
     Momoi = 1,
     Midori = 2,
+    #[default]
     Yuzu = 3,
 }
 
@@ -233,17 +233,19 @@ impl Player {
     }
 
     /// #### 한국어 </br>
-    /// 총알을 발사합니다. </br>
+    /// 총알을 발사합니다. 발사에 성공할 경우 `true`를 반환합니다. </br>
     /// 
     /// #### English (Translation) </br>
-    /// Fires a bullet. </br>
+    /// Fires a bullet. Returns `true` if the fire is successful. </br>
     /// 
-    pub fn fire(&mut self) {
+    pub fn try_fire(&mut self) -> bool {
         if self.shot_cool_time >= COOL_TIME[&self.actor] {
             self.shot_count = 0;
             self.shot_time = 0.0;
             self.shot_cool_time = 0.0;
+            return true;
         }
+        return false;
     }
 }
 

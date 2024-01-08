@@ -83,7 +83,7 @@ impl SceneNode for InGameLoading {
 
         // (한국어) 프레임 버퍼의 텍스처 뷰를 생성합니다.
         // (English Translation) Creates a texture view of the framebuffer.
-        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
         // (한국어) 커맨드 버퍼를 생성합니다.
         // (English Translation) Creates a command buffer.
@@ -317,6 +317,7 @@ pub struct InGameScene {
     pub player_startup_sound: &'static str, 
     pub player_smile_sounds: Vec<&'static str>, 
     pub player_damage_sounds: Vec<&'static str>,
+    pub player_fire_sound: &'static str, 
 }
 
 impl SceneNode for InGameScene {

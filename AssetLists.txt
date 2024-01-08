@@ -138,4 +138,9 @@ sounds/yuzu/yuzu_damage_2.ogg Static
 sounds/ui/click.ogg Static 
 sounds/ui/cancel.ogg Static 
 
+sounds/effect/aris_fire_sound.ogg Static 
+sounds/effect/momoi_fire_sound.ogg Static 
+sounds/effect/midori_fire_sound.ogg Static 
+sounds/effect/yuzu_fire_sound.ogg Static 
+
 sounds/bgm/theme64.ogg Static

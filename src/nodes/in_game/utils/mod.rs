@@ -300,56 +300,6 @@ pub fn create_game_scene(
         ui_brush
     );
 
-    let player_startup_sound = match actor {
-        Actor::Aris => path::ARIS_STAGE_START_SOUND_PATH,
-        Actor::Momoi => path::MOMOI_STAGE_START_SOUND_PATH, 
-        Actor::Midori => path::MIDORI_STAGE_START_SOUND_PATH, 
-        Actor::Yuzu => path::YUZU_STAGE_START_SOUND_PATH, 
-    };
-
-    let player_smile_sounds = match actor {
-        Actor::Aris => vec![
-            path::ARIS_SMILE_0_SOUND_PATH, 
-            path::ARIS_SMILE_1_SOUND_PATH
-        ],
-        Actor::Momoi => vec![
-            path::MOMOI_SMILE_0_SOUND_PATH, 
-            path::MOMOI_SMILE_1_SOUND_PATH, 
-        ], 
-        Actor::Midori => vec![
-            path::MIDORI_SMILE_0_SOUND_PATH, 
-            path::MIDORI_SMILE_1_SOUND_PATH, 
-        ], 
-        Actor::Yuzu => vec![
-            path::YUZU_SMILE_0_SOUND_PATH, 
-            path::YUZU_SMILE_1_SOUND_PATH, 
-        ], 
-    };
-
-    let player_damage_sounds = match actor {
-        Actor::Aris => vec![
-            path::ARIS_DAMAGE_0_SOUND_PATH, 
-            path::ARIS_DAMAGE_1_SOUND_PATH, 
-            path::ARIS_DAMAGE_2_SOUND_PATH
-        ], 
-        Actor::Momoi => vec![
-            path::MOMOI_DAMAGE_0_SOUND_PATH, 
-            path::MOMOI_DAMAGE_1_SOUND_PATH, 
-            path::MOMOI_DAMAGE_2_SOUND_PATH, 
-        ], 
-        Actor::Midori => vec![
-            path::MIDORI_DAMAGE_0_SOUND_PATH, 
-            path::MIDORI_DAMAGE_1_SOUND_PATH, 
-            path::MIDORI_DAMAGE_2_SOUND_PATH, 
-        ], 
-        Actor::Yuzu => vec![
-            path::YUZU_DAMAGE_0_SOUND_PATH, 
-            path::YUZU_DAMAGE_1_SOUND_PATH, 
-            path::YUZU_DAMAGE_2_SOUND_PATH, 
-        ],
-    };
-
-
 
     // (한국어) 이미지 파일을 불러오고, 텍스처를 생성합니다. 
     // (English Translation) Load an image file and create a texture. 
@@ -476,6 +426,63 @@ pub fn create_game_scene(
         text_brush
     );
 
+    // (한국어) `InGame` 게임 장면에서 사용되는 음향 에셋들을 로드합니다.
+    // (English Translation) Load sound assets used in `InGame` game scene. 
+    let player_startup_sound = match actor {
+        Actor::Aris => path::ARIS_STAGE_START_SOUND_PATH,
+        Actor::Momoi => path::MOMOI_STAGE_START_SOUND_PATH, 
+        Actor::Midori => path::MIDORI_STAGE_START_SOUND_PATH, 
+        Actor::Yuzu => path::YUZU_STAGE_START_SOUND_PATH, 
+    };
+
+    let player_smile_sounds = match actor {
+        Actor::Aris => vec![
+            path::ARIS_SMILE_0_SOUND_PATH, 
+            path::ARIS_SMILE_1_SOUND_PATH
+        ],
+        Actor::Momoi => vec![
+            path::MOMOI_SMILE_0_SOUND_PATH, 
+            path::MOMOI_SMILE_1_SOUND_PATH, 
+        ], 
+        Actor::Midori => vec![
+            path::MIDORI_SMILE_0_SOUND_PATH, 
+            path::MIDORI_SMILE_1_SOUND_PATH, 
+        ], 
+        Actor::Yuzu => vec![
+            path::YUZU_SMILE_0_SOUND_PATH, 
+            path::YUZU_SMILE_1_SOUND_PATH, 
+        ], 
+    };
+
+    let player_damage_sounds = match actor {
+        Actor::Aris => vec![
+            path::ARIS_DAMAGE_0_SOUND_PATH, 
+            path::ARIS_DAMAGE_1_SOUND_PATH, 
+            path::ARIS_DAMAGE_2_SOUND_PATH
+        ], 
+        Actor::Momoi => vec![
+            path::MOMOI_DAMAGE_0_SOUND_PATH, 
+            path::MOMOI_DAMAGE_1_SOUND_PATH, 
+            path::MOMOI_DAMAGE_2_SOUND_PATH, 
+        ], 
+        Actor::Midori => vec![
+            path::MIDORI_DAMAGE_0_SOUND_PATH, 
+            path::MIDORI_DAMAGE_1_SOUND_PATH, 
+            path::MIDORI_DAMAGE_2_SOUND_PATH, 
+        ], 
+        Actor::Yuzu => vec![
+            path::YUZU_DAMAGE_0_SOUND_PATH, 
+            path::YUZU_DAMAGE_1_SOUND_PATH, 
+            path::YUZU_DAMAGE_2_SOUND_PATH, 
+        ],
+    };
+
+    let player_fire_sound = match actor {
+        Actor::Aris => path::ARIS_FIRE_SOUND_PATH, 
+        Actor::Momoi => path::MOMOI_FIRE_SOUND_PATH, 
+        Actor::Midori => path::MIDORI_FIRE_SOUND_PATH, 
+        Actor::Yuzu => path::YUZU_FIRE_SOUND_PATH, 
+    };
 
 
     // (한국어) 현재 게임 장면에서 사용되는 에셋들을 로드합니다.
@@ -487,6 +494,7 @@ pub fn create_game_scene(
     for rel_path in player_damage_sounds.iter() {
         asset_bundle.get(rel_path)?;
     }
+    asset_bundle.get(player_fire_sound);
 
 
 
@@ -516,6 +524,7 @@ pub fn create_game_scene(
         player_startup_sound, 
         player_smile_sounds, 
         player_damage_sounds, 
+        player_fire_sound, 
     })
 }
 
