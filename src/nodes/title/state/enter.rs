@@ -91,7 +91,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
     // (한국어) 프레임 버퍼의 텍스쳐 뷰를 생성합니다.
     // (English Translation) Creates a texture view of the framebuffer.
-    let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let view = frame.texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
     // (한국어) 커맨드 버퍼를 생성합니다.
     // (English Translation) Creates a command buffer.

@@ -73,6 +73,14 @@ pub mod path {
     pub const MIDORI_FIRE_SOUND_PATH: &'static str = "sounds/effect/midori_fire_sound.ogg";
     pub const YUZU_FIRE_SOUND_PATH: &'static str = "sounds/effect/yuzu_fire_sound.ogg";
 
+    pub const START_SOUND_PATH: &'static str = "sounds/effect/start_sound.ogg";
+    pub const PAUSE_SOUND_PATH: &'static str = "sounds/effect/pause_sound.ogg";
+    pub const FINISH_SOUND_PATH: &'static str = "sounds/effect/finish_sound.ogg";
+
+    pub const THEME18_SOUND_PATH: &'static str = "sounds/bgm/theme18.ogg";
+    pub const THEME19_SOUND_PATH: &'static str = "sounds/bgm/theme19.ogg";
+    pub const THEME23_SOUND_PATH: &'static str = "sounds/bgm/theme23.ogg";
+    pub const THEME30_SOUND_PATH: &'static str = "sounds/bgm/theme30.ogg";
     pub const THEME64_SOUND_PATH: &'static str = "sounds/bgm/theme64.ogg";
 
     pub const ARIS_TITLE_SOUND_PATH: &'static str = "sounds/aris/aris_title.ogg";

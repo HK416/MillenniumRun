@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::collections::{VecDeque, HashMap};
 
+use rand::prelude::*;
 use ab_glyph::FontArc;
 use glam::{Vec4, Vec3, Vec2};
 use rodio::{Sink, OutputStreamHandle};
@@ -14,7 +15,8 @@ use crate::{
         ui::{UiBrush, UiObject, UiObjectBuilder}, 
         player::{Actor, Player, FaceState}, 
         table::{Table, TileBrush}, 
-        anchor::Anchor, 
+        anchor::Anchor, margin::Margin, 
+        script::{Script, ScriptTags}, 
         user::Settings, 
     }, 
     nodes::{
@@ -29,6 +31,22 @@ use crate::{
     render::texture::DdsTextureDecoder, 
     system::error::AppResult, 
 };
+
+
+
+/// #### 한국어 </br>
+/// 일시정지 버튼 목록 입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a list of pause buttons. </br>
+/// 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PauseButton {
+    Resume = 0, 
+    Setting = 1, 
+    Exit = 3, 
+}
+
 
 
 /// #### 한국어 </br>
@@ -63,7 +81,8 @@ impl InGameAudio {
 
 pub fn create_game_scene(
     actor: Actor, 
-    font: &FontArc, 
+    fonts: &HashMap<String, FontArc>, 
+    script: &Script, 
     device: &wgpu::Device, 
     queue: &wgpu::Queue, 
     tex_sampler: &wgpu::Sampler, 
@@ -75,6 +94,12 @@ pub fn create_game_scene(
     texture_map: &HashMap<String, wgpu::Texture>, 
     asset_bundle: &AssetBundle
 ) -> AppResult<InGameScene> {
+    let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
+        .expect("Registered font not found!");
+
+    let nexon_lv2_gothic_bold = fonts.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)
+        .expect("Registered font not found!");
+
     // (한국어) 텍스처 맵에서 더미 텍스처를 가져와 전경을 생성합니다.
     // (English Translation) Creates the foreground by taking a dummy texture from the texture map. 
     let texture = texture_map.get(path::DUMMY_TEXTURE_PATH)
@@ -368,7 +393,7 @@ pub fn create_game_scene(
     asset_bundle.release(path::WINDOW_RATIO_4_3_TEXTURE_PATH);
 
     let (remaining_timer_bg, remaining_timer_text) = create_remaining_timer(
-        font, 
+        nexon_lv2_gothic_bold, 
         device, 
         queue, 
         tex_sampler, 
@@ -419,12 +444,66 @@ pub fn create_game_scene(
 
 
 
+    // (한국어) 현재 플레이어가 차지한 영역의 비율을 보여주는 텍스트를 생성합니다.
+    // (English Translation) Creates text showing the percentage of area currently occupied by the player. 
     let percent = create_percent_text(
-        font, 
+        nexon_lv2_gothic_bold, 
         device, 
         queue, 
         text_brush
     );
+
+
+    
+    // (한국어) 일시정지 버튼 텍스처를 생성합니다.
+    // (English Translation) Creates a pause window. 
+    let texture = asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("WideButton"),
+            size: wgpu::Extent3d {
+                width:1024,
+                height:192,
+                depth_or_array_layers:1,
+            },
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            mip_level_count: 11,
+            sample_count:1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            device: &device,
+            queue: &queue,
+        })?;
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        }
+    );
+
+    // (한국어) 사용완료한 에셋을 해제합니다.
+    // (English Translation) Release assets that have been used. 
+    asset_bundle.release(path::BUTTON_WIDE_TEXTURE_PATH);
+
+    // (한국어) 일시정지 타이틀 텍스트와 일시정지 버튼들을 생성합니다.
+    // (English Translation) Create pause title text and pause buttons. 
+    let pause_text = create_pause_text(
+        nexon_lv2_gothic_medium, 
+        device, 
+        queue, 
+        text_brush, 
+        script
+    )?;
+    let pause_buttons = create_pause_buttons(
+        nexon_lv2_gothic_medium, 
+        script, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush, 
+        text_brush
+    )?;
+
 
     // (한국어) `InGame` 게임 장면에서 사용되는 음향 에셋들을 로드합니다.
     // (English Translation) Load sound assets used in `InGame` game scene. 
@@ -484,6 +563,10 @@ pub fn create_game_scene(
         Actor::Yuzu => path::YUZU_FIRE_SOUND_PATH, 
     };
 
+    let mut candidates = [path::THEME18_SOUND_PATH, path::THEME19_SOUND_PATH, path::THEME30_SOUND_PATH];
+    candidates.shuffle(&mut rand::thread_rng());
+    let bgm_sound = candidates[0];
+
 
     // (한국어) 현재 게임 장면에서 사용되는 에셋들을 로드합니다.
     // (English Translation) Loads assets used in the current game scene. 
@@ -494,7 +577,8 @@ pub fn create_game_scene(
     for rel_path in player_damage_sounds.iter() {
         asset_bundle.get(rel_path)?;
     }
-    asset_bundle.get(player_fire_sound);
+    asset_bundle.get(player_fire_sound)?;
+    asset_bundle.get(bgm_sound)?;
 
 
 
@@ -502,11 +586,13 @@ pub fn create_game_scene(
         mouse_pressed: false, 
         keyboard_pressed: false, 
         timer: 0.0, 
-        remaining_time: 120.0, 
+        remaining_time: in_game::GAME_DURATION_SEC, 
         state: InGameState::default(), 
+        pause_text, 
+        pause_buttons, 
         percent, 
         percent_timer: in_game::PERCENT_DURATION, 
-        num_total_tiles: 100 * 100, 
+        num_total_tiles: in_game::NUM_TILES as u32, 
         num_owned_tiles: 0, 
         owned_tiles: VecDeque::new(), 
         owned_hearts, 
@@ -525,6 +611,7 @@ pub fn create_game_scene(
         player_smile_sounds, 
         player_damage_sounds, 
         player_fire_sound, 
+        bgm_sound, 
     })
 }
 
@@ -819,4 +906,119 @@ fn create_percent_text(
     .with_anchor(Anchor::new(0.1 + 0.3, 0.72, 0.1, 0.98))
     .with_translation((0.0, 0.0, 0.25).into())
     .build(device, queue)
+}
+
+/// #### 한국어 </br>
+/// 일시정지 사용자 인터페이스 윈도우를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates a puse user interface window. </br>
+/// 
+fn create_pause_text(
+    font: &FontArc, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    text_brush: &TextBrush, 
+    script: &Script
+) -> AppResult<Text> {
+    let text = script.get(ScriptTags::PauseTitle)?;
+    return Ok(TextBuilder::new(
+        Some("PuaseWindow"), 
+        font, 
+        text, 
+        text_brush
+    ).with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(240, -320, 112, 320))
+    .with_color((1.0, 1.0, 1.0, 0.0).into())
+    .with_translation((0.0, 0.0, 0.5).into())
+    .build(device, queue));
+}
+
+/// #### 한국어 </br>
+/// 일시정지 화면에서 사용되는 버튼들을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create buttons used on the pause screen. </br>
+/// 
+fn create_pause_buttons(
+    font: &FontArc, 
+    script: &Script,
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush, 
+) -> AppResult<HashMap<PauseButton, (UiObject, Text)>> {
+    let resume_btn = UiObjectBuilder::new(
+        Some("ResumeButton"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(100, -160, 40, 160))
+    .with_color((1.0, 1.0, 1.0, 0.0).into())
+    .build(device);
+    let text = script.get(ScriptTags::PauseResumeButton)?;
+    let resume_text = TextBuilder::new(
+        Some("ResumeText"), 
+        font, 
+        text, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(100, -160, 40, 160))
+    .with_color((0.0, 0.0, 0.0, 0.0).into())
+    .build(device, queue);
+
+    let setting_btn = UiObjectBuilder::new(
+        Some("SettingButton"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(10, -160, -50, 160))
+    .with_color((1.0, 1.0, 1.0, 0.0).into())
+    .build(device);
+    let text = script.get(ScriptTags::PuaseSettingButton)?;
+    let setting_text = TextBuilder::new(
+        Some("SettingText"), 
+        font, 
+        text, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(10, -160, -50, 160))
+    .with_color((0.0, 0.0, 0.0, 0.0).into())
+    .build(device, queue);
+
+    let exit_button = UiObjectBuilder::new(
+        Some("ExitButton"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(-80, -160, -140, 160))
+    .with_color((255.0 / 255.0, 103.0 / 255.0, 105.0 / 255.0, 0.0).into())
+    .build(device);
+    let text = script.get(ScriptTags::PauseExitButton)?;
+    let exit_text =  TextBuilder::new(
+        Some("ExitText"), 
+        font, 
+        text, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(-80, -160, -140, 160))
+    .with_color((0.0, 0.0, 0.0, 0.0).into())
+    .build(device, queue);
+
+    return Ok(HashMap::from_iter([
+        (PauseButton::Resume, (resume_btn, resume_text)), 
+        (PauseButton::Setting, (setting_btn, setting_text)), 
+        (PauseButton::Exit, (exit_button, exit_text)), 
+    ]));
 }

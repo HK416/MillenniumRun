@@ -9,4 +9,9 @@ Script({
     StoreButton: "저장",
     ExitMessage : "게임을 종료하시겠습니까?",
     EnterStageButton : "탐색 시작",
+    PauseTitle : "일시 정지", 
+    PauseResumeButton : "이어하기", 
+    PuaseSettingButton : "설정", 
+    PauseRetryButton : "재시작", 
+    PauseExitButton : "나가기", 
 })

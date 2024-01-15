@@ -6,7 +6,7 @@ use rand::prelude::*;
 use rodio::OutputStreamHandle;
 use winit::{
     event::{Event, WindowEvent, MouseButton},
-    keyboard::PhysicalKey,
+    keyboard::{PhysicalKey, KeyCode},
     dpi::PhysicalPosition, 
 };
 
@@ -22,12 +22,13 @@ use crate::{
         table::TileBrush,
         bullet::BulletBrush, 
         player::{self, Actor, ControlState}, 
-        sound::SoundDecoder, 
+        sound::{self, SoundDecoder}, 
         interpolation, 
     },
-    nodes::{
-        consts::PIXEL_PER_METER, 
-        in_game::{utils, InGameScene}
+    nodes::in_game::{
+        utils, 
+        InGameScene, 
+        state::InGameState, 
     },
     render::depth::DepthBuffer,
     system::{
@@ -251,6 +252,18 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput { event, .. } => 
             if let PhysicalKey::Code(code) = event.physical_key {
+                // (한국어) 사용자가 `ESC`키를 눌렀을 경우.
+                // (English Translation) When the user presses the `ESC` key.
+                if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
+                    sound::play_click_sound(shared)?;
+
+                    // TODO!
+
+                    // (한국어) 다음 게임 장면 상태로 변경합니다.
+                    // (English Translation) Change to the next game scene state. 
+                    this.timer = 0.0;
+                    this.state = InGameState::EnterPause; 
+                }
 
                 // (한국어) 사용자가 `위쪽`키를 눌렀을 경우.
                 // (English Translation) When the user presses the `Up` key.
@@ -556,8 +569,6 @@ fn update_percent_text(this: &mut InGameScene, shared: &mut Shared, _total_time:
 
 
 fn update_bullets(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
-    use crate::components::sound;
-    
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared objects to use. 
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();

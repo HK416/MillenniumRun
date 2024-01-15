@@ -1,19 +1,27 @@
+use std::thread;
 use std::sync::Arc;
 
 use winit::event::Event;
+use rodio::OutputStreamHandle;
 
 use crate::{
     game_err, 
+    assets::bundle::AssetBundle, 
     components::{
         ui::UiBrush, 
         text::TextBrush, 
         table::TileBrush,
         sprite::SpriteBrush, 
-        camera::GameCamera
+        camera::GameCamera, 
+        user::Settings, 
+        sound, 
     },
-    nodes::in_game::{
-        InGameScene, 
-        state::InGameState, 
+    nodes::{
+        path, 
+        in_game::{
+            InGameScene, 
+            state::InGameState, 
+        }
     },
     render::depth::DepthBuffer,
     system::{
@@ -31,7 +39,7 @@ pub fn handle_events(_this: &mut InGameScene, _shared: &mut Shared, _event: Even
     Ok(())
 }
 
-pub fn update(this: &mut InGameScene, _shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 타이머를 갱신합니다.
     // (English Translation) Updates the timer.
     this.timer += elapsed_time;
@@ -41,6 +49,19 @@ pub fn update(this: &mut InGameScene, _shared: &mut Shared, _total_time: f64, el
     if this.timer >= DURATION {
         this.timer = 0.0;
         this.state = InGameState::Run;
+
+        // (한국어) 게임 시작 소리를 재생합니다.
+        // (English Translation) Play the game start sound. 
+        let stream = shared.get::<OutputStreamHandle>().unwrap();
+        let settings = shared.get::<Settings>().unwrap();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let source = asset_bundle.get(path::START_SOUND_PATH)?
+            .read(&sound::SoundDecoder)?;
+        let sink = sound::play_sound(settings.effect_volume, source, stream)?;
+        thread::spawn(move || {
+            sink.sleep_until_end();
+            sink.detach();
+        });
     }
     
     Ok(())
@@ -74,7 +95,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
 
     // (한국어) 프레임 버퍼의 텍스처 뷰를 생성합니다.
     // (English Translation) Creates a texture view of the framebuffer.
-    let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let view = frame.texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
     // (한국어) 커맨드 버퍼를 생성합니다.
     // (English Translation) Creates a command buffer.

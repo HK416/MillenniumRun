@@ -143,4 +143,12 @@ sounds/effect/momoi_fire_sound.ogg Static
 sounds/effect/midori_fire_sound.ogg Static 
 sounds/effect/yuzu_fire_sound.ogg Static 
 
+sounds/effect/start_sound.ogg Static 
+sounds/effect/pause_sound.ogg Static 
+sounds/effect/finish_sound.ogg Static 
+
+sounds/bgm/theme18.ogg Static 
+sounds/bgm/theme19.ogg Static 
+sounds/bgm/theme23.ogg Static 
+sounds/bgm/theme30.ogg Static 
 sounds/bgm/theme64.ogg Static

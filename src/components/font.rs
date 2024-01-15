@@ -1,6 +1,3 @@
-use std::sync::Arc;
-use std::collections::HashMap;
-
 use ab_glyph::FontArc;
 
 use crate::{

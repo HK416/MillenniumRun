@@ -7,7 +7,7 @@ use std::collections::{VecDeque, HashMap};
 
 use ab_glyph::FontArc;
 use winit::event::Event;
-use rodio::OutputStreamHandle;
+use rodio::{OutputStreamHandle, Source};
 
 use crate::{
     game_err,
@@ -21,6 +21,8 @@ use crate::{
         transform::Projection,
         table::{Table, TileBrush}, 
         player::{Actor, Player, FaceState},
+        sound::SoundDecoder, 
+        script::Script, 
         user::Settings, 
     },
     nodes::{path, consts::PIXEL_PER_METER}, 
@@ -36,6 +38,7 @@ pub const NUM_TILE_ROWS: usize = 100;
 pub const NUM_TILE_COLS: usize = 100;
 pub const NUM_TILES: usize = NUM_TILE_ROWS * NUM_TILE_COLS;
 
+pub const GAME_DURATION_SEC: f64 = 120.0;
 pub const PERCENT_DURATION: f64 = 0.25;
 
 
@@ -237,6 +240,7 @@ fn prepare_in_game_scene(this: &mut InGameLoading, shared: &mut Shared) -> AppRe
     // (English Translation) Get shared object to use.
     let actor = shared.get::<Actor>().cloned().unwrap_or_default();
     let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap().clone();
+    let script = shared.get::<Arc<Script>>().unwrap().clone();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap().clone();
     let tex_sampler = shared.get::<Arc<wgpu::Sampler>>().unwrap().clone();
@@ -251,20 +255,18 @@ fn prepare_in_game_scene(this: &mut InGameLoading, shared: &mut Shared) -> AppRe
     // (한국어) 다른 스레드에서 `InGame` 게임 장면을 준비합니다.
     // (English Translation) Prepare the `InGame` game scene in another thread. 
     this.loading = Some(thread::spawn(move || {
-        // (한국어) 현재 게임 장면에서 사용할 에셋들을 불러옵니다.
-        // (English Translation) Loads assets to be used in the current game scene. 
+        // (한국어) 현재 게임 장면에서 사용할 음향 에셋들을 불러옵니다.
+        // (English Translation) Loads audio assets to be used in the current game scene. 
         asset_bundle.get(path::CLICK_SOUND_PATH)?;
         asset_bundle.get(path::CANCEL_SOUND_PATH)?;
-        asset_bundle.get(path::BUTTON_ETC_TEXTURE_PATH)?;
-        asset_bundle.get(path::INGAME_BACKGROUND_TEXTURE_PATH)?;
-        asset_bundle.get(path::WINDOW_RATIO_4_3_TEXTURE_PATH)?;
-
-        let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)
-            .expect("Registered font not found!");
+        asset_bundle.get(path::START_SOUND_PATH)?;
+        asset_bundle.get(path::PAUSE_SOUND_PATH)?;
+        asset_bundle.get(path::FINISH_SOUND_PATH)?;
 
         utils::create_game_scene(
             actor, 
-            nexon_lv2_gothic_medium, 
+            &fonts, 
+            &script,
             &device, 
             &queue, 
             &tex_sampler, 
@@ -291,6 +293,9 @@ pub struct InGameScene {
     pub timer: f64, 
     pub remaining_time: f64, 
     pub state: state::InGameState,
+
+    pub pause_text: Text, 
+    pub pause_buttons: HashMap<utils::PauseButton, (UiObject, Text)>, 
     
     pub percent: Text, 
     pub percent_timer: f64, 
@@ -308,7 +313,6 @@ pub struct InGameScene {
     pub remaining_timer_bg: UiObject, 
     pub remaining_timer_text: Text, 
 
-    
     pub table: Table, 
     pub player: Player, 
     pub player_faces: HashMap<FaceState, UiObject>, 
@@ -318,6 +322,8 @@ pub struct InGameScene {
     pub player_smile_sounds: Vec<&'static str>, 
     pub player_damage_sounds: Vec<&'static str>,
     pub player_fire_sound: &'static str, 
+
+    pub bgm_sound: &'static str, 
 }
 
 impl SceneNode for InGameScene {
@@ -346,12 +352,36 @@ impl SceneNode for InGameScene {
         let settings = shared.get::<Settings>().unwrap();
         let stream = shared.get::<OutputStreamHandle>().unwrap();
         let audio = utils::InGameAudio::new(settings, stream)?;
+        
+        // (한국어) 배경 음악 소리를 재생합니다.
+        // (English Translation) Play background music sound. 
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let source = asset_bundle.get(self.bgm_sound)?
+            .read(&SoundDecoder)?
+            .amplify(0.5)
+            .repeat_infinite();
+        audio.background.append(source);
         shared.push(audio);
-
+        
         Ok(())
     }
 
     fn exit(&mut self, shared: &mut Shared) -> AppResult<()> {
+        // (한국어) 사용한 음향 에셋들을 해제합니다. 
+        // (English Translation) Release used sound assets.
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        asset_bundle.release(path::START_SOUND_PATH);
+        asset_bundle.release(path::PAUSE_SOUND_PATH);
+        asset_bundle.release(path::FINISH_SOUND_PATH);
+        asset_bundle.release(self.player_fire_sound);
+        for rel_path in self.player_damage_sounds.iter() {
+            asset_bundle.release(rel_path);
+        }
+        for rel_path in self.player_smile_sounds.iter() {
+            asset_bundle.release(rel_path);
+        }
+        asset_bundle.release(self.player_startup_sound);
+
         // (한국어) 현재 게임 장면에서 사용되는 [`rodio::Sink`] 집합을 해제합니다.
         // (English Translation) Releases a set of [`rodio::Sink`] used in current game scene. 
         shared.pop::<Arc<utils::InGameAudio>>().unwrap();

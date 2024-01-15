@@ -36,7 +36,7 @@ impl DepthBuffer {
 
         // (한국어) 깊이 버퍼 텍스처 뷰를 생성합니다.
         // (English Translation) Create a depth buffer texture view.
-        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
         Self { texture_view }
     }

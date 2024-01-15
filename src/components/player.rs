@@ -109,9 +109,9 @@ lazy_static! {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Actor {
     Aris = 0,
+    #[default]
     Momoi = 1,
     Midori = 2,
-    #[default]
     Yuzu = 3,
 }
 

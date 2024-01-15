@@ -83,14 +83,8 @@ impl SceneNode for FirstTimeSetupLoading {
             asset_bundle.get(path::CLICK_SOUND_PATH)?;
             asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
 
-            // (한국어) 
-            // 버튼 텍스처를 생성합니다.
-            // 다음 게임 장면에서 버튼 텍스처가 사용되므로 해제하지 않습니다.
-            // 
-            // (English Translation) 
-            // Create a button texture.
-            // Don't release the asset because the button texture will be used in the next game scene.
-            // 
+            // (한국어) 버튼 텍스처를 생성합니다.
+            // (English Translation) Create a button texture.
             let texture = asset_bundle
                 .get(path::BUTTON_WIDE_TEXTURE_PATH)?
                 .read(&DdsTextureDecoder {
@@ -114,6 +108,10 @@ impl SceneNode for FirstTimeSetupLoading {
                     ..Default::default()
                 }
             );
+
+            // (한국어) 사용한 에셋을 해제합니다.
+            // (English Translation) Release used assets. 
+            asset_bundle.release(path::BUTTON_WIDE_TEXTURE_PATH);
 
 
             // (한국어)한국어 선택 버튼을 생성합니다.
@@ -198,7 +196,7 @@ impl SceneNode for FirstTimeSetupLoading {
 
         // (한국어) 프레임 버퍼의 텍스쳐 뷰를 생성합니다.
         // (English Translation) Creates a texture view of the framebuffer.
-        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
         // (한국어) 커맨드 버퍼를 생성합니다.
         // (English Translation) Creates a command buffer.

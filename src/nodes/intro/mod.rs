@@ -6,7 +6,6 @@ use std::collections::HashMap;
 
 use ab_glyph::FontArc;
 
-use crate::scene::state::SceneState;
 use crate::{
     game_err,
     assets::bundle::AssetBundle,
@@ -20,7 +19,8 @@ use crate::{
         script::{Script, ScriptTags},
     },
     nodes::{path, consts::PIXEL_PER_METER},
-    scene::node::SceneNode,
+    render::texture::DdsTextureDecoder, 
+    scene::{node::SceneNode, state::SceneState},
     system::{
         error::{AppResult, GameError},
         shared::Shared,
@@ -57,13 +57,36 @@ impl SceneNode for IntroLoading {
         self.loading = Some(thread::spawn(move || {
             // (한국어) 현재 게임 장면에서 사용할 에셋들을 로드합니다. 
             // (English Translation) Loads assets to be used in the current game scene.
+            asset_bundle.get(path::LOGO_TEXTURE_PATH)?;
             asset_bundle.get(path::ARIS_TITLE_SOUND_PATH)?;
             asset_bundle.get(path::MOMOI_TITLE_SOUND_PATH)?;
             asset_bundle.get(path::MIDORI_TITLE_SOUND_PATH)?;
             asset_bundle.get(path::YUZU_TITLE_SOUND_PATH)?;
 
-            let logo_texture = textures.get(path::LOGO_TEXTURE_PATH) 
-                .expect("A registered texture could not be found.");
+            // (한국어) 로고 이미지 텍스처를 생성합니다.
+            // (English Translation) Create a logo image texture. 
+            let logo_texture = asset_bundle.get(path::LOGO_TEXTURE_PATH)?
+                .read(&DdsTextureDecoder {
+                    name: Some("Logo"), 
+                    size: wgpu::Extent3d {
+                        width: 512, 
+                        height: 512, 
+                        depth_or_array_layers: 1, 
+                    }, 
+                    dimension: wgpu::TextureDimension::D2, 
+                    format: wgpu::TextureFormat::Bgra8Unorm, 
+                    mip_level_count: 10, 
+                    sample_count: 1, 
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+                    view_formats: &[], 
+                    device: &device, 
+                    queue: &queue
+                })?;
+
+            // (한국어) 사용을 완료한 에셋을 정리합니다.
+            // (English Translation) Release assets that have been used.
+            asset_bundle.release(path::LOGO_TEXTURE_PATH);
+
             let dummy_texture = textures.get(path::DUMMY_TEXTURE_PATH)
                 .expect("A registered texture could not be found.");
 
@@ -167,7 +190,7 @@ impl SceneNode for IntroLoading {
 
         // (한국어) 프레임 버퍼의 텍스쳐 뷰를 생성합니다.
         // (English Translation) Creates a texture view of the framebuffer.
-        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
         // (한국어) 커맨드 버퍼를 생성합니다.
         // (English Translation) Creates a command buffer.
@@ -232,19 +255,24 @@ impl SceneNode for IntroScene {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 사용할 공유 객체 가져오기
         // (English Translation) Get shared object to use.
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
-
-        let asset_bundle_cloned = asset_bundle.clone();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap().clone();
         self.loading = Some(thread::spawn(move || {
             // (한국어) `Title` 게임 장면에서 사용될 에셋들을 로드합니다.
             // (English Translation) Loads assets to be used in `Title` game scene. 
-            asset_bundle_cloned.get(path::TITLE_BACKGROUND_TEXTURE_PATH)?;
-            asset_bundle_cloned.get(path::ARIS_STANDING_TEXTURE_PATH)?;
-            asset_bundle_cloned.get(path::MOMOI_STANDING_TEXTURE_PATH)?;
-            asset_bundle_cloned.get(path::TITLE_BUTTON_START_TEXTURE_PATH)?;
-            asset_bundle_cloned.get(path::TITLE_BUTTON_SETTING_TEXTURE_PATH)?;
-            asset_bundle_cloned.get(path::TITLE_BUTTON_EXIT_TEXTURE_PATH)?;
-            asset_bundle_cloned.get(path::THEME64_SOUND_PATH)?;
+            asset_bundle.get(path::CLICK_SOUND_PATH)?;
+            asset_bundle.get(path::CANCEL_SOUND_PATH)?;
+            asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
+            asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?;
+            asset_bundle.get(path::BUTTON_RETURN_TEXTURE_PATH)?;
+            asset_bundle.get(path::TITLE_BUTTON_START_TEXTURE_PATH)?;
+            asset_bundle.get(path::TITLE_BUTTON_SETTING_TEXTURE_PATH)?;
+            asset_bundle.get(path::TITLE_BUTTON_EXIT_TEXTURE_PATH)?;
+            asset_bundle.get(path::TITLE_BACKGROUND_TEXTURE_PATH)?;
+            asset_bundle.get(path::WINDOW_RATIO_4_3_TEXTURE_PATH)?;
+            asset_bundle.get(path::ARIS_STANDING_TEXTURE_PATH)?;
+            asset_bundle.get(path::MOMOI_STANDING_TEXTURE_PATH)?;
+            asset_bundle.get(path::MIDORI_STANDING_TEXTURE_PATH)?;
+            asset_bundle.get(path::YUZU_STANDING_TEXTURE_PATH)?;
             Ok(())
         }));
         Ok(())

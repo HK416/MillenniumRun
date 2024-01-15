@@ -60,17 +60,15 @@ impl SceneNode for SetupScene {
         self.loading = Some(thread::spawn(move || {
             asset_bundle.get(path::SETTINGS_PATH)?;
 
-            asset_bundle.get(path::LOGO_TEXTURE_PATH)?;
             asset_bundle.get(path::DUMMY_TEXTURE_PATH)?;
 
+            asset_bundle.get(path::NEXON_LV2_GOTHIC_PATH)?;
             asset_bundle.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)?;
             asset_bundle.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)?;
-            asset_bundle.get(path::NEXON_LV2_GOTHIC_PATH)?;
 
             asset_bundle.get(path::UI_SHADER_PATH)?;
             asset_bundle.get(path::UI_TEXT_SHADER_PATH)?;
             asset_bundle.get(path::SPRITE_SHADER_PATH)?;
-            asset_bundle.get(path::TILE_SPRITE_SHADER_PATH)?;
 
             asset_bundle.get(path::CLICK_SOUND_PATH)?;
             asset_bundle.get(path::CANCEL_SOUND_PATH)?;
@@ -151,9 +149,10 @@ impl SceneNode for SetupScene {
                     // (한국어) 설정된 언어의 스크립트 파일을 불러옵니다.
                     // (English Translation) Loads the script file of the set language.
                     let asset_bundle = shared.get::<AssetBundle>().unwrap();
-                    let script = match config.language {
-                        Language::Korean | Language::Unknown => asset_bundle.get(path::KOR_SCRIPTS_PATH)?.read(&ScriptDecoder)?,
+                    let rel_path = match config.language {
+                        Language::Korean | Language::Unknown => path::KOR_SCRIPTS_PATH,
                     };
+                    let script = asset_bundle.get(rel_path)?.read(&ScriptDecoder)?;
                     shared.push(Arc::new(script));
                     return  Ok(());
                 } 
@@ -319,26 +318,6 @@ fn setup_texture_map(
     queue: &wgpu::Queue, 
     asset_bundle: &AssetBundle
 ) -> AppResult<Arc<HashMap<String, wgpu::Texture>>> {
-    // (한국어) 로고 텍스처를 생성합니다.
-    // (English Translation) Create a logo texture. 
-    let logo = asset_bundle.get(path::LOGO_TEXTURE_PATH)?
-        .read(&DdsTextureDecoder {
-            name: Some("Logo"), 
-            size: wgpu::Extent3d {
-                width: 512, 
-                height: 512, 
-                depth_or_array_layers: 1, 
-            }, 
-            dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bgra8Unorm, 
-            mip_level_count: 10, 
-            sample_count: 1, 
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
-            view_formats: &[], 
-            device, 
-            queue
-        })?;
-
     // (한국어) 더미 텍스처를 생성합니다.
     // (English Translation) Create a dummy texture.
     let dummy = asset_bundle.get(path::DUMMY_TEXTURE_PATH)?
@@ -361,11 +340,9 @@ fn setup_texture_map(
 
     // (한국어) 사용완료한 에셋을 해제합니다.
     // (English Translation)  Release assets that have been used. 
-    asset_bundle.release(path::LOGO_TEXTURE_PATH);
     asset_bundle.release(path::DUMMY_TEXTURE_PATH);
 
     return Ok(HashMap::from_iter([
-        (path::LOGO_TEXTURE_PATH.to_string(), logo),
         (path::DUMMY_TEXTURE_PATH.to_string(), dummy), 
     ]).into());
 }

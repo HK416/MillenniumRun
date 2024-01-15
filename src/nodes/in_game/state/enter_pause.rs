@@ -1,10 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use glam::{Vec3, Vec4Swizzles, Vec4};
-use winit::{
-    event::{Event, WindowEvent, MouseButton}, 
-    keyboard::{PhysicalKey, KeyCode}, dpi::PhysicalPosition, 
-};
+use winit::event::Event;
 
 use crate::{
     game_err, 
@@ -14,10 +10,10 @@ use crate::{
         sprite::SpriteBrush, 
         table::TileBrush, 
         bullet::BulletBrush, 
-        camera::GameCamera, collider2d::Collider2d, 
+        camera::GameCamera, 
+        interpolation, 
     },
     nodes::in_game::{
-        utils, 
         InGameScene, 
         state::InGameState, 
     },
@@ -29,22 +25,48 @@ use crate::{
     }, 
 };
 
-/// #### 한국어 </br>
-/// 현재 눌려져있는 버튼의 원래 색상 데이터를 담고 있습니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Contains the original color data of the currently pressed button. </br>
-/// 
-static FOCUSED_PAUSE_BTN: Mutex<Option<(utils::PauseButton, Vec3, Vec3)>> = Mutex::new(None); 
+const DURATION: f64 = 0.15;
 
 
-pub fn handle_events(this: &mut InGameScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
-    handle_keyboard_input(this, shared, &event)?;
-    handle_mouse_input(this, shared, &event)?;
+
+pub fn handle_events(_this: &mut InGameScene, _shared: &mut Shared, _event: Event<AppEvent>) -> AppResult<()> {
     Ok(())
 }
 
-pub fn update(_this: &mut InGameScene, _shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
+pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer. 
+    this.timer += elapsed_time;
+
+    // (한국어) 사용할 공유 객체들을 가져옵니다.
+    // (English Translation) Get shared object to use.
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+
+    // (한국어) 전경의 알파 값을 갱신합니다.
+    // (English Translation) Updates the alpha value of the foreground. 
+    let alpha = 0.8 * interpolation::f64::smooth_step(this.timer, DURATION) as f32;
+    this.foreground.update(queue, |data| {
+        data.color.w = alpha;
+    });
+
+    // (한국어) 일시정지 사용자 인터페이스의 알파 값을 갱신합니다. 
+    // (English Translation) Updates the alpha value of the pause user interface. 
+    let alpha = 1.0 * interpolation::f64::smooth_step(this.timer, DURATION) as f32;
+    this.pause_text.update(queue, |data| {
+        data.color.w = alpha;
+    });
+    for (ui, text) in this.pause_buttons.values() {
+        ui.update(queue, |data| { data.color.w = alpha; });
+        text.update(queue, |data| { data.color.w = alpha; });
+    }
+
+    // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
+    // (English Translation) If it is greater than the duration, it changes to the next state. 
+    if this.timer >= DURATION {
+        this.timer = 0.0;
+        this.state = InGameState::Pause;
+    }
+
     Ok(())
 }
 
@@ -86,7 +108,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
     {
         let mut rpass = encoder.begin_render_pass(
             &wgpu::RenderPassDescriptor {
-                label: Some("RenderPass(InGameScene(Pause(Background)))"),
+                label: Some("RenderPass(InGameScene(EnterPause(Background)))"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
                         view: &view,
@@ -129,7 +151,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
     {
         let mut rpass = encoder.begin_render_pass(
             &wgpu::RenderPassDescriptor {
-                label: Some("RenderPass(InGameScene(Pause(Ui)))"),
+                label: Some("RenderPass(InGameScene(EnterPause(Ui)))"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
                         view: &view,
@@ -163,7 +185,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
     {
         let mut rpass = encoder.begin_render_pass(
             &wgpu::RenderPassDescriptor {
-                label: Some("RenderPass(InGameScene(Pause(Sprite)))"),
+                label: Some("RenderPass(InGameScene(EnterPause(Sprite)))"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
                         view: &view,
@@ -197,7 +219,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
     {
         let mut rpass = encoder.begin_render_pass(
             &wgpu::RenderPassDescriptor {
-                label: Some("RenderPass(InGameScene(Pause(Foreground)))"),
+                label: Some("RenderPass(InGameScene(EnterPause(Foreground)))"),
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
                         view: &view, 
@@ -232,7 +254,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
     {
         let mut rpass = encoder.begin_render_pass(
             &wgpu::RenderPassDescriptor {
-                label: Some("RenderPass(InGameScene(Pause(PauseUI)))"), 
+                label: Some("RenderPass(InGameScene(EnterPause(PauseUI)))"), 
                 color_attachments: &[
                     Some(wgpu::RenderPassColorAttachment {
                         view: &view, 
@@ -275,134 +297,3 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
     Ok(())
 }
 
-fn handle_keyboard_input(this: &mut InGameScene, _shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    match event {
-        Event::WindowEvent { event, .. } => match event {
-            WindowEvent::KeyboardInput { event, .. } => 
-            if let PhysicalKey::Code(code) = event.physical_key {
-                if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
-                    // (한국어) 다음 게임 장면 상태로 변경합니다.
-                    // (English Translation) Change to the next game scene state. 
-                    this.timer = 0.0;
-                    this.state = InGameState::ExitPause; 
-                }
-            },
-            _ => { /* empty */ }
-        }, 
-        _ => { /* empty */ }
-    }
-    Ok(())
-}
-
-fn handle_mouse_input(this: &mut InGameScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    // (한국어) 사용할 공유 객체를 가져옵니다.
-    // (English Translation) Get shared object to use.
-    let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
-    let camera = shared.get::<Arc<GameCamera>>().unwrap(); 
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-
-    match event {
-        Event::WindowEvent { event, .. } => match event {
-            WindowEvent::MouseInput { state, button, .. } =>
-            if MouseButton::Left == *button && state.is_pressed() {
-                // (한국어) 마우스 커서가 ui영역 안에 있는지 확인합니다.
-                // (English Translation) Make sure the mouse cursor is inside the ui area. 
-                let select = this.pause_buttons.iter()
-                    .find(|(_, (ui, _))| {
-                        ui.test(&(cursor_pos, camera))
-                    });
-
-                // (한국어) 
-                // 마우스 커서가 ui 영역 안에 있는 경우: 
-                // 1. `FOCUSED`에 해당 ui의 태그, 색상, 텍스트 색상을 저장합니다. 
-                // 2. 해당 ui의 색상과 텍스트 색상을 변경합니다. 
-                // 3. ui 눌림 함수를 호출합니다. 
-                //
-                // (English Translation) 
-                // If the mouse cursor is inside the ui area: 
-                // 1. Store the tag of the ui, ui color, and text color in `FOCUSED`. 
-                // 2. Change the color of the ui and the color of the text. 
-                // 3. Calls the ui pressed function. 
-                //
-                if let Some((tag, (ui, text))) = select {
-                    // <1>
-                    let ui_color = { ui.data.lock().expect("Failed to access variable.").color.xyz() };
-                    let text_color = { text.data.lock().expect("Failed to access variable.").color.xyz() };
-                    let mut guard = FOCUSED_PAUSE_BTN.lock().expect("Failed to access variaboe.");
-                    *guard = Some((*tag, ui_color, text_color));
-
-                    // <2>
-                    ui.update(queue, |data| data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0));
-                    text.update(queue, |data| data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0));
-
-                    // <3>
-                    btn_pressed(*tag, this, shared)?;
-                }
-            } else if MouseButton::Left == *button && !state.is_pressed() {
-                let mut guard = FOCUSED_PAUSE_BTN.lock().expect("Failed to access variable.");
-                if let Some((tag, ui_color, text_color)) = guard.take() {
-                    // (한국어) 선택했던 ui의 색상을 원래 색상으로 되돌립니다.
-                    // (English Translation) Returns the color of the selected ui to its original color.
-                    if let Some((ui, text)) = this.pause_buttons.get(&tag) {
-                        ui.update(queue, |data| data.color = (ui_color, data.color.w).into());
-                        text.update(queue, |data| data.color = (text_color, data.color.w).into());
-
-                        // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
-                        // (English Translation) Make sure the mouse cursor is inside the ui area. 
-                        if ui.test(&(cursor_pos, camera)) {
-                            // (한국어) ui 떼어짐 함수를 호출합니다.
-                            // (English Transaltion) Calls the ui release function.
-                            btn_released(tag, this, shared)?;
-                        }
-                    }
-                }
-            },
-            WindowEvent::CursorMoved { .. } => {
-                let guard = FOCUSED_PAUSE_BTN.lock().expect("Failed to access variable.");
-                if let Some((tag, _, _)) = guard.as_ref() {
-                    // (한국어) ui 끌림 함수를 호출합니다.
-                    // (English Translatioin) Calls the ui dragged function.
-                    btn_dragged(*tag, this, shared)?;
-                }
-            },
-            _ => { /* empty */ }
-        }, 
-        _ => { /* empty */ }
-    };
-
-    Ok(())
-}
-
-#[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn btn_pressed(tag: utils::PauseButton, this: &mut InGameScene, shared: &mut Shared) -> AppResult<()> {
-    use crate::components::sound;
-
-    match tag {
-        utils::PauseButton::Resume => sound::play_cancel_sound(shared),
-        utils::PauseButton::Setting => sound::play_click_sound(shared),
-        utils::PauseButton::Exit => sound::play_click_sound(shared), 
-        _ => Ok(())
-    }
-}
-
-#[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn btn_released(tag: utils::PauseButton, this: &mut InGameScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
-        utils::PauseButton::Resume => {
-            this.timer = 0.0;
-            this.state = InGameState::ExitPause;
-            Ok(())
-        },
-        _ => Ok(())
-    }
-}
-
-#[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn btn_dragged(tag: utils::PauseButton, this: &mut InGameScene, shared: &mut Shared) -> AppResult<()> {
-    match tag {
-        _ => Ok(())
-    }
-}

@@ -83,7 +83,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
 
     // (한국어) 프레임 버퍼의 텍스처 뷰를 생성합니다.
     // (English Translation) Creates a texture view of the framebuffer.
-    let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let view = frame.texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
     // (한국어) 커맨드 버퍼를 생성합니다.
     // (English Translation) Creates a command buffer.
@@ -159,6 +159,41 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         camera.bind(&mut rpass);
         ui_brush.draw(&mut rpass, [&this.menu_button, &this.remaining_timer_bg].into_iter());
         text_brush.draw(&mut rpass, [&this.remaining_timer_text, &this.percent].into_iter());
+    }
+
+    {
+        let mut rpass = encoder.begin_render_pass(
+            &wgpu::RenderPassDescriptor {
+                label: Some("RenderPass(InGameScene(Enter(Foreground)))"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &view, 
+                        resolve_target: None, 
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store, 
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(
+                    wgpu::RenderPassDepthStencilAttachment {
+                        view: depth.view(), 
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: wgpu::StoreOp::Store, 
+                        }), 
+                        stencil_ops: None, 
+                    }
+                ), 
+                timestamp_writes: None,
+                occlusion_query_set: None, 
+            }
+        );
+
+        // (한국어) 카메라를 바인드 합니다.
+        // (English Translation) Bind the camera. 
+        camera.bind(&mut rpass);
+        ui_brush.draw(&mut rpass, [&this.foreground].into_iter());
     }
 
     {

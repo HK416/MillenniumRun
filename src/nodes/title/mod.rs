@@ -148,7 +148,7 @@ impl SceneNode for TitleLoading {
 
         // (한국어) 프레임 버퍼의 텍스쳐 뷰를 생성합니다.
         // (English Translation) Creates a texture view of the framebuffer.
-        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
         // (한국어) 커맨드 버퍼를 생성합니다.
         // (English Translation) Creates a command buffer.
@@ -228,6 +228,7 @@ impl SceneNode for TitleScene {
         // (English Translation) Play background music.
         let source = asset_bundle.get(path::THEME64_SOUND_PATH)?
             .read(&SoundDecoder)?
+            .amplify(0.5)
             .repeat_infinite();
         let sink = play_sound(settings.background_volume, source, stream)?;
 

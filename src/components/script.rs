@@ -32,6 +32,11 @@ pub enum ScriptTags {
     StoreButton,
     ExitMessage,
     EnterStageButton,
+    PauseTitle, 
+    PauseResumeButton,
+    PuaseSettingButton,  
+    PauseRetryButton, 
+    PauseExitButton, 
 }
 
 

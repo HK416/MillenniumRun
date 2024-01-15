@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use glam::{Mat4, Vec4, Vec3, Vec2};
+use glam::{Vec4, Vec3, Vec2};
 
 use crate::{
     components::{
