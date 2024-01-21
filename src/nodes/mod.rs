@@ -49,6 +49,7 @@ pub mod path {
     pub const ARIS_BULLET_TEXTURE_PATH: &'static str = "textures/etc/aris_bullet.dds";
     pub const MOMOI_BULLET_TEXTURE_PATH: &'static str = "textures/etc/momoi_bullet.dds";
     pub const MIDORI_BULLET_TEXTURE_PATH: &'static str = "textures/etc/midori_bullet.dds";
+    pub const YUUKA_BULLET_TEXTURE_PATH: &'static str = "textures/etc/yuuka_bullet.dds";
 
     pub const TEMP_STAGE_TEXTURE_PATH: &'static str = "textures/img/temp.dds";
 
@@ -64,6 +65,8 @@ pub mod path {
     pub const YUZU_STANDING_TEXTURE_PATH: &'static str = "textures/character/yuzu_standing.dds";
     pub const YUZU_PLAYER_TEXTURE_PATH: &'static str = "textures/character/yuzu_player.dds";
 
+    pub const YUUKA_ENEMY_TEXTURE_PATH: &'static str = "textures/enemy/yuuka.dds";
+
     // Sounds -----------------------------------------------------------------
     pub const CLICK_SOUND_PATH: &'static str = "sounds/ui/click.ogg";
     pub const CANCEL_SOUND_PATH: &'static str = "sounds/ui/cancel.ogg";
@@ -72,6 +75,7 @@ pub mod path {
     pub const MOMOI_FIRE_SOUND_PATH: &'static str = "sounds/effect/momoi_fire_sound.ogg";
     pub const MIDORI_FIRE_SOUND_PATH: &'static str = "sounds/effect/midori_fire_sound.ogg";
     pub const YUZU_FIRE_SOUND_PATH: &'static str = "sounds/effect/yuzu_fire_sound.ogg";
+    pub const YUUKA_FIRE_SOUND_PATH: &'static str = "sounds/effect/yuuka_fire_sound.ogg";
 
     pub const START_SOUND_PATH: &'static str = "sounds/effect/start_sound.ogg";
     pub const PAUSE_SOUND_PATH: &'static str = "sounds/effect/pause_sound.ogg";
@@ -118,4 +122,8 @@ pub mod path {
     pub const YUZU_DAMAGE_0_SOUND_PATH: &'static str = "sounds/yuzu/yuzu_damage_0.ogg";
     pub const YUZU_DAMAGE_1_SOUND_PATH: &'static str = "sounds/yuzu/yuzu_damage_1.ogg";
     pub const YUZU_DAMAGE_2_SOUND_PATH: &'static str = "sounds/yuzu/yuzu_damage_2.ogg";
+
+    pub const YUUKA_ATTACK1_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_attack_1.ogg";
+    pub const YUUKA_ATTACK2_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_attack_2.ogg";
+    pub const YUUKA_ATTACK3_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_attack_3.ogg";
 }

@@ -61,6 +61,11 @@ textures/character/midori_player.dds Static
 textures/character/yuzu_standing.dds Static
 textures/character/yuzu_player.dds Static
 
+#-------#
+# Enemy #
+#-------#
+textures/enemy/yuuka.dds Static 
+
 #----------------#
 # User Interface #
 #----------------#
@@ -87,6 +92,7 @@ textures/etc/yuzu_bullet.dds Static
 textures/etc/aris_bullet.dds Static 
 textures/etc/momoi_bullet.dds Static 
 textures/etc/midori_bullet.dds Static 
+textures/etc/yuuka_bullet.dds Static
 
 #-------#
 # Image #
@@ -132,6 +138,10 @@ sounds/yuzu/yuzu_damage_0.ogg Static
 sounds/yuzu/yuzu_damage_1.ogg Static 
 sounds/yuzu/yuzu_damage_2.ogg Static
 
+sounds/yuuka/yuuka_attack_1.ogg Static 
+sounds/yuuka/yuuka_attack_2.ogg Static 
+sounds/yuuka/yuuka_attack_3.ogg Static 
+
 #--------#
 # Sounds #
 #--------#
@@ -142,6 +152,7 @@ sounds/effect/aris_fire_sound.ogg Static
 sounds/effect/momoi_fire_sound.ogg Static 
 sounds/effect/midori_fire_sound.ogg Static 
 sounds/effect/yuzu_fire_sound.ogg Static 
+sounds/effect/yuuka_fire_sound.ogg Static 
 
 sounds/effect/start_sound.ogg Static 
 sounds/effect/pause_sound.ogg Static 

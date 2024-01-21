@@ -20,7 +20,8 @@ use crate::{
         camera::CameraCreator,
         transform::Projection,
         table::{Table, TileBrush}, 
-        player::{Actor, Player, FaceState},
+        player::{Actor, Player, PlayerFaceState},
+        boss::{Boss, BossFaceState},
         sound::SoundDecoder, 
         script::Script, 
         user::Settings, 
@@ -38,7 +39,7 @@ pub const NUM_TILE_ROWS: usize = 100;
 pub const NUM_TILE_COLS: usize = 100;
 pub const NUM_TILES: usize = NUM_TILE_ROWS * NUM_TILE_COLS;
 
-pub const GAME_DURATION_SEC: f64 = 120.0;
+pub const GAME_DURATION_SEC: f64 = 100.0;
 pub const PERCENT_DURATION: f64 = 0.25;
 
 
@@ -315,8 +316,13 @@ pub struct InGameScene {
 
     pub table: Table, 
     pub player: Player, 
-    pub player_faces: HashMap<FaceState, UiObject>, 
+    pub player_faces: HashMap<PlayerFaceState, UiObject>, 
     pub player_bullet: Bullet, 
+
+    pub boss: Boss, 
+    pub boss_faces: HashMap<BossFaceState, UiObject>, 
+    pub enemy_bullet: Bullet, 
+
 
     pub player_startup_sound: &'static str, 
     pub player_smile_sounds: Vec<&'static str>, 

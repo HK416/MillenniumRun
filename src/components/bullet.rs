@@ -6,7 +6,10 @@ use bytemuck::{Pod, Zeroable, offset_of};
 
 use crate::{
     assets::bundle::AssetBundle, 
-    components::collider2d::shape::OBB, 
+    components::{
+        collider2d::{Collider2d, shape::OBB}, 
+        table::Table, 
+    }, 
     render::shader::WgslDecoder, 
     system::error::AppResult, 
 };
@@ -48,7 +51,9 @@ impl Default for VertexInput {
 /// 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Instance {
+    pub speed: f32, 
     pub timer: f64, 
+    pub life_time: f64, 
     pub size: Vec2, 
     pub color: Vec4, 
     pub scale: Vec3, 
@@ -91,7 +96,9 @@ impl Default for Instance {
     #[inline]
     fn default() -> Self {
         Self { 
+            speed: 0.0, 
             timer: 0.0, 
+            life_time: 0.0, 
             size: Vec2 { x: 0.0, y: 0.0 }, 
             color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 }, 
             scale: Vec3 { x: 1.0, y: 1.0, z: 1.0 }, 
@@ -402,4 +409,47 @@ fn create_pipeline(
             multiview, 
         },
     )
+}
+
+/// #### 한국어 </br>
+/// 총알을 갱신하는 함수입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Updates the bullets. </br>
+/// 
+pub fn update_bullets(
+    queue: &wgpu::Queue, 
+    table: &Table, 
+    bullet: &Bullet, 
+    elapsed_time: f64
+) {
+    bullet.update(queue, |instances| {
+        let mut next = Vec::with_capacity(instances.capacity());
+        while let Some(mut bullet) = instances.pop() {
+            // (한국어) 총알의 타이머를 갱신합니다. 
+            // (English Translation) Updates the bullet's timer. 
+            bullet.timer += elapsed_time;
+
+            // (한국어) 총알이 생명주기를 초과한 경우 건너뜁니다. 
+            // (English Translation) If the bullet has exceeded its life cycle, it is skipped. 
+            if bullet.timer >= bullet.life_time {
+                continue;
+            }
+
+            // (한국어) 총알이 타일을 벗어난 경우 건너뜁니다.
+            // (English Translation) If the bullet leaves the tile, it is skipped.
+            if !table.aabb.test(&bullet.collider()) {
+                continue;
+            }
+
+            // (한국어) 총알의 위치를 갱신합니다. 
+            // (English Translation) Updates the bullet's position. 
+            let distance = bullet.direction.normalize() * bullet.speed;
+            bullet.translation += distance;
+
+            next.push(bullet);
+        }
+
+        instances.append(&mut next);
+    })
 }

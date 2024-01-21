@@ -107,6 +107,7 @@ pub struct Sprite {
     buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     pub instances: Mutex<Vec<Instance>>,
+    capacity: usize, 
 }
 
 impl Sprite {
@@ -129,7 +130,7 @@ impl Sprite {
         let data: Vec<Data> = instances.iter().map(|it| it.to_data()).collect();
         let buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
-                label: Some("Vertex(InstanceData(LightSprite))"),
+                label: Some("Vertex(InstanceData(Sprite))"),
                 contents: bytemuck::cast_slice(&data),
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             },
@@ -139,7 +140,7 @@ impl Sprite {
         // (English Translation) Create a texture image bind group.
         let bind_group = device.create_bind_group(
             &wgpu::BindGroupDescriptor {
-                label: Some("BindGroup(Texture(LightSprite))"),
+                label: Some("BindGroup(Texture(Sprite))"),
                 layout: &sprite_brush.texture_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
@@ -161,6 +162,7 @@ impl Sprite {
         Self { 
             buffer, 
             bind_group, 
+            capacity: instances.len(), 
             instances: instances.into(), 
         }
     }
@@ -175,25 +177,19 @@ impl Sprite {
     where F: Fn(&mut MutexGuard<'_, Vec<Instance>>) {
         let mut guard = self.instances.lock().expect("Failed to access variable.");
         mapping_func(&mut guard);
-        let data: Vec<Data> = guard.iter().map(|it| it.to_data()).collect();
+
+        let n = self.capacity.min(guard.len());
+        let data: Vec<Data> = guard.iter().take(n).map(|it| it.to_data()).collect();
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&data));
     }
 
-    #[inline]
-    pub fn num_of_instances(&self) -> u32 {
-        self.instances.lock().expect("Failed to access variable.").len() as u32
-    }
+    fn draw<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
+        let guard = self.instances.lock().expect("Failed to access variable.");
+        let n = self.capacity.min(guard.len()) as u32;
 
-    #[inline]
-    fn bind<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
         rpass.set_bind_group(1, &self.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.buffer.slice(..));
-    }
-
-    #[inline]
-    fn draw<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
-        let num = self.num_of_instances();
-        rpass.draw(0..4, 0..num);
+        rpass.draw(0..4, 0..n);
     }
 }
 
@@ -253,7 +249,6 @@ impl SpriteBrush {
     ) where Iter: Iterator<Item = &'pass Sprite> {
         rpass.set_pipeline(&self.pipeline);
         for sprite in iter {
-            sprite.bind(rpass);
             sprite.draw(rpass);
         }
     }

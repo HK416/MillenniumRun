@@ -13,7 +13,8 @@ use crate::{
         sprite::SpriteBrush, 
         text::{TextBrush, Text, TextBuilder},
         ui::{UiBrush, UiObject, UiObjectBuilder}, 
-        player::{Actor, Player, FaceState}, 
+        player::{Actor, Player, PlayerFaceState}, 
+        boss::{Boss, BossFaceState}, 
         table::{Table, TileBrush}, 
         anchor::Anchor, margin::Margin, 
         script::{Script, ScriptTags}, 
@@ -207,7 +208,7 @@ pub fn create_game_scene(
 
     let texture = asset_bundle.get(rel_path)?
         .read(&DdsTextureDecoder {
-            name: Some("Bullet"), 
+            name: Some("Bullet(Player)"), 
             size: match actor {
                 Actor::Aris => wgpu::Extent3d { width: 256, height: 128, depth_or_array_layers: 1 }, 
                 _ => wgpu::Extent3d { width: 128, height: 128, depth_or_array_layers: 1 },
@@ -324,6 +325,92 @@ pub fn create_game_scene(
         tex_sampler, 
         ui_brush
     );
+
+
+    // (한국어) 이미지 파일을 불러오고, 텍스처를 생성합니다.
+    // (English Translation) Load an image file and create a texture. 
+    let texture = asset_bundle.get(path::YUUKA_BULLET_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("Bullet(Enemy)"), 
+            size: wgpu::Extent3d { width: 128, height: 128, depth_or_array_layers: 1 }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bgra8Unorm, 
+            mip_level_count: 8,
+            sample_count: 1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue, 
+        })?;
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        }
+    );
+
+    // (한국어) 사용완료한 에셋을 해제합니다.
+    // (English Translation) Release assets that have been used. 
+    asset_bundle.release(path::YUUKA_BULLET_TEXTURE_PATH);
+
+    // (한국어) 총알 스프라이트들을 생성합니다.
+    // (English Translation) Create bullet sprites.
+    let enemy_bullet = Bullet::with_capacity(
+        device, 
+        tex_sampler, 
+        &texture_view, 
+        bullet_brush, 
+        128
+    );
+
+
+
+    // (한국어) 이미지 파일을 불러오고, 텍스처를 생성합니다.
+    // (English Translation) Load an image file and create a texture. 
+    let texture = asset_bundle.get(path::YUUKA_ENEMY_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("Yuuka"), 
+            size: wgpu::Extent3d {
+                width: 256,
+                height: 256,
+                depth_or_array_layers: 3,
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bgra8Unorm, 
+            mip_level_count: 9,
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue,
+        })?;
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        }
+    );
+
+    // (한국어) 사용완료한 에셋을 해제합니다.
+    // (English Translation) Release assets that have been used. 
+    asset_bundle.release(path::YUUKA_ENEMY_TEXTURE_PATH);
+
+    let boss = Boss::new(
+        table.boss_spawn_pos.0, 
+        table.boss_spawn_pos.1, 
+        -0.5 * PIXEL_PER_METER, 
+        &table, 
+        device, 
+        tex_sampler, 
+        &texture_view, 
+        sprite_brush
+    );
+
+    let boss_faces = create_boss_face(
+        device, 
+        &texture, 
+        tex_sampler, 
+        ui_brush
+    );
+
 
 
     // (한국어) 이미지 파일을 불러오고, 텍스처를 생성합니다. 
@@ -607,6 +694,9 @@ pub fn create_game_scene(
         player, 
         player_faces, 
         player_bullet, 
+        boss, 
+        boss_faces, 
+        enemy_bullet, 
         player_startup_sound, 
         player_smile_sounds, 
         player_damage_sounds, 
@@ -746,10 +836,12 @@ fn create_remaining_timer(
     .with_anchor(Anchor::new(1.0 - 0.03666666667, 0.73, 1.0 - 0.1233333333, 0.88))
     .build(device);
 
+    let min = (in_game::GAME_DURATION_SEC / 60.0) as u32;
+    let sec = (in_game::GAME_DURATION_SEC % 60.0) as u32;
     let text = TextBuilder::new(
         Some("RemainingTimer"), 
-        font, 
-        "2:00", 
+        font,         
+        &format!("{}:{:0>2}", min, sec), 
         text_brush
     )
     .with_translation((0.0, 0.0, 0.5).into())
@@ -770,15 +862,15 @@ fn create_player_face(
     texture: &wgpu::Texture, 
     tex_sampler: &wgpu::Sampler, 
     ui_brush: &UiBrush
-) -> HashMap<FaceState, UiObject> {
+) -> HashMap<PlayerFaceState, UiObject> {
     let scale = (0.0, 0.0, 0.0).into();
-    let anchor = Anchor::new(0.5 + 0.1333333333, 0.88, 0.5, 0.98);
+    let anchor = Anchor::new(0.55 + 0.1333333333, 0.88, 0.55, 0.98);
 
     // (한국어) `Idle` 상태의 플레이어 얼굴 인터페이스를 생성합니다. 
     // (English Translation) Creates a player face interface in the `Idle` state. 
     let texture_view = texture.create_view(
         &wgpu::TextureViewDescriptor {
-            base_array_layer: FaceState::Idle as u32, 
+            base_array_layer: PlayerFaceState::Idle as u32, 
             array_layer_count: Some(1), 
             dimension: Some(wgpu::TextureViewDimension::D2), 
             ..Default::default()
@@ -799,7 +891,7 @@ fn create_player_face(
     // (English Translation) Creates a player face interface in the `Hit` state. 
     let texture_view = texture.create_view(
         &wgpu::TextureViewDescriptor {
-            base_array_layer: FaceState::Hit as u32,
+            base_array_layer: PlayerFaceState::Hit as u32,
             array_layer_count: Some(1), 
             dimension: Some(wgpu::TextureViewDimension::D2),
             ..Default::default()
@@ -820,7 +912,7 @@ fn create_player_face(
     // (English Translation) Creates a player face interface in the `Smile` state. 
     let texture_view = texture.create_view(
         &wgpu::TextureViewDescriptor {
-            base_array_layer: FaceState::Smile as u32,
+            base_array_layer: PlayerFaceState::Smile as u32,
             array_layer_count: Some(1), 
             dimension: Some(wgpu::TextureViewDimension::D2),
             ..Default::default()
@@ -838,9 +930,94 @@ fn create_player_face(
     .build(device);
 
     return HashMap::from_iter([
-        (FaceState::Idle, idle), 
-        (FaceState::Hit, hit), 
-        (FaceState::Smile, smile), 
+        (PlayerFaceState::Idle, idle), 
+        (PlayerFaceState::Hit, hit), 
+        (PlayerFaceState::Smile, smile), 
+    ]);
+}
+
+/// #### 한국어 </br>
+/// 보스의 상태를 보여주는 사용자 인터페이스를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a user interface that shows the boss's status. </br>
+/// 
+fn create_boss_face(
+    device: &wgpu::Device, 
+    texture: &wgpu::Texture, 
+    tex_sampler: &wgpu::Sampler, 
+    ui_brush: &UiBrush
+) -> HashMap<BossFaceState, UiObject> {
+    let scale = Vec3::new(0.0, 0.0, 0.0);
+    let anchor = Anchor::new(0.45 + 0.1333333333, 0.72, 0.45, 0.82);
+
+    // (한국어) `Idle` 상태의 보스 얼굴 인터페이스를 생성합니다.
+    // (English Transalation) Creates a boss face interface in the `Idle` state. 
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            base_array_layer: BossFaceState::Idle as u32, 
+            array_layer_count: Some(1), 
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            ..Default::default()
+        }
+    );
+    let idle = UiObjectBuilder::new(
+        Some("BossIdleFace"), 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush
+    )
+    .with_global_translation((0.0, 0.0, 0.5).into())
+    .with_local_scale(scale)
+    .with_anchor(anchor)
+    .build(device);
+    
+    // (한국어) `Embarrass` 상태의 보스 얼굴 인터페이스를 생성합니다.
+    // (English Translation) Creates a boss face interface in the `Embarrass` state. 
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            base_array_layer: BossFaceState::Embarrass as u32, 
+            array_layer_count: Some(1), 
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            ..Default::default()
+        }
+    );
+    let embarrass = UiObjectBuilder::new(
+        Some("BossEmbarrassFace"), 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush
+    )
+    .with_global_translation((0.0, 0.0, 0.5).into())
+    .with_local_scale(scale)
+    .with_anchor(anchor)
+    .build(device);
+
+    // (한국어) `Smile` 상태의 보스 얼굴 인터페이스를 생성합니다.
+    // (English Translation) Creates a boss face interface in the `Smile` state. 
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            base_array_layer: BossFaceState::Smile as u32, 
+            array_layer_count: Some(1), 
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            ..Default::default()
+        }
+    );
+    let smile = UiObjectBuilder::new(
+        Some("BossSmileFace"), 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush
+    )
+    .with_global_translation((0.0, 0.0, 0.5).into())
+    .with_local_scale(scale)
+    .with_anchor(anchor)
+    .build(device);
+
+    return HashMap::from_iter([
+        (BossFaceState::Idle, idle), 
+        (BossFaceState::Embarrass, embarrass), 
+        (BossFaceState::Smile, smile), 
     ]);
 }
 

@@ -317,6 +317,7 @@ pub struct Table {
     pub tiles: Vec<Vec<Tile>>, 
     pub player_spawn_pos: (usize, usize), 
     pub half_spawn_area: usize, 
+    pub boss_spawn_pos: (usize, usize), 
     pub num_rows: usize, 
     pub num_cols: usize, 
     pub edge_color: Vec4, 
@@ -384,11 +385,17 @@ impl Table {
         let nr = num_rows / 4;
         let nc = num_cols / 4;
         let mut spawns = vec![
-            (1 * nr, 1 * nc), (1 * nr, 2 * nc), (1 * nr, 3 * nc),
-            (2 * nr, 1 * nc), (2 * nr, 3 * nc),
-            (3 * nr, 1 * nc), (3 * nr, 2 * nc), (3 * nr, 3 * nc),
+            ((1 * nr, 1 * nc), (3 * nr, 3 * nc)), 
+            ((1 * nr, 2 * nc), (3 * nr, 2 * nc)), 
+            ((1 * nr, 3 * nc), (3 * nr, 1 * nc)),
+            ((2 * nr, 1 * nc), (2 * nr, 3 * nc)), 
+            ((2 * nr, 3 * nc), (2 * nr, 1 * nc)),
+            ((3 * nr, 1 * nc), (1 * nr, 3 * nc)), 
+            ((3 * nr, 2 * nc), (1 * nr, 2 * nc)), 
+            ((3 * nr, 3 * nc), (1 * nr, 1 * nc)),
         ];
         spawns.shuffle(&mut rand::thread_rng());
+        let (player_spawn_pos, boss_spawn_pos) = spawns.pop().unwrap();
 
 
         // (한국어) 타일의 바운드 박스를 생성합니다.
@@ -401,8 +408,9 @@ impl Table {
 
         Self { 
             tiles, 
-            player_spawn_pos: spawns.pop().unwrap(), 
+            player_spawn_pos, 
             half_spawn_area, 
+            boss_spawn_pos, 
             num_rows, 
             num_cols, 
             edge_color, 

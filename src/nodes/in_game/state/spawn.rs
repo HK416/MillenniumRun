@@ -99,7 +99,7 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, ela
     let tile_brush = shared.get::<Arc<TileBrush>>().unwrap();
 
     // (한국어) 플레이어의 크기를 갱신합니다.
-    // (English Translation) Updates the player's size.
+    // (English Translation) Updates the player's scale.
     let s = scale_interpolation(this.timer, DURATION) as f32;
     this.player.sprite.update(queue, |instances| {
         instances[0].scale = (s, s, s).into();
@@ -111,7 +111,7 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, ela
     }
 
     // (한국어) 플레이어 체력 인터페이스의 크기를 갱신합니다. 
-    // (English Translation) Update the size of the player health interface. 
+    // (English Translation) Update the scale of the player health interface. 
     let s = interpolation::f64::smooth_step(this.timer, DURATION) as f32;
     for ui in this.owned_hearts.iter() {
         ui.update(queue, |data| {
@@ -119,6 +119,18 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, ela
         });
     }
 
+    // (한국어) 보스의 크기를 갱신합니다.
+    // (English Translation) Updates the boss's scale.
+    let s = scale_interpolation(this.timer, DURATION) as f32;
+    this.boss.sprite.update(queue, |instances| {
+        instances[0].scale = (s, s, s).into();
+    });
+    for face in this.boss_faces.values() {
+        face.update(queue, |data| {
+            data.local_scale = (s, s, s).into();
+        });
+    }
+    
     // (한국어) 타일을 갱신합니다.
     // (English Translation) Updates the tiles. 
     let mut next = VecDeque::new();
@@ -276,6 +288,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
                 &this.menu_button, 
                 &this.remaining_timer_bg, 
                 &this.player_faces[&this.player.face_state], 
+                &this.boss_faces[&this.boss.face_state], 
             ].into_iter()
         );
         ui_brush.draw(&mut rpass, this.owned_hearts.iter());
@@ -315,7 +328,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 카메라를 바인드 합니다.
         // (English Translation) Bind the camera. 
         camera.bind(&mut rpass);
-        sprite_brush.draw(&mut rpass, [&this.player.sprite].into_iter());
+        sprite_brush.draw(&mut rpass, [&this.player.sprite, &this.boss.sprite].into_iter());
     }
 
 

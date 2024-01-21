@@ -17,3 +17,4 @@ pub mod user;
 pub mod bullet;
 pub mod player;
 pub mod table;
+pub mod boss;

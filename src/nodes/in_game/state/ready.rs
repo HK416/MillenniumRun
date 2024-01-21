@@ -175,6 +175,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
                 &this.menu_button, 
                 &this.remaining_timer_bg, 
                 &this.player_faces[&this.player.face_state], 
+                &this.boss_faces[&this.boss.face_state], 
             ].into_iter()
         );
         ui_brush.draw(&mut rpass, this.owned_hearts.iter());
@@ -214,7 +215,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 카메라를 바인드 합니다.
         // (English Translation) Bind the camera. 
         camera.bind(&mut rpass);
-        sprite_brush.draw(&mut rpass, [&this.player.sprite].into_iter());
+        sprite_brush.draw(&mut rpass, [&this.player.sprite, &this.boss.sprite].into_iter());
     }
 
 

@@ -1,3 +1,4 @@
+use std::f32::consts::PI;
 use std::collections::{VecDeque, HashMap};
 
 use glam::{Vec2, Vec3};
@@ -5,11 +6,10 @@ use lazy_static::lazy_static;
 
 use crate::{
     components::{
-        collider2d::Collider2d, 
-        ui::UiObject, 
+        collider2d::shape::AABB, 
         sprite::{Sprite, SpriteBrush, Instance as SpriteData}, 
-        table::{self, Table, Tile, TileBrush}, 
-        bullet::{Bullet, Instance as BulletData}, 
+        bullet::{self, Bullet, Instance as BulletData}, 
+        table::{self, Table, Tile, TileBrush},
     }, 
     nodes::consts::PIXEL_PER_METER, 
 };
@@ -124,7 +124,7 @@ pub enum Actor {
 /// List of player's sprite states. </br>
 /// 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum FaceState {
+pub enum PlayerFaceState {
     #[default]
     Idle = 0, 
     Hit = 1, 
@@ -140,7 +140,7 @@ pub enum FaceState {
 /// List of player's control states. </br>
 /// 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ControlState {
+pub enum PlayerControlState {
     /// #### 한국어 </br>
     /// 사용자가 아무 것도 조작하고 있지 않는 상태 입니다. </br>
     /// 다음 위치로 이동하기 위한 입력을 받습니다. </br>
@@ -155,6 +155,19 @@ pub enum ControlState {
     Right = 2,
     Up = 3,
     Down = 4,
+}
+
+/// #### 한국어 </br>
+/// 플레이어의 게임 상태 목록입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// List of player's game states. </br>
+/// 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PlayerGameState {
+    #[default]
+    Empty = 0,
+    Invincibility = 1, 
 }
 
 
@@ -174,10 +187,13 @@ pub struct Player {
     pub shot_cool_time: f64, 
 
     pub face_timer: f64, 
-    pub face_state: FaceState, 
+    pub face_state: PlayerFaceState, 
 
     pub moving_timer: f64, 
-    pub control_state: ControlState,
+    pub control_state: PlayerControlState,
+
+    pub game_timer: f64,
+    pub game_state: PlayerGameState, 
 
     pub depth: f32, 
     pub curr: (usize, usize),
@@ -221,9 +237,11 @@ impl Player {
             shot_time: SHOT_TIME[&actor], 
             shot_cool_time: COOL_TIME[&actor], 
             face_timer: 0.0, 
-            face_state: FaceState::Idle, 
+            face_state: PlayerFaceState::default(), 
             moving_timer: 0.0, 
-            control_state: ControlState::Idle, 
+            control_state: PlayerControlState::default(), 
+            game_timer: 0.0, 
+            game_state: PlayerGameState::default(), 
             depth, 
             curr: (row, col), 
             next: None, 
@@ -247,30 +265,77 @@ impl Player {
         }
         return false;
     }
+
+    /// #### 한국어 </br>
+    /// 플레이어의 충돌체를 반환합니다. </br>
+    /// 
+    /// #### English (Translation) </br>
+    /// Returns the player's collider. </br>
+    /// 
+    #[inline]
+    pub fn collider(&self) -> AABB {
+        let instances = self.sprite.instances.lock().expect("Failed to access variable.");
+        AABB {
+            x: instances[0].translation.x, 
+            y: instances[0].translation.y, 
+            width: instances[0].size.x, 
+            height: instances[0].size.y, 
+        }
+    }
 }
 
 
+const GAME_UPDATE_FN: [&'static dyn Fn(f64, &wgpu::Queue, &mut Player); 2] = [
+    &update_player_empty_state, 
+    &update_player_invincibility_state, 
+];
 
 /// #### 한국어 </br>
-/// 플레이어의 얼굴 상태를 변경합니다. </br>
+/// 플레이어의 게임 상태를 갱신합니다. </br>
 /// 
 /// #### English (Translation) </br>
-/// Change the state of the player's face. </br>
+/// Updates the playaer's game state. </br>
 /// 
-fn change_player_face_state(
-    new_state: FaceState, 
-    queue: &wgpu::Queue, 
-    player: &mut Player
-) {
-    player.face_timer = 0.0;
-    player.face_state = new_state;
+#[inline]
+pub fn update_player_game_state(elapsed_time: f64, queue: &wgpu::Queue, player: &mut Player) {
+    GAME_UPDATE_FN[player.game_state as usize](elapsed_time, queue, player);
+}
+
+#[inline]
+fn update_player_empty_state(_elapsed_time: f64, _queue: &wgpu::Queue, _player: &mut Player) {
+    /* empty */
+}
+
+fn update_player_invincibility_state(elapsed_time: f64, queue: &wgpu::Queue, player: &mut Player) {
+    const DURATION: f64 = 3.0;
+    
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer.
+    player.game_timer += elapsed_time;
+
+    // (한국어) 플레이어 스프라이트의 색상을 갱신합니다.
+    // (English Translation) Updates the color of the player sprite. 
+    let delta = {
+        let t = (player.game_timer / DURATION).min(1.0) as f32;
+        0.5 * (36.0 * PI * t).cos() + 0.5
+    };
+    let c = 0.75 + 0.25 * delta.round();
     player.sprite.update(queue, |instances| {
-        instances[0].texture_index = new_state as u32;
+        instances[0].color = (c, c, c, instances[0].color.w).into();
     });
+    
+    // (한국어) 지속 시간보다 클 경우 `Empty` 상태로 변경합니다.
+    // (English Translation) If it is greater than the duration, it changes to `Empty` state. 
+    if player.game_timer >= DURATION {
+        player.game_timer = 0.0;
+        player.game_state = PlayerGameState::Empty;
+    }
 }
 
 
-const UPDATE_FN: [&'static dyn Fn(f64, &wgpu::Queue, &mut Player); 3] = [
+
+
+const FACE_UPDATE_FN: [&'static dyn Fn(f64, &wgpu::Queue, &mut Player); 3] = [
     &update_player_idle_face, 
     &update_player_hit_face, 
     &update_player_smile_face, 
@@ -284,7 +349,7 @@ const UPDATE_FN: [&'static dyn Fn(f64, &wgpu::Queue, &mut Player); 3] = [
 /// 
 #[inline]
 pub fn update_player_face(elapsed_time: f64, queue: &wgpu::Queue, player: &mut Player) {
-    UPDATE_FN[player.face_state as usize](elapsed_time, queue, player)
+    FACE_UPDATE_FN[player.face_state as usize](elapsed_time, queue, player)
 }
 
 
@@ -304,7 +369,11 @@ fn update_player_smile_face(elapsed_time: f64, queue: &wgpu::Queue, player: &mut
     // (한국어) 지속 시간보다 클 경우 `Idle` 상태로 변경합니다.
     // (English Translation) If it is greater than the duration, it changes to `Idle` state. 
     if player.face_timer >= DURATION {
-        change_player_face_state(FaceState::Idle, queue, player);
+        player.face_timer = 0.0;
+        player.face_state = PlayerFaceState::Idle;
+        player.sprite.update(queue, |instances| {
+            instances[0].texture_index = PlayerFaceState::Idle as u32;
+        });
     }
 }
 
@@ -319,7 +388,11 @@ fn update_player_hit_face(elapsed_time: f64, queue: &wgpu::Queue, player: &mut P
     // (한국어) 지속 시간보다 클 경우 `Idle` 상태로 변경합니다.
     // (English Translation) If it is greater than the duration, it changes to `Idle` state. 
     if player.face_timer >= DURATION {
-        change_player_face_state(FaceState::Idle, queue, player);
+        player.face_timer = 0.0;
+        player.face_state = PlayerFaceState::Idle;
+        player.sprite.update(queue, |instances| {
+            instances[0].texture_index = PlayerFaceState::Idle as u32;
+        });
     }
 }
 
@@ -380,17 +453,17 @@ pub fn translation_player(
 pub fn set_player_next_position(table: &Table, player: &mut Player) {
     if player.next.is_none() {
         player.next = match player.control_state {
-            ControlState::Idle => None,
-            ControlState::Left => (player.curr.1 > 0).then(|| {
+            PlayerControlState::Idle => None,
+            PlayerControlState::Left => (player.curr.1 > 0).then(|| {
                 (player.curr.0, player.curr.1 - 1)
             }),
-            ControlState::Right => (player.curr.1 + 1 < table.num_cols).then(|| {
+            PlayerControlState::Right => (player.curr.1 + 1 < table.num_cols).then(|| {
                 (player.curr.0, player.curr.1 + 1)
             }),
-            ControlState::Down => (player.curr.0 > 0).then(|| {
+            PlayerControlState::Down => (player.curr.0 > 0).then(|| {
                 (player.curr.0 - 1, player.curr.1)
             }), 
-            ControlState::Up => (player.curr.0 + 1 < table.num_rows).then(|| {
+            PlayerControlState::Up => (player.curr.0 + 1 < table.num_rows).then(|| {
                 (player.curr.0 + 1, player.curr.1)
             })
         }
@@ -413,8 +486,6 @@ pub fn check_current_pos(
     keyboard_pressed: bool, 
     num_owned_tiles: &mut u32, 
     owned_tiles: &mut VecDeque<(f64, Vec<(usize, usize)>)>, 
-    owned_hearts: &mut VecDeque<UiObject>, 
-    lost_hearts: &mut VecDeque<(f64, UiObject)>,   
     tile_brush: &TileBrush,
     queue: &wgpu::Queue
 ) -> Option<bool> {
@@ -512,63 +583,89 @@ pub fn check_current_pos(
                     *num_owned_tiles += inside_tiles.len() as u32;
                     owned_tiles.push_back((0.0, inside_tiles));
 
+                    // (한국어) 키보드 입력이 없는 경우 플레이어 조작 상태를 `Idle`로 변경합니다.
+                    // (English Translation) If there is no keyboard input, change the player control state to `Idle`.
                     if !keyboard_pressed {
-                        player.control_state = ControlState::Idle;
+                        player.control_state = PlayerControlState::Idle;
                     }
 
-                    change_player_face_state(FaceState::Smile, queue, player);
+                    // (한국어) 플레이어의 표정을 웃는 표정으로 변경합니다.
+                    // (English Translation) Changes the player's face to a smiley face. 
+                    player.face_timer = 0.0;
+                    player.face_state = PlayerFaceState::Smile;
+                    player.sprite.update(queue, |instances| {
+                        instances[0].texture_index = PlayerFaceState::Smile as u32;
+                    });
+
                     return Some(true);
                 } 
             } else {
                 // (한국어) 
                 // 현재 타일에 방문한 적이 있고, 경로에 포함되는 경우:
                 // - 경로의 모든 타일을 원래 상태로 복구하고, 경로를 비웁니다.
-                // - 플레이어의 라이프 카운트를 감소시킵니다.
                 // - 플레이어는 처음 위치에서 스폰됩니다.
                 // 
                 // (English Translation)
                 // If the current tile has been visited and is included in the path:
                 // - Restores all tiles in the path to their original state and clears the path.
-                // - Decreases the player's life count. 
                 // - Players spawn at their initial location. 
                 // 
-                tile_brush.update(queue, |instances| {
-                    for &(r, c) in player.path.iter() {
-                        instances[r * table.num_cols + c].color = table.tiles[r][c].color;
-                    }
-                });
-                while let Some((r, c)) = player.path.pop_front() {
-                    table.tiles[r][c].visited = false;
-                }
-                
-
-                if let Some(heart) = owned_hearts.pop_back() {
-                    lost_hearts.push_back((0.0, heart));
-                    if owned_hearts.len() == 0 {
-                        todo!("Game Over!")
-                    }
-                } else {
-                    todo!("Game Over!");
-                }
-                
-                player.curr = table.player_spawn_pos;
-                player.moving_timer = 0.0;
-                player.control_state = ControlState::Idle;
-
-                let x = table::position(table.origin.x, table.size.x, player.curr.1);
-                let y = table::position(table.origin.y, table.size.y, player.curr.0);
-                player.sprite.update(queue, |instances| {
-                    instances[0].translation.x = x;
-                    instances[0].translation.y = y;
-                });
-
-                change_player_face_state(FaceState::Hit, queue, player);
+                restore(queue, table, player, tile_brush);
                 return Some(false);
             }
         }
     }
 
     return None;
+}
+
+/// #### 한국어 </br>
+/// 경로의 모든 타일을 원래 상태로 복구하고, 경로를 비웁니다. </br>
+/// 플레이어를 처음 위치에 스폰합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Restores all tiles in the path to their original state and clears the path. </br>
+/// Players spawn at their initial position. </br>
+/// 
+pub fn restore(
+    queue: &wgpu::Queue, 
+    table: &mut Table, 
+    player: &mut Player, 
+    tile_brush: &TileBrush
+) {
+    tile_brush.update(queue, |instances| {
+        for &(r, c) in player.path.iter() {
+            instances[r * table.num_cols + c].color = table.tiles[r][c].color;
+        }
+    });
+    while let Some((r, c)) = player.path.pop_front() {
+        table.tiles[r][c].visited = false;
+    }
+    
+    player.next = None;
+    player.curr = table.player_spawn_pos;
+    player.moving_timer = 0.0;
+    player.control_state = PlayerControlState::Idle;
+
+    let x = table::position(table.origin.x, table.size.x, player.curr.1);
+    let y = table::position(table.origin.y, table.size.y, player.curr.0);
+    player.sprite.update(queue, |instances| {
+        instances[0].translation.x = x;
+        instances[0].translation.y = y;
+    });
+
+    // (한국어) 플레이어의 얼굴을 `Hit` 얼굴로 변경합니다.
+    // (English Translation) Changes the player's face to `Hit` face. 
+    player.face_timer = 0.0;
+    player.face_state = PlayerFaceState::Hit;
+    player.sprite.update(queue, |instances| {
+        instances[0].texture_index = PlayerFaceState::Hit as u32;
+    });
+
+    // (한국어) 플레이어의 게임 상태를 `Invincibility`로 변경합니다.
+    // (English Translation) Changes the player's game state to `Invincibility` state. 
+    player.game_timer = 0.0;
+    player.game_state = PlayerGameState::Invincibility;
 }
 
 
@@ -781,49 +878,18 @@ pub fn update_player_bullet(
 
     // (한국어) 플레이어의 총알을 추가해야 하는지 확인합니다.
     // (English Translation) Check if the player's bullets need to be added. 
-    let flag = if player.shot_count < MAX_SHOT_NUM[&player.actor] 
+    if player.shot_count < MAX_SHOT_NUM[&player.actor] 
     && player.shot_time >= SHOT_TIME[&player.actor] {
+        let mut instances = bullet.instances.lock().expect("Failed to access variable.");
+        instances.push(create_bullet(table, player, cursor_pos_world));
+
         player.shot_count += 1;
         player.shot_time -= SHOT_TIME[&player.actor];
-        true
-    } else {
-        false
-    };
+    } 
 
     // (한국어) 총알을 갱신합니다.
     // (English Translation) Updates the bullets.
-    bullet.update(queue, |instances| {
-        if flag {
-            instances.push(create_bullet(table, player, cursor_pos_world))
-        }
-
-        let mut next = Vec::with_capacity(instances.capacity());
-        while let Some(mut bullet) = instances.pop() {
-            // (한국어) 총알의 타이머를 갱신합니다. 
-            // (English Translation) Updates the bullet's timer. 
-            bullet.timer += elapsed_time;
-            
-            // (한국어) 총알이 생명주기를 초과한 경우 건너뜁니다. 
-            // (English Translation) If the bullet has exceeded its life cycle, it is skipped. 
-            if bullet.timer >= BULLET_LIFE_TIME {
-                continue;
-            }
-
-            // (한국어) 총알이 타일을 벗어난 경우 건너뜁니다.
-            // (English Translation) If the bullet leaves the tile, it is skipped.
-            if !table.aabb.test(&bullet.collider()) {
-                continue;
-            }
-
-            // (한국어) 총알의 위치를 갱신합니다. 
-            // (English Translation) Updates the bullet's position. 
-            let distance = bullet.direction.normalize() * BULLET_SPEED[&player.actor];
-            bullet.translation += distance;
-
-            next.push(bullet);
-        }
-        instances.append(&mut next);
-    });
+    bullet::update_bullets(queue, table, bullet, elapsed_time);
 }
 
 fn create_bullet(
@@ -837,6 +903,8 @@ fn create_bullet(
     let direction = Vec3::new(dir.x, dir.y, 0.0);
     let translation = Vec3::new(x, y, player.depth);
     BulletData {
+        speed: BULLET_SPEED[&player.actor], 
+        life_time: BULLET_LIFE_TIME, 
         size: BULLET_SIZE[&player.actor], 
         direction, 
         translation, 

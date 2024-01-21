@@ -14,15 +14,17 @@ use crate::{
     game_err,
     assets::bundle::AssetBundle, 
     components::{
+        collider2d::Collider2d, 
         text::TextBrush,
         ui::UiBrush,
         camera::GameCamera,
         sprite::SpriteBrush,
         user::Settings,
         table::TileBrush,
-        bullet::BulletBrush, 
-        player::{self, Actor, ControlState}, 
+        bullet::{self, BulletBrush}, 
+        player::{self, PlayerControlState, PlayerGameState}, 
         sound::{self, SoundDecoder}, 
+        boss, 
         interpolation, 
     },
     nodes::in_game::{
@@ -47,14 +49,18 @@ pub fn handle_events(this: &mut InGameScene, shared: &mut Shared, event: Event<A
 }
 
 pub fn update(this: &mut InGameScene, shared: &mut Shared, total_time: f64, elapsed_time: f64) -> AppResult<()> {
-    update_percent_text(this, shared, total_time, elapsed_time)?;
-    update_timer(this, shared, total_time, elapsed_time)?;
-    update_lost_hearts(this, shared, total_time, elapsed_time)?;
     player_update(this, shared, total_time, elapsed_time)?;
+    update_boss(this, shared, total_time, elapsed_time)?;
+    
+    update_bullets(this, shared, total_time, elapsed_time)?;
+    
+    handles_collision(this, shared, total_time, elapsed_time)?;
+
+    update_lost_hearts(this, shared, total_time, elapsed_time)?;
     update_owned_tiles(this, shared, total_time, elapsed_time)?;
 
-    update_bullets(this, shared, total_time, elapsed_time)?;
-
+    update_percent_text(this, shared, total_time, elapsed_time)?;
+    update_remaining_time(this, shared, total_time, elapsed_time)?;
     Ok(())
 }
 
@@ -129,6 +135,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
                 &this.background, 
                 &this.stage_image, 
                 &this.player_faces[&this.player.face_state], 
+                &this.boss_faces[&this.boss.face_state], 
             ].into_iter()
         );
         ui_brush.draw(&mut rpass, this.owned_hearts.iter());
@@ -200,8 +207,8 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 카메라를 바인드 합니다.
         // (English Translation) Bind the camera. 
         camera.bind(&mut rpass);
-        sprite_brush.draw(&mut rpass, [&this.player.sprite].into_iter());
-        bullet_brush.draw(&mut rpass, [&this.player_bullet].into_iter());
+        sprite_brush.draw(&mut rpass, [&this.player.sprite, &this.boss.sprite].into_iter());
+        bullet_brush.draw(&mut rpass, [&this.player_bullet, &this.enemy_bullet].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -257,8 +264,6 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
                     sound::play_click_sound(shared)?;
 
-                    // TODO!
-
                     // (한국어) 다음 게임 장면 상태로 변경합니다.
                     // (English Translation) Change to the next game scene state. 
                     this.timer = 0.0;
@@ -268,21 +273,21 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 // (한국어) 사용자가 `위쪽`키를 눌렀을 경우.
                 // (English Translation) When the user presses the `Up` key.
                 if control.up.to_keycode() == code && event.state.is_pressed() && !event.repeat {
-                    if !this.player.path.is_empty() && this.player.control_state == ControlState::Down {
+                    if !this.player.path.is_empty() && this.player.control_state == PlayerControlState::Down {
                         return Ok(());
                     }
                     this.keyboard_pressed = true;
-                    this.player.control_state = ControlState::Up;
+                    this.player.control_state = PlayerControlState::Up;
                 }
 
                 // (한국어) 사용자가 `위쪽`키를 떼었을 경우.
                 // (English Translation) When the user releases the `Up` key.
                 if control.up.to_keycode() == code && !event.state.is_pressed() && !event.repeat 
-                && this.player.control_state == ControlState::Up {
+                && this.player.control_state == PlayerControlState::Up {
                     this.keyboard_pressed = false;
 
                     if this.player.path.is_empty() {
-                        this.player.control_state = ControlState::Idle;
+                        this.player.control_state = PlayerControlState::Idle;
                     }
                 }
 
@@ -290,21 +295,21 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 // (한국어) 사용자가 `아래쪽`키를 눌렀을 경우.
                 // (English Translation) When the user presses the `Down` key.
                 if control.down.to_keycode() == code && event.state.is_pressed() && !event.repeat {
-                    if !this.player.path.is_empty() && this.player.control_state == ControlState::Up {
+                    if !this.player.path.is_empty() && this.player.control_state == PlayerControlState::Up {
                         return Ok(());
                     }
                     this.keyboard_pressed = true;
-                    this.player.control_state = ControlState::Down;
+                    this.player.control_state = PlayerControlState::Down;
                 }
 
                 // (한국어) 사용자가 `아래쪽`키를 떼었을 경우.
                 // (English Translation) When the user releases the `Down` key.
                 if control.down.to_keycode() == code && !event.state.is_pressed() && !event.repeat 
-                && this.player.control_state == ControlState::Down {
+                && this.player.control_state == PlayerControlState::Down {
                     this.keyboard_pressed = false;
 
                     if this.player.path.is_empty() {
-                        this.player.control_state = ControlState::Idle;
+                        this.player.control_state = PlayerControlState::Idle;
                     }
                 }
 
@@ -312,21 +317,21 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 // (한국어) 사용자가 `왼쪽`키를 눌렀을 경우.
                 // (English Translation) When the user presses the `Left` key.
                 if control.left.to_keycode() == code && event.state.is_pressed() && !event.repeat {
-                    if !this.player.path.is_empty() && this.player.control_state == ControlState::Right {
+                    if !this.player.path.is_empty() && this.player.control_state == PlayerControlState::Right {
                         return Ok(());
                     }
                     this.keyboard_pressed = true;
-                    this.player.control_state = ControlState::Left;
+                    this.player.control_state = PlayerControlState::Left;
                 }
 
                 // (한국어) 사용자가 `왼쪽`키를 떼었을 경우.
                 // (English Translation) When the user releases the `Left` key.
                 if control.left.to_keycode() == code && !event.state.is_pressed() && !event.repeat 
-                && this.player.control_state == ControlState::Left {
+                && this.player.control_state == PlayerControlState::Left {
                     this.keyboard_pressed = false; 
 
                     if this.player.path.is_empty() { 
-                        this.player.control_state = ControlState::Idle;
+                        this.player.control_state = PlayerControlState::Idle;
                     }
                 }
 
@@ -334,21 +339,21 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 // (한국어) 사용자가 `오른쪽`키를 눌렀을 경우.
                 // (English Translation) When the user presses the `Right` key.
                 if control.right.to_keycode() == code && event.state.is_pressed() && !event.repeat {
-                    if !this.player.path.is_empty() && this.player.control_state == ControlState::Left {
+                    if !this.player.path.is_empty() && this.player.control_state == PlayerControlState::Left {
                         return Ok(());
                     }
                     this.keyboard_pressed = true;
-                    this.player.control_state = ControlState::Right;
+                    this.player.control_state = PlayerControlState::Right;
                 }
 
                 // (한국어) 사용자가 `오른쪽`키를 떼었을 경우.
                 // (English Translation) When the user releases the `Right` key.
                 if control.right.to_keycode() == code && !event.state.is_pressed() && !event.repeat 
-                && this.player.control_state == ControlState::Right {
+                && this.player.control_state == PlayerControlState::Right {
                     this.keyboard_pressed = false; 
 
                     if this.player.path.is_empty() {
-                        this.player.control_state = ControlState::Idle;
+                        this.player.control_state = PlayerControlState::Idle;
                     }
                 }
             },
@@ -365,7 +370,7 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
 /// #### English (Translation) </br>
 /// Update the user interface to display time remaining. </br>
 /// 
-fn update_timer(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+fn update_remaining_time(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 사용할 공유 객체를 가져옵니다.
     // (English Translation) Get the shared object to use.
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -485,6 +490,7 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
     let tile_brush = shared.get::<Arc<TileBrush>>().unwrap();
 
     player::update_player_face(elapsed_time, queue, &mut this.player);
+    player::update_player_game_state(elapsed_time, queue, &mut this.player);
 
     player::translation_player(
         elapsed_time, 
@@ -499,8 +505,6 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
         this.keyboard_pressed, 
         &mut this.num_owned_tiles,
         &mut this.owned_tiles, 
-        &mut this.owned_hearts, 
-        &mut this.lost_hearts, 
         tile_brush, 
         queue
     ) {
@@ -522,6 +526,17 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
                 audio.voice.append(source)
             }
         } else {
+            // (한국어) 플레이어의 라이프 카운트를 감소시킵니다.
+            // (English Translation) Decreases the player's life count.
+            if let Some(heart) = this.owned_hearts.pop_back() {
+                this.lost_hearts.push_back((0.0, heart));
+                if this.owned_hearts.len() == 0 {
+                    todo!("Game Over!")
+                }
+            } else {
+                todo!("Game Over!");
+            }
+
             // (한국어) 무작위로 캐릭터 목소리를 재생합니다.
             // (English Translation) Plays character voices randomly. 
             let asset_bundle = shared.get::<AssetBundle>().unwrap();
@@ -544,6 +559,12 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
     Ok(())
 }
 
+/// #### 한국어 </br>
+/// 플레이어가 차지한 영역의 비율을 보여주는 텍스트를 갱신하는 함수입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This function updates text showing the percentage of area occupied by the player. </br>
+/// 
 fn update_percent_text(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 타이머를 갱신합니다.
     // (English Translation) Updates the timer.
@@ -567,7 +588,12 @@ fn update_percent_text(this: &mut InGameScene, shared: &mut Shared, _total_time:
     Ok(())
 }
 
-
+/// #### 한국어  </br>
+/// 발사된 총알들을 갱신하는 함수입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This function updates the bullets fired bullets. </br>
+/// 
 fn update_bullets(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared objects to use. 
@@ -598,6 +624,75 @@ fn update_bullets(this: &mut InGameScene, shared: &mut Shared, _total_time: f64,
         elapsed_time, 
         cursor_pos_world
     );
+    bullet::update_bullets(
+        queue, 
+        &this.table, 
+        &this.enemy_bullet, 
+        elapsed_time
+    );
+
+    Ok(())
+}
+
+/// #### 한국어 </br>
+/// 보스를 갱신하는 함수입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a function that updates the boss. </br>
+/// 
+#[inline]
+fn update_boss(this: &mut InGameScene, shared: &mut Shared, total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    boss::update_boss(this, shared, total_time, elapsed_time)
+}
+
+/// #### 한국어 </br>
+/// 모든 충돌을 처리합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Handles all collision. </br>
+/// 
+fn handles_collision(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
+    // (한국어) 사용하려는 공유 객체들을 가져옵니다.
+    // (English Translation) Get shared object to use. 
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let tile_brush = shared.get::<Arc<TileBrush>>().unwrap();
+    
+    if this.player.game_state != PlayerGameState::Invincibility {
+        let mut flag = false;
+        let player_collider = this.player.collider();
+
+        // (한국어) 1. 플레이어와 보스와의 충돌을 확인합니다.
+        // (English Translation) 1. Check the collision between the player and the boss. 
+        let boss_collider = this.boss.collider();
+        flag |= player_collider.test(&boss_collider);
+
+        if flag {
+            player::restore(queue, &mut this.table, &mut this.player, tile_brush);
+
+            // (한국어) 플레이어의 라이프 카운트를 감소시킵니다.
+            // (English Translation) Decreases the player's life count.
+            if let Some(heart) = this.owned_hearts.pop_back() {
+                this.lost_hearts.push_back((0.0, heart));
+                if this.owned_hearts.len() == 0 {
+                    todo!("Game Over!")
+                }
+            } else {
+                todo!("Game Over!");
+            }
+
+            // (한국어) 무작위로 캐릭터 목소리를 재생합니다.
+            // (English Translation) Plays character voices randomly. 
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
+            let mut rng = rand::thread_rng();
+            if audio.voice.empty() {
+                let rel_path = this.player_damage_sounds.choose(&mut rng).unwrap();
+                let source = asset_bundle.get(rel_path)?
+                .read(&SoundDecoder)?;
+                audio.voice.append(source)
+            }
+        }
+    }
 
     Ok(())
 }
