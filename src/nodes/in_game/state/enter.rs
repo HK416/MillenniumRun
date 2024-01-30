@@ -49,6 +49,55 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, ela
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) If it is greater than the duration, it changes to the next state.
     if this.timer >= DURATION {
+        // (한국어) 플레이어 주변 타일을 비웁니다.
+        // (English Translation) Clears tiles around the player. 
+        let (r, c) = this.table.player_spawn_pos;
+        let hs = this.table.half_spawn_area;
+        let mut temp = Vec::with_capacity(4 * hs * hs);
+        for row in r - hs..=r + hs {
+            for col in c - hs..=c + hs {
+                if row == r - hs 
+                || row == r + hs
+                || col == c - hs
+                || col == c + hs {
+                    this.table.tiles[row][col].color = this.table.edge_color;
+                    this.table.tiles[row][col].visited = false;
+                } else {
+                    this.num_owned_tiles += 1;
+                    this.table.tiles[row][col].color = this.table.fill_color;
+                    this.table.tiles[row][col].visited = true;
+                    temp.push((row, col));
+                }
+            }
+        }
+        
+        // (한국어) 타일의 변경된 내용을 적용합니다.
+        // (English Translation) Apply changes to the tile. 
+        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        let tile_brush = shared.get::<Arc<TileBrush>>().unwrap();
+        tile_brush.update(queue, |instances| {
+            for row in r - hs..=r + hs {
+                for col in c - hs..=c + hs {
+                    instances[row * this.table.num_cols + col].color = this.table.tiles[row][col].color;
+                }
+            }
+        });
+
+        // (한국어) 플레이어가 소유한 영역을 갱신합니다.
+        // (English Translation) Updates player owned area. 
+        this.owned_tiles.push_back((0.0, temp));
+        let per = this.num_owned_tiles as f32 /  this.num_total_tiles as f32 * 100.0;
+        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+        this.percent.change(
+            &format!("{}%", per.floor() as u32), 
+            device, 
+            queue, 
+            &text_brush.tex_sampler, 
+            &text_brush.texture_layout
+        );
+
         this.timer = 0.0;
         this.state = InGameState::Spawn;
     }
@@ -121,7 +170,10 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 카메라를 바인드 합니다.
         // (English Translation) Bind the camera. 
         camera.bind(&mut rpass);
-        ui_brush.draw(&mut rpass, [&this.background, &this.stage_image].into_iter());
+        ui_brush.draw(&mut rpass, [
+            &this.background, 
+            &this.stage_images[this.result_star_index], 
+            ].into_iter());
         tile_brush.draw(&mut rpass);
     }
 

@@ -7,9 +7,10 @@ use crate::{
     components::{
         ui::{UiBrush, UiObject}, 
         text::{TextBrush, Text},  
-        camera::GameCamera, 
-        transform::Projection, 
         sprite::SpriteBrush,  
+        transform::Projection, 
+        camera::GameCamera, 
+        player::Actor, 
     },
     nodes::title::{
         utils,
@@ -42,8 +43,8 @@ pub fn handle_events(_this: &mut TitleScene, _shared: &mut Shared, _event: Event
 pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
+    let sprite = shared.get::<Actor>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
-    let sprite = shared.get::<utils::Sprites>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
 
     // (한국어) 경과한 시간을 갱신합니다.
@@ -56,28 +57,28 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     camera.update(queue, |data| {
         data.projection = Projection::new_ortho(
             match sprite {
-                utils::Sprites::Aris => utils::STAGE_ARIS_TOP + (utils::STAGE_TOP - utils::STAGE_ARIS_TOP) * delta,
-                utils::Sprites::Momoi => utils::STAGE_MOMOI_TOP + (utils::STAGE_TOP - utils::STAGE_MOMOI_TOP) * delta,
-                utils::Sprites::Midori => utils::STAGE_MIDORI_TOP + (utils::STAGE_TOP - utils::STAGE_MIDORI_TOP) * delta,
-                utils::Sprites::Yuzu => utils::STAGE_YUZU_TOP + (utils::STAGE_TOP - utils::STAGE_YUZU_TOP) * delta,
+                Actor::Aris => utils::STAGE_ARIS_TOP + (utils::STAGE_TOP - utils::STAGE_ARIS_TOP) * delta,
+                Actor::Momoi => utils::STAGE_MOMOI_TOP + (utils::STAGE_TOP - utils::STAGE_MOMOI_TOP) * delta,
+                Actor::Midori => utils::STAGE_MIDORI_TOP + (utils::STAGE_TOP - utils::STAGE_MIDORI_TOP) * delta,
+                Actor::Yuzu => utils::STAGE_YUZU_TOP + (utils::STAGE_TOP - utils::STAGE_YUZU_TOP) * delta,
             }, 
             match sprite {
-                utils::Sprites::Aris => utils::STAGE_ARIS_LEFT + (utils::STAGE_LEFT - utils::STAGE_ARIS_LEFT) * delta,
-                utils::Sprites::Momoi => utils::STAGE_MOMOI_LEFT + (utils::STAGE_LEFT - utils::STAGE_MOMOI_LEFT) * delta,
-                utils::Sprites::Midori => utils::STAGE_MIDORI_LEFT + (utils::STAGE_LEFT - utils::STAGE_MIDORI_LEFT) * delta,
-                utils::Sprites::Yuzu => utils::STAGE_YUZU_LEFT + (utils::STAGE_LEFT - utils::STAGE_YUZU_LEFT) * delta,
+                Actor::Aris => utils::STAGE_ARIS_LEFT + (utils::STAGE_LEFT - utils::STAGE_ARIS_LEFT) * delta,
+                Actor::Momoi => utils::STAGE_MOMOI_LEFT + (utils::STAGE_LEFT - utils::STAGE_MOMOI_LEFT) * delta,
+                Actor::Midori => utils::STAGE_MIDORI_LEFT + (utils::STAGE_LEFT - utils::STAGE_MIDORI_LEFT) * delta,
+                Actor::Yuzu => utils::STAGE_YUZU_LEFT + (utils::STAGE_LEFT - utils::STAGE_YUZU_LEFT) * delta,
             }, 
             match sprite {
-                utils::Sprites::Aris => utils::STAGE_ARIS_BOTTOM + (utils::STAGE_BOTTOM - utils::STAGE_ARIS_BOTTOM) * delta,
-                utils::Sprites::Momoi => utils::STAGE_MOMOI_BOTTOM + (utils::STAGE_BOTTOM - utils::STAGE_MOMOI_BOTTOM) * delta,
-                utils::Sprites::Midori => utils::STAGE_MIDORI_BOTTOM + (utils::STAGE_BOTTOM - utils::STAGE_MIDORI_BOTTOM) * delta,
-                utils::Sprites::Yuzu => utils::STAGE_YUZU_BOTTOM + (utils::STAGE_BOTTOM - utils::STAGE_YUZU_BOTTOM) * delta,
+                Actor::Aris => utils::STAGE_ARIS_BOTTOM + (utils::STAGE_BOTTOM - utils::STAGE_ARIS_BOTTOM) * delta,
+                Actor::Momoi => utils::STAGE_MOMOI_BOTTOM + (utils::STAGE_BOTTOM - utils::STAGE_MOMOI_BOTTOM) * delta,
+                Actor::Midori => utils::STAGE_MIDORI_BOTTOM + (utils::STAGE_BOTTOM - utils::STAGE_MIDORI_BOTTOM) * delta,
+                Actor::Yuzu => utils::STAGE_YUZU_BOTTOM + (utils::STAGE_BOTTOM - utils::STAGE_YUZU_BOTTOM) * delta,
             }, 
             match sprite {
-                utils::Sprites::Aris => utils::STAGE_ARIS_RIGHT + (utils::STAGE_RIGHT - utils::STAGE_ARIS_RIGHT) * delta,
-                utils::Sprites::Momoi => utils::STAGE_MOMOI_RIGHT + (utils::STAGE_RIGHT - utils::STAGE_MOMOI_RIGHT) * delta,
-                utils::Sprites::Midori => utils::STAGE_MIDORI_RIGHT + (utils::STAGE_RIGHT - utils::STAGE_MIDORI_RIGHT) * delta,
-                utils::Sprites::Yuzu => utils::STAGE_YUZU_RIGHT + (utils::STAGE_RIGHT - utils::STAGE_YUZU_RIGHT) * delta,
+                Actor::Aris => utils::STAGE_ARIS_RIGHT + (utils::STAGE_RIGHT - utils::STAGE_ARIS_RIGHT) * delta,
+                Actor::Momoi => utils::STAGE_MOMOI_RIGHT + (utils::STAGE_RIGHT - utils::STAGE_MOMOI_RIGHT) * delta,
+                Actor::Midori => utils::STAGE_MIDORI_RIGHT + (utils::STAGE_RIGHT - utils::STAGE_MIDORI_RIGHT) * delta,
+                Actor::Yuzu => utils::STAGE_YUZU_RIGHT + (utils::STAGE_RIGHT - utils::STAGE_YUZU_RIGHT) * delta,
             }, 
             0.0,
             1000.0
@@ -92,7 +93,7 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) changes to the next state if it is greater than the duration.
     if this.elapsed_time >= DURATION {
-        shared.pop::<utils::Sprites>().unwrap();
+        shared.pop::<Actor>().unwrap();
         this.state = TitleState::Stage;
         this.elapsed_time = 0.0;
         return Ok(());

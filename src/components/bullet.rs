@@ -59,7 +59,6 @@ pub struct Instance {
     pub scale: Vec3, 
     pub direction: Vec3, 
     pub translation: Vec3, 
-    pub box_offset: Vec2, 
     pub box_size: Vec2, 
 }
 
@@ -83,8 +82,8 @@ impl Instance {
     #[inline]
     pub fn collider(&self) -> OBB {
         OBB { 
-            x: self.translation.x + self.box_offset.x, 
-            y: self.translation.y + self.box_offset.y, 
+            x: self.translation.x, 
+            y: self.translation.y, 
             width: self.box_size.x, 
             height: self.box_size.y, 
             radian: Vec3::X.angle_between(self.direction), 
@@ -104,7 +103,6 @@ impl Default for Instance {
             scale: Vec3 { x: 1.0, y: 1.0, z: 1.0 }, 
             direction: Vec3 { x: 1.0, y: 0.0, z: 0.0 }, 
             translation: Vec3 { x: 0.0, y: 0.0, z: 0.0 }, 
-            box_offset: Vec2 { x: 0.0, y: 0.0 },
             box_size: Vec2 { x: 0.0, y: 0.0 }, 
         }
     }
@@ -195,6 +193,9 @@ impl Bullet {
     fn draw<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
         let guard = self.instances.lock().expect("Failed to access variable.");
         let num_instance = self.capacity.min(guard.len());
+        if num_instance == 0 {
+            return;
+        }
 
         rpass.set_bind_group(1, &self.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.buffer.slice(..));

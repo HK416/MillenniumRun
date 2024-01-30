@@ -35,23 +35,6 @@ pub enum Language {
 
 
 /// #### 한국어 </br>
-/// 애플리케이션 화면 모드 목록입니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// This is a list of application screen modes. </br>
-/// 
-#[repr(u8)]
-#[derive(Serialize, Deserialize)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ScreenMode {
-    #[default]
-    Windowed,
-    FullScreen,
-}
-
-
-
-/// #### 한국어 </br>
 /// 애플리케이션 윈도우의 해상도 목록 입니다. </br>
 /// 
 /// #### English (Translation) </br>
@@ -112,7 +95,6 @@ impl Into<LogicalSize<u32>> for Resolution {
 pub struct Settings {
     pub control: Control, 
     pub language: Language,
-    pub screen_mode: ScreenMode,
     pub resolution: Resolution,
     pub background_volume: Volume,
     pub effect_volume: Volume,
@@ -125,7 +107,6 @@ impl Default for Settings {
         Self { 
             control: Control::default(), 
             language: Language::default(), 
-            screen_mode: ScreenMode::default(), 
             resolution: Resolution::default(), 
             background_volume: Volume::new(80),
             effect_volume: Volume::new(100),
@@ -244,29 +225,5 @@ pub fn set_window_size(window: &Window, resolution: Resolution) -> AppResult<Res
                 "The application window cannot be resized."
             ))
         }
-    }
-}
-
-
-/// #### 한국어 </br>
-/// 애플리케이션 윈도우 화면 모드를 설정합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Sets the application window screen mode. </br>
-/// 
-#[inline]
-pub fn set_screen_mode(window: &Window, screen_mode: ScreenMode) {
-    match screen_mode {
-        ScreenMode::Windowed => window.set_fullscreen(None),
-        ScreenMode::FullScreen => {
-            #[cfg(target_os = "macos")] {
-                use winit::platform::macos::WindowExtMacOS;
-                window.set_simple_fullscreen(true);
-            }
-            #[cfg(not(target_os = "macos"))] {
-                use winit::window::Fullscreen;
-                window.set_fullscreen(Some(Fullscreen::Borderless(None)));
-            }
-        },
     }
 }

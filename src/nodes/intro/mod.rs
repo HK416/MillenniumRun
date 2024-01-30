@@ -125,11 +125,18 @@ impl SceneNode for IntroLoading {
                 &logo_texture, 
                 &ui_brush
             );
+            let loading_text = create_loading_text(
+                nexon_lv2_gothic_medium, 
+                &device, 
+                &queue, 
+                &text_brush
+            );
 
             Ok(IntroScene { 
                 timer: 0.0, 
                 state: state::IntroState::default(), 
                 loading: None, 
+                loading_text, 
                 notifications, 
                 foreground, 
                 logo 
@@ -246,6 +253,7 @@ pub struct IntroScene {
     timer: f64,
     state: state::IntroState,
     loading: Option<JoinHandle<AppResult<()>>>,
+    loading_text: Text, 
     notifications: Vec<Text>,
     foreground: UiObject, 
     logo: UiObject,
@@ -273,6 +281,10 @@ impl SceneNode for IntroScene {
             asset_bundle.get(path::MOMOI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::MIDORI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::YUZU_STANDING_TEXTURE_PATH)?;
+
+            // TODO: 스테이지 이미지들을 추가하세요.
+            asset_bundle.get(path::TEMP_STAGE_TEXTURE_PATH)?;
+
             Ok(())
         }));
         Ok(())
@@ -413,4 +425,22 @@ fn create_foreground(
     .build(device);
 
     return foreground;
+}
+
+fn create_loading_text(
+    font: &FontArc,
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    text_brush: &TextBrush
+) -> Text {
+    TextBuilder::new(
+        Some("LoadingText"), 
+        font, 
+        "Loading", 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.0, 1.0, 0.0, 1.0))
+    .with_margin(Margin::new(128, -256, 0, 0))
+    .with_color((0.0, 0.0, 0.0, 1.0).into())
+    .build(device, queue)
 }

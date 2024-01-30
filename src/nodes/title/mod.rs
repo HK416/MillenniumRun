@@ -13,16 +13,24 @@ use crate::{
     game_err,
     assets::bundle::AssetBundle,
     components::{
-        collider2d::shape::AABB,
-        sprite::{Sprite, SpriteBrush},
-        text::{TextBrush, Text},
         ui::{UiBrush, UiObject},
-        camera::CameraCreator,
+        text::{TextBrush, Text, TextBuilder},
+        sprite::{Sprite, SpriteBrush},
+        collider2d::shape::AABB,
+        anchor::Anchor, margin::Margin, 
+        camera::{CameraCreator, GameCamera},
         transform::Projection, 
         sound::SoundDecoder,
         script::Script,
         user::Settings,
+        player::Actor, 
     },
+    render::depth::DepthBuffer, 
+    nodes::{
+        path, 
+        consts::PIXEL_PER_METER, 
+        title::state::TitleState, 
+    }, 
     scene::{node::SceneNode, state::SceneState},
     system::{
         error::{AppResult, GameError},
@@ -41,13 +49,23 @@ use crate::{
 /// 
 #[derive(Debug)]
 pub struct TitleLoading {
-    pub loading: Option<JoinHandle<AppResult<TitleScene>>>
+    actor: Option<Actor>, 
+    loading_text: Option<Text>, 
+    loading: Option<JoinHandle<AppResult<TitleScene>>>, 
+}
+
+impl TitleLoading {
+    #[inline]
+    pub fn new(actor: Actor) -> Self {
+        Self { 
+            actor: Some(actor), 
+            ..Default::default()
+        }
+    }
 }
 
 impl SceneNode for TitleLoading {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
-        use crate::nodes::{path, consts::PIXEL_PER_METER};
-
         // (한국어) 사용할 공유 객체를 가져옵니다.
         // (English Translation) Get shared object to use.
         let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap().clone();
@@ -79,6 +97,9 @@ impl SceneNode for TitleLoading {
             asset_bundle.get(path::MIDORI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::YUZU_STANDING_TEXTURE_PATH)?;
         
+            // TODO: 스테이지 이미지들을 추가하세요.
+            asset_bundle.get(path::TEMP_STAGE_TEXTURE_PATH)?;
+
             let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
             .expect("A registered font could not be found.");
 
@@ -95,32 +116,85 @@ impl SceneNode for TitleLoading {
                 &asset_bundle
             )
         }));
+
+        // (한국어) 로딩 텍스트를 생성합니다.
+        // (English Translation) Create a loading text.
+        let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap();
+        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+
+        let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
+            .expect("Registered font could not found!");
+        let text = TextBuilder::new(
+            Some("LoadingText"), 
+            nexon_lv2_gothic_medium, 
+            "Loading", 
+            text_brush
+        )
+        .with_anchor(Anchor::new(0.0, 1.0, 0.0, 1.0))
+        .with_margin(Margin::new(128, -256, 0, 0))
+        .with_color(if self.actor.is_some() { (1.0, 1.0, 1.0, 1.0) } else { (0.0, 0.0, 0.0, 1.0) }.into())
+        .build(device, queue);
+        self.loading_text = Some(text);
         
         // (한국어) 현재 게임 장면에서 사용할 카메라를 생성합니다.
         // (English Translation) Creates a camera to use in the current game scene. 
         let camera_creator = shared.get::<Arc<CameraCreator>>().unwrap().clone();
-        let camera = camera_creator.create(
-            Some("Title"), 
-            None, 
-            None, 
-            Some(Projection::new_ortho(
-                utils::MENU_TOP, 
-                utils::MENU_LEFT, 
-                utils::MENU_BOTTOM, 
-                utils::MENU_RIGHT, 
-                0.0 * PIXEL_PER_METER, 
-                1000.0 * PIXEL_PER_METER
-            )), 
-            None
-        );
+        let camera = if self.actor.is_some() {
+            camera_creator.create(
+                Some("Title"), 
+                None, 
+                None, 
+                Some(Projection::new_ortho(
+                    utils::STAGE_TOP, 
+                    utils::STAGE_LEFT, 
+                    utils::STAGE_BOTTOM, 
+                    utils::STAGE_RIGHT, 
+                    0.0 * PIXEL_PER_METER, 
+                    1000.0 * PIXEL_PER_METER
+                )), 
+                None
+            )
+        } else {
+            camera_creator.create(
+                Some("Title"), 
+                None, 
+                None, 
+                Some(Projection::new_ortho(
+                    utils::MENU_TOP, 
+                    utils::MENU_LEFT, 
+                    utils::MENU_BOTTOM, 
+                    utils::MENU_RIGHT, 
+                    0.0 * PIXEL_PER_METER, 
+                    1000.0 * PIXEL_PER_METER
+                )), 
+                None
+            )
+        };
         shared.push(Arc::new(camera));
 
         Ok(())
     }
 
     fn update(&mut self, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
+        // (한국어) 사용할 공유 객체들을 가져옵니다.
+        // (English Translation) Get shared objects to use.
+        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+
         if self.loading.as_ref().is_some_and(|it| it.is_finished()) {
-            let next_scene = self.loading.take().unwrap().join().unwrap()?;
+            let mut next_scene = self.loading.take().unwrap().join().unwrap()?;
+            if self.actor.is_some() {
+                next_scene.state = TitleState::ReturnStage;
+                next_scene.foreground.update(queue, |data| {
+                    data.color = (0.0, 0.0, 0.0, 1.0).into();
+                });
+            } else {
+                next_scene.state = TitleState::Enter;
+                next_scene.foreground.update(queue, |data| {
+                    data.color = (1.0, 1.0, 1.0, 1.0).into();
+                });
+            }
             *shared.get_mut::<SceneState>().unwrap() = SceneState::Change(Box::new(next_scene));
         }
         Ok(())
@@ -132,6 +206,9 @@ impl SceneNode for TitleLoading {
         let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
+        let camera = shared.get::<Arc<GameCamera>>().unwrap();
+        let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
 
         // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
         // (English Translation) Wait until the previous operation is finished.
@@ -155,7 +232,7 @@ impl SceneNode for TitleLoading {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
         {
-            let mut _rpass = encoder.begin_render_pass(
+            let mut rpass = encoder.begin_render_pass(
                 &wgpu::RenderPassDescriptor {
                     label: Some("RenderPass(TitleLoading)"),
                     color_attachments: &[
@@ -163,16 +240,32 @@ impl SceneNode for TitleLoading {
                             view: &view, 
                             resolve_target: None, 
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                                load: wgpu::LoadOp::Clear(if self.actor.is_none() { 
+                                    wgpu::Color::WHITE 
+                                } else {
+                                    wgpu::Color::BLACK
+                                }),
                                 store: wgpu::StoreOp::Store,
                             }, 
                         }),
                     ],
-                    depth_stencil_attachment: None,
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment { 
+                        view: depth.view(), 
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0), 
+                            store: wgpu::StoreOp::Discard
+                        }), 
+                        stencil_ops: None 
+                    }),
                     timestamp_writes: None,
                     occlusion_query_set: None,
                 }
             );
+
+            camera.bind(&mut rpass);
+            text_brush.draw(&mut rpass, [
+                self.loading_text.as_ref().unwrap()
+            ].into_iter());
         }
 
         // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -187,7 +280,11 @@ impl SceneNode for TitleLoading {
 impl Default for TitleLoading {
     #[inline]
     fn default() -> Self {
-        Self { loading: None }
+        Self { 
+            actor: None, 
+            loading_text: None, 
+            loading: None  
+        }
     }
 }
 
@@ -216,7 +313,7 @@ pub struct TitleScene {
 
 impl SceneNode for TitleScene {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
-        use crate::{components::sound::play_sound, nodes::path};
+        use crate::components::sound;
 
         // (한국어) 사용할 공유 객체를 가져옵니다.
         // (English Translation) Get shared object to use.
@@ -230,7 +327,7 @@ impl SceneNode for TitleScene {
             .read(&SoundDecoder)?
             .amplify(0.5)
             .repeat_infinite();
-        let sink = play_sound(settings.background_volume, source, stream)?;
+        let sink = sound::play_sound(settings.background_volume, source, stream)?;
 
         // (한국어) 사용을 완료한 에셋을 정리합니다.
         // (English Translation) Release assets that have been used.
@@ -246,7 +343,7 @@ impl SceneNode for TitleScene {
     fn exit(&mut self, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 배경 음악을 제거합니다.
         // (English Translation) Detach background music.
-        shared.pop::<Sink>().unwrap().detach();
+        shared.pop::<Sink>().unwrap().stop();
         Ok(())
     }
 

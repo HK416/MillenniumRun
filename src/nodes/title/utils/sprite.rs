@@ -92,33 +92,6 @@ pub const STAGE_YUZU_BOTTOM: f32 = YUZU_Y + 0.5 * YUZU_HEIGHT * SCALE - 0.5 * ST
 pub const STAGE_YUZU_RIGHT: f32 = YUZU_X + 0.5 * STAGE_VIEW_WIDTH;
 
 
-/// #### 한국어 </br>
-/// 스테이지 스프라이트의 목록입니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// This is a list of stage sprites. </br>
-/// 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Sprites {
-    Aris = 0,
-    Momoi = 1,
-    Midori = 2,
-    Yuzu = 3,
-}
-
-impl From<usize> for Sprites {
-    #[inline]
-    fn from(value: usize) -> Self {
-        match value {
-            0 => Self::Aris,
-            1 => Self::Momoi,
-            2 => Self::Midori,
-            3 => Self::Yuzu,
-            _ => panic!("index out of range!"),
-        }
-    }
-}
-
 
 /// #### 한국어 </br>
 /// 캐릭터 스프라이트를 생성하는데 사용되는 텍스처 뷰 집합입니다. </br>

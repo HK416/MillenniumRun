@@ -185,11 +185,14 @@ impl Sprite {
 
     fn draw<'pass>(&'pass self, rpass: &mut wgpu::RenderPass<'pass>) {
         let guard = self.instances.lock().expect("Failed to access variable.");
-        let n = self.capacity.min(guard.len()) as u32;
+        let num_instance = self.capacity.min(guard.len()) as u32;
+        if num_instance == 0 {
+            return;
+        }
 
         rpass.set_bind_group(1, &self.bind_group, &[]);
         rpass.set_vertex_buffer(0, self.buffer.slice(..));
-        rpass.draw(0..4, 0..n);
+        rpass.draw(0..4, 0..num_instance);
     }
 }
 

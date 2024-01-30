@@ -317,24 +317,24 @@ impl Collider2d<OBB> for OBB {
     fn test(&self, other: &OBB) -> bool {
         let rotation = glam::Quat::from_rotation_z(self.radian);
         let a = [
-            (self.x - 0.5 * self.width, self.y + 0.5 * self.height),
-            (self.x - 0.5 * self.width, self.y - 0.5 * self.height),
-            (self.x + 0.5 * self.width, self.y - 0.5 * self.height),
-            (self.x + 0.5 * self.width, self.y + 0.5 * self.height),
+            (-0.5 * self.width, 0.5 * self.height),
+            (-0.5 * self.width, -0.5 * self.height),
+            (0.5 * self.width, -0.5 * self.height),
+            (0.5 * self.width, 0.5 * self.height),
         ].map(|p| {
             let v = rotation.mul_vec3((p.0, p.1, 0.0).into());
-            (v.x, v.y)
+            (v.x + self.x, v.y + self.y)
         });
 
         let rotation = glam::Quat::from_rotation_z(other.radian);
         let b = [
-            (other.x - 0.5 * other.width, other.y + 0.5 * other.height),
-            (other.x - 0.5 * other.width, other.y - 0.5 * other.height),
-            (other.x + 0.5 * other.width, other.y - 0.5 * other.height),
-            (other.x + 0.5 * other.width, other.y + 0.5 * other.height),
+            (-0.5 * other.width, 0.5 * other.height),
+            (-0.5 * other.width, -0.5 * other.height),
+            (0.5 * other.width, -0.5 * other.height),
+            (0.5 * other.width, 0.5 * other.height),
         ].map(|p| {
             let v = rotation.mul_vec3((p.0, p.1, 0.0).into());
-            (v.x, v.y)
+            (v.x + other.x, v.y + other.y)
         });
 
         gjk::intersect(a.iter(), b.iter())

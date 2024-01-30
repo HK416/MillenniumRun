@@ -10,18 +10,24 @@ use winit::{
 use crate::{
     game_err,
     components::{
-        collider2d::Collider2d, 
-        text::TextBrush, 
         ui::UiBrush, 
-        camera::GameCamera, 
+        text::TextBrush, 
         sprite::SpriteBrush, 
+        collider2d::Collider2d, 
+        camera::GameCamera, 
+        player::Actor, 
+        sound, 
     },
-    nodes::title::{
-        utils,
-        TitleScene, 
-        state::TitleState,
+    nodes::{
+        title::{
+            utils,
+            TitleScene, 
+            state::TitleState,
+        },
+        in_game::InGameLoading,
     }, 
     render::depth::DepthBuffer, 
+    scene::state::SceneState, 
     system::{
         error::{AppResult, GameError},
         event::AppEvent, 
@@ -242,11 +248,9 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
 
 fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    use crate::components::sound;
-    
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let sprite = shared.get::<utils::Sprites>().unwrap();
+    let sprite = shared.get::<Actor>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
 
     match event {
@@ -306,7 +310,11 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                     // (English Translation) Change to the next game scene state.
                     this.state = TitleState::ExitSelected;
                     this.elapsed_time = 0.0;
-                };
+                } else if KeyCode::Enter == code && !event.repeat && event.state.is_pressed() {
+                    sound::play_click_sound(shared)?;
+                    let state = shared.get_mut::<SceneState>().unwrap();
+                    *state = SceneState::Change(Box::new(InGameLoading::default()));
+                }
             },
             _ => { /* empty */ }
         },
@@ -544,13 +552,9 @@ fn handle_mouse_input_for_sys(this: &mut TitleScene, shared: &mut Shared, event:
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
 fn ui_pressed(btn: utils::StageWindow, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    use crate::components::sound;
-
     match btn {
         utils::StageWindow::Enter => {
-            sound::play_click_sound(shared)?;
-            // TODO
-            Ok(())
+            sound::play_click_sound(shared)
         },
         _ => Ok(())
     }
@@ -560,8 +564,6 @@ fn ui_pressed(btn: utils::StageWindow, this: &mut TitleScene, shared: &mut Share
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
 fn sys_ui_pressed(btn: utils::SystemButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    use crate::components::sound;
-
     match btn {
         utils::SystemButtons::Return => {
             sound::play_cancel_sound(shared)
@@ -573,8 +575,13 @@ fn sys_ui_pressed(btn: utils::SystemButtons, this: &mut TitleScene, shared: &mut
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_released(btn: utils::StageWindow, this: &mut TitleScene, _shared: &mut Shared) -> AppResult<()> {
+fn ui_released(btn: utils::StageWindow, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     match btn {
+        utils::StageWindow::Enter => {
+            let state = shared.get_mut::<SceneState>().unwrap();
+            *state = SceneState::Change(Box::new(InGameLoading::default()));
+            Ok(())
+        },
         _ => Ok(())
     }
 }
@@ -585,7 +592,7 @@ fn ui_released(btn: utils::StageWindow, this: &mut TitleScene, _shared: &mut Sha
 fn sys_ui_released(btn: utils::SystemButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let sprite = shared.get::<utils::Sprites>().unwrap();
+    let sprite = shared.get::<Actor>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
 
     match btn {

@@ -9,15 +9,16 @@ use ab_glyph::FontArc;
 use winit::event::Event;
 use rodio::{OutputStreamHandle, Source};
 
+use crate::components::anchor::Anchor;
 use crate::{
     game_err,
     assets::bundle::AssetBundle,
     components::{
         ui::{UiBrush, UiObject},
-        text::{TextBrush, Text}, 
+        text::{TextBrush, Text, TextBuilder}, 
         sprite::SpriteBrush,
         bullet::{Bullet, BulletBrush},
-        camera::CameraCreator,
+        camera::{CameraCreator, GameCamera},
         transform::Projection,
         table::{Table, TileBrush}, 
         player::{Actor, Player, PlayerFaceState},
@@ -28,6 +29,7 @@ use crate::{
     },
     nodes::{path, consts::PIXEL_PER_METER}, 
     scene::{node::SceneNode, state::SceneState},
+    render::depth::DepthBuffer, 
     system::{
         error::{AppResult, GameError},
         event::AppEvent,
@@ -39,12 +41,13 @@ pub const NUM_TILE_ROWS: usize = 100;
 pub const NUM_TILE_COLS: usize = 100;
 pub const NUM_TILES: usize = NUM_TILE_ROWS * NUM_TILE_COLS;
 
-pub const GAME_DURATION_SEC: f64 = 100.0;
+pub const GAME_DURATION_SEC: f64 = 90.0;
 pub const PERCENT_DURATION: f64 = 0.25;
 
 
 #[derive(Debug)]
 pub struct InGameLoading {
+    loading_text: Option<Text>, 
     loading: Option<JoinHandle<AppResult<InGameScene>>>,
 }
 
@@ -52,6 +55,7 @@ impl SceneNode for InGameLoading {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
         prepare_brushes(self, shared)?;
         prepare_in_game_scene(self, shared)?;
+        prepare_loading_scene(self, shared)?;
         Ok(())
     }
 
@@ -71,6 +75,9 @@ impl SceneNode for InGameLoading {
         let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
+        let camera = shared.get::<Arc<GameCamera>>().unwrap();
+        let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
 
         // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
         // (English Translation) Wait until the previous operation is finished.
@@ -94,7 +101,7 @@ impl SceneNode for InGameLoading {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         
         {
-            let mut _rpass = encoder.begin_render_pass(
+            let mut rpass = encoder.begin_render_pass(
                 &wgpu::RenderPassDescriptor {
                     label: Some("RenderPass(InGameLoading)"),
                     color_attachments: &[
@@ -107,11 +114,21 @@ impl SceneNode for InGameLoading {
                             },
                         }),
                     ],
-                    depth_stencil_attachment: None,
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: depth.view(), 
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0), 
+                            store: wgpu::StoreOp::Discard,
+                        }),
+                        stencil_ops: None,
+                    }),
                     timestamp_writes: None,
                     occlusion_query_set: None,
                 },
             );
+
+            camera.bind(&mut rpass);
+            text_brush.draw(&mut rpass, [self.loading_text.as_ref().unwrap()].into_iter());
         }
 
         // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -127,7 +144,10 @@ impl SceneNode for InGameLoading {
 impl Default for InGameLoading {
     #[inline]
     fn default() -> Self {
-        Self { loading: None }
+        Self { 
+            loading_text: None, 
+            loading: None, 
+        }
     }
 }
 
@@ -263,6 +283,10 @@ fn prepare_in_game_scene(this: &mut InGameLoading, shared: &mut Shared) -> AppRe
         asset_bundle.get(path::START_SOUND_PATH)?;
         asset_bundle.get(path::PAUSE_SOUND_PATH)?;
         asset_bundle.get(path::FINISH_SOUND_PATH)?;
+        asset_bundle.get(path::THEME23_SOUND_PATH)?;
+        asset_bundle.get(path::THEME27_SOUND_PATH)?;
+        asset_bundle.get(path::YUUKA_DEFEAT_SOUND_PATH)?;
+        asset_bundle.get(path::YUUKA_VICTORY_SOUND_PATH)?;
 
         utils::create_game_scene(
             actor, 
@@ -284,19 +308,43 @@ fn prepare_in_game_scene(this: &mut InGameLoading, shared: &mut Shared) -> AppRe
     Ok(())
 }
 
+fn prepare_loading_scene(this: &mut InGameLoading, shared: &mut Shared) -> AppResult<()> {
+    // (한국어) 사용할 공유 객체들을 가져옵니다.
+    // (English Translation) Get shared objects to use.    
+    let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap().clone();
+    let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+
+    let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
+        .expect("Registered font not found!");
+    let loading_text = TextBuilder::new(
+        Some("LoadingText"), 
+        nexon_lv2_gothic_medium, 
+        "Loading", 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.2, 0.7, 0.0, 1.0))
+    .with_color((1.0, 1.0, 1.0, 1.0).into())
+    .build(device, queue);
+
+    this.loading_text = Some(loading_text);
+
+    Ok(())
+}
+
 
 
 #[derive(Debug)]
 pub struct InGameScene {
-    pub mouse_pressed: bool, 
-    pub keyboard_pressed: bool, 
-
     pub timer: f64, 
     pub remaining_time: f64, 
     pub state: state::InGameState,
 
     pub pause_text: Text, 
     pub pause_buttons: HashMap<utils::PauseButton, (UiObject, Text)>, 
+    pub pause_exit_window: (UiObject, Text), 
+    pub pause_exit_buttons: HashMap<utils::ExitWndButton, (UiObject, Text)>, 
     
     pub percent: Text, 
     pub percent_timer: f64, 
@@ -309,25 +357,27 @@ pub struct InGameScene {
 
     pub foreground: UiObject, 
     pub background: UiObject, 
-    pub stage_image: UiObject, 
+    pub stage_images: Vec<UiObject>, 
     pub menu_button: UiObject, 
     pub remaining_timer_bg: UiObject, 
     pub remaining_timer_text: Text, 
+    pub result_window_btn: (UiObject, Text), 
+    pub result_title: UiObject, 
+    pub result_stars: Vec<UiObject>, 
+    pub result_star_index: usize, 
+    pub result_condition_texts: Vec<Text>, 
 
     pub table: Table, 
     pub player: Player, 
     pub player_faces: HashMap<PlayerFaceState, UiObject>, 
-    pub player_bullet: Bullet, 
 
     pub boss: Boss, 
     pub boss_faces: HashMap<BossFaceState, UiObject>, 
     pub enemy_bullet: Bullet, 
 
-
     pub player_startup_sound: &'static str, 
     pub player_smile_sounds: Vec<&'static str>, 
     pub player_damage_sounds: Vec<&'static str>,
-    pub player_fire_sound: &'static str, 
 
     pub bgm_sound: &'static str, 
 }
@@ -379,7 +429,9 @@ impl SceneNode for InGameScene {
         asset_bundle.release(path::START_SOUND_PATH);
         asset_bundle.release(path::PAUSE_SOUND_PATH);
         asset_bundle.release(path::FINISH_SOUND_PATH);
-        asset_bundle.release(self.player_fire_sound);
+        asset_bundle.release(path::THEME23_SOUND_PATH);
+        asset_bundle.release(path::THEME27_SOUND_PATH);
+        asset_bundle.release(self.bgm_sound);
         for rel_path in self.player_damage_sounds.iter() {
             asset_bundle.release(rel_path);
         }

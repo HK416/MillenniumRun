@@ -106,6 +106,7 @@ impl SceneNode for SetupScene {
         let fonts = setup_fonts(asset_bundle)?;
         let (stream, handle) = setup_sound_engine()?;
         let camera_creator = CameraCreator::new(device.clone(), window.clone());
+        let camera = camera_creator.create(Some("Default"), None, None, None, None);
         let ui_brush = setup_ui_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
         let text_brush = setup_text_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
         let sprite_brush = setup_sprite_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
@@ -119,6 +120,7 @@ impl SceneNode for SetupScene {
         shared.push(stream);
         shared.push(handle);
         shared.push(camera_creator);
+        shared.push(Arc::new(camera));
         shared.push(text_brush);
         shared.push(ui_brush);
         shared.push(sprite_brush);
@@ -372,10 +374,7 @@ fn setup_sound_engine() -> AppResult<(OutputStream, OutputStreamHandle)> {
 /// Load the user settings file and configure Windows. </br>
 /// 
 fn setup_window(window: &Window, asset_bundle: &AssetBundle) -> AppResult<(Settings, Option<Script>)> {
-    use crate::components::user::{
-        set_window_size,
-        set_screen_mode,
-    };
+    use crate::components::user::set_window_size;
 
     // (한국어) 설정 파일 가져오기.
     // (English Translation) Get settings file.
@@ -392,7 +391,6 @@ fn setup_window(window: &Window, asset_bundle: &AssetBundle) -> AppResult<(Setti
     // (한국어) 애플리케이션 윈도우를 설정합니다.
     // (English Translation) Set the application window.
     settings.resolution = set_window_size(window, settings.resolution)?;
-    set_screen_mode(window, settings.screen_mode);
     window.set_title(match settings.language {
         Language::Unknown => "Select a language",
         _ => "Millennium Run",

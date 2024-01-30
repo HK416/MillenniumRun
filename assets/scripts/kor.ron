@@ -14,4 +14,7 @@ Script({
     PuaseSettingButton : "설정", 
     PauseRetryButton : "재시작", 
     PauseExitButton : "나가기", 
+    ResultConditionText0 : "● 20% 이상 차지",
+    ResultConditionText1 : "● 50% 이상 차지",
+    ResultConditionText2 : "● 80% 이상 차지",
 })

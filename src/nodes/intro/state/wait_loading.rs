@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     game_err,
-    components::{ui::UiBrush, camera::GameCamera},
+    components::{ui::UiBrush, text::TextBrush, camera::GameCamera},
     nodes::intro::{IntroScene, state::IntroState},
     render::depth::DepthBuffer,
     system::{
@@ -49,6 +49,7 @@ pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -101,6 +102,7 @@ pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
 
         camera.bind(&mut rpass);
         ui_brush.draw(&mut rpass, [&this.logo].into_iter());
+        text_brush.draw(&mut rpass, [&this.loading_text].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

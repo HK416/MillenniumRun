@@ -12,6 +12,7 @@ mod msgbox;
 mod stage;
 mod selected;
 mod setting;
+mod return_stage;
 
 use winit::event::Event;
 
@@ -49,6 +50,7 @@ pub enum TitleState {
     EnterSelected,
     ExitSelected,
     Selected,
+    ReturnStage, 
 }
 
 
@@ -57,7 +59,7 @@ type HandleEventsFn = dyn Fn(&mut TitleScene, &mut Shared, Event<AppEvent>) -> A
 type UpdateFn = dyn Fn(&mut TitleScene, &mut Shared, f64, f64) -> AppResult<()>;
 type DrawFn = dyn Fn(&TitleScene, &mut Shared) -> AppResult<()>;
 
-pub const HANDLE_EVENTS: [&'static HandleEventsFn; 14] = [
+pub const HANDLE_EVENTS: [&'static HandleEventsFn; 15] = [
     &enter::handle_events,
     &menu::handle_events,
     &enter_setting::handle_events,
@@ -72,9 +74,10 @@ pub const HANDLE_EVENTS: [&'static HandleEventsFn; 14] = [
     &enter_selected::handle_events,
     &exit_selected::handle_events,
     &selected::handle_events,
+    &return_stage::handle_events, 
 ];
 
-pub const UPDATES: [&'static UpdateFn; 14] = [
+pub const UPDATES: [&'static UpdateFn; 15] = [
     &enter::update,
     &menu::update,
     &enter_setting::update,
@@ -89,9 +92,10 @@ pub const UPDATES: [&'static UpdateFn; 14] = [
     &enter_selected::update,
     &exit_selected::update,
     &selected::update,
+    &return_stage::update, 
 ];
 
-pub const DRAWS: [&'static DrawFn; 14] = [
+pub const DRAWS: [&'static DrawFn; 15] = [
     &enter::draw,
     &menu::draw,
     &enter_setting::draw,
@@ -106,4 +110,5 @@ pub const DRAWS: [&'static DrawFn; 14] = [
     &enter_selected::draw,
     &exit_selected::draw,
     &selected::draw,
+    &return_stage::draw, 
 ];

@@ -29,8 +29,7 @@ use crate::{
 
 const BULLET_LIFE_TIME: f64 = 5.0;
 const BULLET_SIZE: Vec2 = Vec2::new(2.0 * PIXEL_PER_METER, 2.0 * PIXEL_PER_METER);
-const COLLIDE_OFFSET: Vec2 = Vec2::new(0.0, 0.0);
-const COLLIDE_SIZE: Vec2 = Vec2::new(2.0 * PIXEL_PER_METER, 2.0 * PIXEL_PER_METER);
+const COLLIDE_SIZE: Vec2 = Vec2::new(1.0 * PIXEL_PER_METER, 1.0 * PIXEL_PER_METER);
 
 
 
@@ -176,8 +175,8 @@ pub fn update_boss(this: &mut InGameScene, shared: &mut Shared, total_time: f64,
 /// This is an update function that is called when the boss's behavior state is `Idle`. </br>
 /// 
 fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
-    const DURATION: f64 = 3.0;
-    const SPEED: f32 = 5.0 * PIXEL_PER_METER; // meter per sec
+    const DURATION: f64 = 2.5;
+    const SPEED: f32 = 7.0 * PIXEL_PER_METER; // meter per sec
 
     // (한국어) 타이머를 갱신합니다.
     // (English Translation) Updates the timer.
@@ -195,10 +194,7 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
     if this.boss.behavior_timer >= DURATION {
         let mut next_state = vec![
             BossBehaviorState::FireBulletPattern0, 
-            BossBehaviorState::FireBulletPattern0, 
-            BossBehaviorState::FireBulletPattern0, 
             BossBehaviorState::FireBulletPattern1, 
-            BossBehaviorState::FireBulletPattern2, 
             BossBehaviorState::FireBulletPattern2, 
             BossBehaviorState::PrepareRush,
         ];
@@ -369,7 +365,7 @@ fn update_boss_fire_bullet_pattern0(this: &mut InGameScene, shared: &mut Shared,
     let stream = shared.get::<OutputStreamHandle>().unwrap();
     let settings = shared.get::<Settings>().unwrap();
     let asset_bundle = shared.get::<AssetBundle>().unwrap();    
-    let source = asset_bundle.get(path::YUUKA_FIRE_SOUND_PATH)?
+    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
         .read(&sound::SoundDecoder)?;
     let sink = sound::play_sound(settings.effect_volume, source, stream)?;
     thread::spawn(move || {
@@ -396,7 +392,6 @@ fn update_boss_fire_bullet_pattern0(this: &mut InGameScene, shared: &mut Shared,
             direction, 
             translation, 
             size: BULLET_SIZE, 
-            box_offset: COLLIDE_OFFSET, 
             box_size: COLLIDE_SIZE, 
             ..Default::default()
         });
@@ -434,7 +429,7 @@ fn update_boss_fire_bullet_pattern1(this: &mut InGameScene, shared: &mut Shared,
     let stream = shared.get::<OutputStreamHandle>().unwrap();
     let settings = shared.get::<Settings>().unwrap();
     let asset_bundle = shared.get::<AssetBundle>().unwrap();    
-    let source = asset_bundle.get(path::YUUKA_FIRE_SOUND_PATH)?
+    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
         .read(&sound::SoundDecoder)?;
     let sink = sound::play_sound(settings.effect_volume, source, stream)?;
     thread::spawn(move || {
@@ -460,7 +455,6 @@ fn update_boss_fire_bullet_pattern1(this: &mut InGameScene, shared: &mut Shared,
         direction: (dist - origin).normalize(), 
         translation: origin, 
         size: BULLET_SIZE, 
-        box_offset: COLLIDE_OFFSET, 
         box_size: COLLIDE_SIZE,
         ..Default::default() 
     });
@@ -494,7 +488,7 @@ fn update_boss_fire_bullet_pattern2(this: &mut InGameScene, shared: &mut Shared,
     let stream = shared.get::<OutputStreamHandle>().unwrap();
     let settings = shared.get::<Settings>().unwrap();
     let asset_bundle = shared.get::<AssetBundle>().unwrap();    
-    let source = asset_bundle.get(path::YUUKA_FIRE_SOUND_PATH)?
+    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
         .read(&sound::SoundDecoder)?;
     let sink = sound::play_sound(settings.effect_volume, source, stream)?;
     thread::spawn(move || {
@@ -521,7 +515,6 @@ fn update_boss_fire_bullet_pattern2(this: &mut InGameScene, shared: &mut Shared,
             direction, 
             translation, 
             size: BULLET_SIZE, 
-            box_offset: COLLIDE_OFFSET, 
             box_size: COLLIDE_SIZE, 
             ..Default::default()
         });
@@ -661,4 +654,65 @@ fn rush_speed_interpolation(val: f64, max: f64) -> f64 {
     debug_assert!(val >= 0.0 && max >= 0.0, "The given values must be greater than or equal to 0!");
     let t = (val / max).clamp(0.0, 1.0);
     return -0.01 * t * t * t + t.powf(-2.0 * t) - 1.0;
+}
+
+
+const FACE_UPDATE_FN: [&'static dyn Fn(f64, &wgpu::Queue, &mut Boss); 3] = [
+    &update_boss_idle_face, 
+    &update_boss_embarrass_face, 
+    &update_boss_smile_face, 
+];
+
+/// #### 한국어 </br>
+/// 보스의 얼굴을 갱신합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Updates the boss's face. </br>
+/// 
+#[inline]
+pub fn update_boss_face(elapsed_time: f64, queue: &wgpu::Queue, boss: &mut Boss) {
+    FACE_UPDATE_FN[boss.face_state as usize](elapsed_time, queue, boss)
+}
+
+#[inline]
+fn update_boss_idle_face(_elapsed_time: f64, _queue: &wgpu::Queue, _boss: &mut Boss) {
+    /* empty */
+}
+
+#[inline]
+fn update_boss_embarrass_face(elapsed_time: f64, queue: &wgpu::Queue, boss: &mut Boss) {
+    const DURATION: f64 = 2.5;
+
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer.
+    boss.face_timer += elapsed_time;
+
+    // (한국어) 지속 시간보다 클 경우 `Idle` 상태로 변경합니다.
+    // (English Translation) If it is freater than the duration, it changes to `Idle` state.
+    if boss.face_timer >= DURATION {
+        boss.face_timer = 0.0;
+        boss.face_state = BossFaceState::Idle;
+        boss.sprite.update(queue, |instances| {
+            instances[0].texture_index = BossFaceState::Idle as u32;
+        });
+    }
+}
+
+#[inline]
+fn update_boss_smile_face(elapsed_time: f64, queue: &wgpu::Queue, boss: &mut Boss) {
+    const DURATION: f64 = 2.5;
+
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer.
+    boss.face_timer += elapsed_time;
+
+    // (한국어) 지속 시간보다 클 경우 `Idle` 상태로 변경합니다.
+    // (English Translation) If it is freater than the duration, it changes to `Idle` state.
+    if boss.face_timer >= DURATION {
+        boss.face_timer = 0.0;
+        boss.face_state = BossFaceState::Idle;
+        boss.sprite.update(queue, |instances| {
+            instances[0].texture_index = BossFaceState::Idle as u32;
+        });
+    }
 }

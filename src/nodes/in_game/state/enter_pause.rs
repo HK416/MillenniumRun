@@ -34,13 +34,13 @@ pub fn handle_events(_this: &mut InGameScene, _shared: &mut Shared, _event: Even
 }
 
 pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
-    // (한국어) 타이머를 갱신합니다.
-    // (English Translation) Updates the timer. 
-    this.timer += elapsed_time;
-
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared object to use.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer. 
+    this.timer += elapsed_time;
 
     // (한국어) 전경의 알파 값을 갱신합니다.
     // (English Translation) Updates the alpha value of the foreground. 
@@ -139,7 +139,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             [
                 &this.background, 
-                &this.stage_image, 
+                &this.stage_images[this.result_star_index], 
                 &this.player_faces[&this.player.face_state], 
                 &this.boss_faces[&this.boss.face_state], 
             ].into_iter()
@@ -214,7 +214,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         // (English Translation) Bind the camera. 
         camera.bind(&mut rpass);
         sprite_brush.draw(&mut rpass, [&this.player.sprite, &this.boss.sprite].into_iter());
-        bullet_brush.draw(&mut rpass, [&this.player_bullet, &this.enemy_bullet].into_iter());
+        bullet_brush.draw(&mut rpass, [&this.enemy_bullet].into_iter());
     }
 
     {

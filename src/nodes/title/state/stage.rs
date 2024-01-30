@@ -10,11 +10,12 @@ use winit::{
 use crate::{
     game_err,
     components::{
-        collider2d::Collider2d,
-        text::TextBrush, 
         ui::UiBrush, 
-        camera::GameCamera,
+        text::TextBrush, 
         sprite::SpriteBrush,
+        collider2d::Collider2d,
+        camera::GameCamera,
+        player::Actor, 
     },
     nodes::title::{
         utils,
@@ -326,7 +327,7 @@ fn handle_mouse_input_for_sprites(this: &mut TitleScene, shared: &mut Shared, ev
                         });
 
                         // <3>
-                        sprite_pressed(utils::Sprites::from(index), this, shared)?;
+                        sprite_pressed(Actor::from(index), this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
                     let mut guard = FOCUSED_SPRITE.lock().expect("Failed to access variable.");
@@ -363,7 +364,7 @@ fn handle_mouse_input_for_sprites(this: &mut TitleScene, shared: &mut Shared, ev
                         if select.is_some_and(|select| index == select) {
                             // (한국어) 스프라이트 떼어짐 함수를 호출합니다.
                             // (English Translation) Calls the sprite released function.
-                            sprite_released(utils::Sprites::from(index), this, shared)?;
+                            sprite_released(Actor::from(index), this, shared)?;
                         }
                     }
                 }
@@ -375,7 +376,7 @@ fn handle_mouse_input_for_sprites(this: &mut TitleScene, shared: &mut Shared, ev
                 if let Some((index, _)) = guard.as_ref() {
                     // (한국어) ui 끌림 함수를 호출합니다.
                     // (English Translation) Calls the ui dragged function.
-                    sprite_dragged(utils::Sprites::from(*index), this, shared)?;
+                    sprite_dragged(Actor::from(*index), this, shared)?;
                 }
             },
             _ => { /* empty */ }
@@ -495,7 +496,7 @@ fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: 
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn sprite_pressed(sp: utils::Sprites, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+fn sprite_pressed(sp: Actor, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     match sp {
         _ => Ok(())
     }
@@ -518,7 +519,7 @@ fn ui_pressed(btn: utils::SystemButtons, this: &mut TitleScene, shared: &mut Sha
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn sprite_released(sp: utils::Sprites, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+fn sprite_released(sp: Actor, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 선택된 스프라이트의 이미지를 변경합니다. 
     // (English Translation) Changes the image of the selected sprite. 
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -530,26 +531,26 @@ fn sprite_released(sp: utils::Sprites, this: &mut TitleScene, shared: &mut Share
     });
     
     match sp {
-        utils::Sprites::Yuzu => {
-            shared.push(utils::Sprites::Yuzu);
+        Actor::Aris => {
+            shared.push(Actor::Aris);
             this.state = TitleState::EnterSelected;
             this.elapsed_time = 0.0;
             Ok(())
         },
-        utils::Sprites::Aris => {
-            shared.push(utils::Sprites::Aris);
+        Actor::Momoi => {
+            shared.push(Actor::Momoi);
             this.state = TitleState::EnterSelected;
             this.elapsed_time = 0.0;
             Ok(())
         },
-        utils::Sprites::Momoi => {
-            shared.push(utils::Sprites::Momoi);
+        Actor::Midori => {
+            shared.push(Actor::Midori);
             this.state = TitleState::EnterSelected;
             this.elapsed_time = 0.0;
             Ok(())
         },
-        utils::Sprites::Midori => {
-            shared.push(utils::Sprites::Midori);
+        Actor::Yuzu => {
+            shared.push(Actor::Yuzu);
             this.state = TitleState::EnterSelected;
             this.elapsed_time = 0.0;
             Ok(())
@@ -575,7 +576,7 @@ fn ui_released(btn: utils::SystemButtons, this: &mut TitleScene, _shared: &mut S
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn sprite_dragged(sp: utils::Sprites, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+fn sprite_dragged(sp: Actor, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     match sp {
         _ => Ok(())
     }

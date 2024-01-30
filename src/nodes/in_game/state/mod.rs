@@ -5,6 +5,13 @@ mod run;
 mod enter_pause;
 mod pause;
 mod exit_pause;
+mod enter_msgbox;
+mod msgbox;
+mod exit_msgbox;
+mod wait_for_finish;
+mod disappear_run;
+mod appear_result;
+mod result;
 
 use winit::event::Event;
 
@@ -35,13 +42,20 @@ pub enum InGameState {
     EnterPause, 
     Pause, 
     ExitPause, 
+    EnterMsgBox,
+    MsgBox,
+    ExitMsgBox,
+    WaitForFinish, 
+    DisappearRun, 
+    AppearResult, 
+    Result, 
 }
 
 type HandleEventsFn = dyn Fn(&mut InGameScene, &mut Shared, Event<AppEvent>) -> AppResult<()>;
 type UpdateFn = dyn Fn(&mut InGameScene, &mut Shared, f64, f64) -> AppResult<()>;
 type DrawFn = dyn Fn(&InGameScene, &mut Shared) -> AppResult<()>;
 
-pub const HANDLE_EVENTS: [&'static HandleEventsFn; 7] = [
+pub const HANDLE_EVENTS: [&'static HandleEventsFn; 14] = [
     &enter::handle_events, 
     &spawn::handle_events, 
     &ready::handle_events, 
@@ -49,9 +63,16 @@ pub const HANDLE_EVENTS: [&'static HandleEventsFn; 7] = [
     &enter_pause::handle_events, 
     &pause::handle_events, 
     &exit_pause::handle_events, 
+    &enter_msgbox::handle_events, 
+    &msgbox::handle_events, 
+    &exit_msgbox::handle_events, 
+    &wait_for_finish::handle_events, 
+    &disappear_run::handle_events, 
+    &appear_result::handle_events, 
+    &result::handle_events, 
 ];
 
-pub const UPDATES: [&'static UpdateFn; 7] = [
+pub const UPDATES: [&'static UpdateFn; 14] = [
     &enter::update, 
     &spawn::update, 
     &ready::update, 
@@ -59,9 +80,16 @@ pub const UPDATES: [&'static UpdateFn; 7] = [
     &enter_pause::update, 
     &pause::update, 
     &exit_pause::update, 
+    &enter_msgbox::update, 
+    &msgbox::update, 
+    &exit_msgbox::update, 
+    &wait_for_finish::update, 
+    &disappear_run::update, 
+    &appear_result::update, 
+    &result::update, 
 ];
 
-pub const DRAWS: [&'static DrawFn; 7] = [
+pub const DRAWS: [&'static DrawFn; 14] = [
     &enter::draw, 
     &spawn::draw, 
     &ready::draw, 
@@ -69,4 +97,11 @@ pub const DRAWS: [&'static DrawFn; 7] = [
     &enter_pause::draw, 
     &pause::draw, 
     &exit_pause::draw, 
+    &enter_msgbox::draw, 
+    &msgbox::draw, 
+    &exit_msgbox::draw, 
+    &wait_for_finish::draw, 
+    &disappear_run::draw, 
+    &appear_result::draw, 
+    &result::draw, 
 ];

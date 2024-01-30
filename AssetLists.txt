@@ -23,6 +23,7 @@
 #--------#
 # System #
 #--------#
+user.sav Optional
 user.settings Optional
 textures/sys/logo.dds Static
 textures/sys/dummy.dds Static
@@ -65,11 +66,14 @@ textures/character/yuzu_player.dds Static
 # Enemy #
 #-------#
 textures/enemy/yuuka.dds Static 
+textures/enemy/yuuka_bullet.dds Static
 
 #----------------#
 # User Interface #
 #----------------#
-textures/ui/heart.dds Static
+textures/ui/star.dds Static 
+textures/ui/heart.dds Static 
+textures/ui/finish.dds Static 
 textures/ui/button_etc.dds Static
 textures/ui/button_return.dds Static
 textures/ui/button_medium.dds Static
@@ -85,15 +89,6 @@ textures/ui/window_ratio_4_3.dds Static
 textures/bg/title_background.dds Static
 textures/bg/ingame_background.dds Static
 
-#-----#
-# Etc #
-#-----#
-textures/etc/yuzu_bullet.dds Static 
-textures/etc/aris_bullet.dds Static 
-textures/etc/momoi_bullet.dds Static 
-textures/etc/midori_bullet.dds Static 
-textures/etc/yuuka_bullet.dds Static
-
 #-------#
 # Image #
 #-------#
@@ -103,7 +98,6 @@ textures/img/temp.dds Static
 # Character Voices #
 #------------------#
 sounds/aris/aris_title.ogg Static 
-sounds/aris/aris_stage_enter.ogg Static 
 sounds/aris/aris_stage_start.ogg Static 
 sounds/aris/aris_smile_0.ogg Static 
 sounds/aris/aris_smile_1.ogg Static 
@@ -112,7 +106,6 @@ sounds/aris/aris_damage_1.ogg Static
 sounds/aris/aris_damage_2.ogg Static 
 
 sounds/momoi/momoi_title.ogg Static 
-sounds/momoi/momoi_stage_enter.ogg Static 
 sounds/momoi/momoi_stage_start.ogg Static 
 sounds/momoi/momoi_smile_0.ogg Static 
 sounds/momoi/momoi_smile_1.ogg Static 
@@ -121,7 +114,6 @@ sounds/momoi/momoi_damage_1.ogg Static
 sounds/momoi/momoi_damage_2.ogg Static
 
 sounds/midori/midori_title.ogg Static 
-sounds/midori/midori_stage_enter.ogg Static 
 sounds/midori/midori_stage_start.ogg Static 
 sounds/midori/midori_smile_0.ogg Static 
 sounds/midori/midori_smile_1.ogg Static 
@@ -130,7 +122,6 @@ sounds/midori/midori_damage_1.ogg Static
 sounds/midori/midori_damage_2.ogg Static
 
 sounds/yuzu/yuzu_title.ogg Static 
-sounds/yuzu/yuzu_stage_enter.ogg Static 
 sounds/yuzu/yuzu_stage_start.ogg Static 
 sounds/yuzu/yuzu_smile_0.ogg Static 
 sounds/yuzu/yuzu_smile_1.ogg Static 
@@ -138,28 +129,26 @@ sounds/yuzu/yuzu_damage_0.ogg Static
 sounds/yuzu/yuzu_damage_1.ogg Static 
 sounds/yuzu/yuzu_damage_2.ogg Static
 
+sounds/yuuka/yuuka_attack_0.ogg Static 
 sounds/yuuka/yuuka_attack_1.ogg Static 
 sounds/yuuka/yuuka_attack_2.ogg Static 
 sounds/yuuka/yuuka_attack_3.ogg Static 
+sounds/yuuka/yuuka_victory.ogg Static 
+sounds/yuuka/yuuka_defeat.ogg Static 
 
 #--------#
 # Sounds #
 #--------#
-sounds/ui/click.ogg Static 
-sounds/ui/cancel.ogg Static 
+sounds/effect/click.ogg Static 
+sounds/effect/cancel.ogg Static 
+sounds/effect/start.ogg Static 
+sounds/effect/pause.ogg Static 
+sounds/effect/finish.ogg Static 
+sounds/effect/bullet_fire.ogg Static 
 
-sounds/effect/aris_fire_sound.ogg Static 
-sounds/effect/momoi_fire_sound.ogg Static 
-sounds/effect/midori_fire_sound.ogg Static 
-sounds/effect/yuzu_fire_sound.ogg Static 
-sounds/effect/yuuka_fire_sound.ogg Static 
-
-sounds/effect/start_sound.ogg Static 
-sounds/effect/pause_sound.ogg Static 
-sounds/effect/finish_sound.ogg Static 
-
-sounds/bgm/theme18.ogg Static 
-sounds/bgm/theme19.ogg Static 
-sounds/bgm/theme23.ogg Static 
-sounds/bgm/theme30.ogg Static 
-sounds/bgm/theme64.ogg Static
+sounds/bgm/theme18.ogg Static # Mechanical JUNGLE - KARUT
+sounds/bgm/theme19.ogg Static # Virtual Storm - KARUT
+sounds/bgm/theme23.ogg Static # Party Time - Mitsukiyo
+sounds/bgm/theme27.ogg Static # Fade Out - KARUT
+sounds/bgm/theme30.ogg Static # Crossfire - KARUT
+sounds/bgm/theme64.ogg Static # Pixel Time - Mitsukiyo

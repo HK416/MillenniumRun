@@ -37,6 +37,9 @@ pub enum ScriptTags {
     PuaseSettingButton,  
     PauseRetryButton, 
     PauseExitButton, 
+    ResultConditionText0,
+    ResultConditionText1,
+    ResultConditionText2,
 }
 
 

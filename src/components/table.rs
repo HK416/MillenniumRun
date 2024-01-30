@@ -1,5 +1,6 @@
 use std::mem::size_of;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::collections::VecDeque;
 
 use rand::seq::SliceRandom;
 use glam::{Mat4, Vec4, Vec3, Vec2};
@@ -114,18 +115,19 @@ impl TileBrush {
     }
 
     #[inline]
-    pub fn num_of_instances(&self) -> u32 {
-        self.instances.lock().expect("Failed to access variable.").len() as u32
-    }
-
-    #[inline]
     pub fn draw<'pass>(
         &'pass self, 
         rpass: &mut wgpu::RenderPass<'pass>
     ) {
+        let guard = self.instances.lock().expect("Failed to access variable.");
+        let num_instances = guard.len() as u32;
+        if num_instances == 0 {
+            return;
+        }
+
         rpass.set_pipeline(&self.pipeline);
         rpass.set_vertex_buffer(0, self.instance_buffer.slice(..));
-        rpass.draw(0..4, 0..self.num_of_instances());
+        rpass.draw(0..4, 0..num_instances);
     }
 }
 
@@ -434,4 +436,266 @@ impl Table {
 #[inline]
 pub fn position(pos: f32, size: f32, index: usize) -> f32 {
     pos + 0.5 * size + size * index as f32
+}
+
+/// #### 한국어 </br>
+/// 플레이어가 소유한 타일을 갱신합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Updates tiles owned by the player. </br>
+/// 
+pub fn update_owned_tiles(
+    queue: &wgpu::Queue, 
+    tile_brush: &TileBrush, 
+    table: &mut Table, 
+    path: &mut VecDeque<(usize, usize)>, 
+    num_owned_tiles: &mut u32, 
+    owned_tiles: &mut VecDeque<(f64, Vec<(usize, usize)>)>, 
+) {
+    // (한국어) 안쪽 영역의 타일들을 구한다.
+    // (English Translation) Finds the tiles in the inner area. 
+    let mut inside_tiles = search_inside_tiles(
+        table.num_rows, 
+        table.num_cols, 
+        &table.tiles, 
+        &path, 
+    );
+
+    // (한국어) 선분 영역의 타일들을 구한다.
+    // (English Translation) Finds the tiles in edge area.
+    let mut edge_tiles = search_edge_tiles(
+        table.num_rows, 
+        table.num_cols, 
+        &table.tiles,
+        &path, 
+        &inside_tiles
+    );
+
+    // (한국어) 안쪽 영역 타일에 경로를 포함시킵니다.
+    // (English Translation) Include the path in the inner area tile.
+    while let Some(path) = path.pop_front() {
+        inside_tiles.push(path);
+    }
+
+    tile_brush.update(queue, |instances| {
+        // (한국어) 선분 영역의 타일을 갱신합니다.
+        // (English Translation) Updates the tiles in the edge area.
+        for &(r, c) in edge_tiles.iter() {
+            instances[r * table.num_cols + c].color = table.edge_color;
+        }
+        
+        // (한국어) 안쪽 영역의 타일을 갱신합니다.
+        // (English Translation) Updates the tiles in the inner area.
+        for &(r, c) in inside_tiles.iter() {
+            instances[r * table.num_cols + c].color = table.fill_color;
+        }
+    });
+
+    // (한국어) 타일을 재설정 합니다.
+    // (English Translation) Reset the tile.
+    while let Some((r, c)) = edge_tiles.pop() {
+        table.tiles[r][c].color = table.edge_color;
+    }
+    for &(r, c) in inside_tiles.iter() {
+        table.tiles[r][c].color = table.fill_color;
+        table.tiles[r][c].visited = true;
+    }
+
+    // (한국어) 소유 타일 목록에 추가합니다.
+    // (English Translation) Add it to the list of owned tiles. 
+    *num_owned_tiles += inside_tiles.len() as u32;
+    owned_tiles.push_back((0.0, inside_tiles));
+}
+
+/// #### 한국어 </br>
+/// 선분 안쪽 타일들을 찾는 함수입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a function that finds tiles inside a edge. </br>
+/// 
+fn search_inside_tiles(
+    max_rows: usize, 
+    max_cols: usize, 
+    tiles: &Vec<Vec<Tile>>,
+    path: &VecDeque<(usize, usize)>,
+) -> Vec<(usize, usize)> {
+    // (한국어) 타일의 캐시입니다.
+    // (English Translation) This is the cache of tiles.
+    let mut inside = vec![vec![false; max_cols]; max_rows];
+    let mut outside = vec![vec![false; max_cols]; max_rows];
+
+    for &(r, c) in path.iter() {
+        // (한국어) 한 위치의 탐색 가능한 영역을 담습니다.
+        // (English Translation) Contains the navigable area of a position. 
+        let mut begins = Vec::with_capacity(8);
+        if r > 0 && !tiles[r - 1][c].visited { begins.push((r - 1, c)); }
+        if r + 1 < max_rows && !tiles[r + 1][c].visited { begins.push((r + 1, c)); }
+        if c > 0 && !tiles[r][c - 1].visited { begins.push((r, c - 1)); }
+        if c + 1 < max_cols && !tiles[r][c + 1].visited { begins.push((r, c + 1)); }
+        if r > 0 && c > 0 && !tiles[r - 1][c - 1].visited { begins.push((r - 1, c - 1)); }
+        if r > 0 && c + 1 < max_cols && !tiles[r - 1][c + 1].visited { begins.push((r - 1, c + 1)); }
+        if r + 1 < max_rows && c > 0 && !tiles[r + 1][c - 1].visited { begins.push((r + 1, c - 1)); }
+        if r + 1 < max_rows && c + 1 < max_cols && !tiles[r + 1][c + 1].visited { begins.push((r + 1, c + 1)); }
+        
+        // (한국어) 깊이 우선 탐색으로 인접한 영역을 찾습니다.
+        // (English Translation) Find adjacent regions using `DFS`.
+        'check: while let Some(pos) = begins.pop() {
+            let mut is_inside = true;
+            let mut stack = VecDeque::with_capacity(max_rows);
+            let mut visited = vec![vec![false; max_cols]; max_rows];
+            stack.push_back(pos);
+
+            'dfs: while let Some((r, c)) = stack.pop_back() {
+                // (한국어) 타일이 캐시에 속해 있는 경우 탐색할 필요가 없음.
+                // (English Translation) No need to seek if the tile is included in the cache.
+                if outside[r][c] || inside[r][c] {
+                    continue 'check;
+                }
+
+                // (한국어) 깊이 우선 탐색에서 중복되는 탐색 영역을 제거함.
+                // (English Translation) Removal of overlapping search areas in `DFS`.
+                if visited[r][c] {
+                    continue 'dfs;
+                }
+
+                // (한국어) 경계에 속하지 않으므로 외부 영역에 해당함.
+                // (English Translation) Since it does not belong to the boundary, it is an external area.
+                if r == 0 || r + 1 == max_rows || c == 0 || c + 1 == max_cols {
+                    is_inside = false;
+                }
+
+                visited[r][c] = true;
+
+                if r > 0 && !tiles[r - 1][c].visited && !visited[r - 1][c] { 
+                    stack.push_back((r - 1, c)); 
+                }
+
+                if r + 1 < max_rows && !tiles[r + 1][c].visited && !visited[r + 1][c] { 
+                    stack.push_back((r + 1, c)); 
+                }
+
+                if c > 0 && !tiles[r][c - 1].visited && !visited[r][c - 1] { 
+                    stack.push_back((r, c - 1));
+                }
+
+                if c + 1 < max_cols && !tiles[r][c + 1].visited && !visited[r][c + 1] { 
+                    stack.push_back((r, c + 1)); 
+                }
+
+                if r > 0 && c > 0 
+                && !tiles[r - 1][c - 1].visited && !visited[r - 1][c - 1] { 
+                    stack.push_back((r - 1, c - 1)); 
+                }
+
+                if r > 0 && c + 1 < max_cols 
+                && !tiles[r - 1][c + 1].visited && !visited[r - 1][c + 1] { 
+                    stack.push_back((r - 1, c + 1)); 
+                }
+
+                if r + 1 < max_rows && c > 0 
+                && !tiles[r + 1][c - 1].visited && !visited[r + 1][c - 1] { 
+                    stack.push_back((r + 1, c - 1)); 
+                }
+
+                if r + 1 < max_rows && c + 1 < max_cols 
+                && !tiles[r + 1][c + 1].visited && !visited[r + 1][c + 1] { 
+                    stack.push_back((r + 1, c + 1)); 
+                }
+            }
+
+            if is_inside {
+                for r in 0..max_rows {
+                    for c in 0..max_cols {
+                        inside[r][c] |= visited[r][c];
+                    }
+                }
+            } else {
+                for r in 0..max_rows {
+                    for c in 0..max_cols {
+                        outside[r][c] |= visited[r][c];
+                    }
+                }
+            }
+        }
+    }
+
+    return inside.into_iter()
+    .enumerate()
+    .map(|(r, rows)| {
+        rows.into_iter()
+            .enumerate()
+            .filter_map(|(c, flag)| {
+                flag.then_some((r, c))
+            })
+            .collect::<Vec<_>>()
+    })
+    .flatten()
+    .collect();
+}
+
+/// #### 한국어 </br>
+/// 선분 타일들을 찾는 함수입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a function that finds edge tiles. </br>
+/// 
+fn search_edge_tiles(
+    max_rows: usize, 
+    max_cols: usize, 
+    tiles: &Vec<Vec<Tile>>,
+    path: &VecDeque<(usize, usize)>,
+    inside_tiles: &Vec<(usize, usize)>, 
+) -> Vec<(usize, usize)> {
+    let mut visited = vec![vec![false; max_cols]; max_rows];
+    for &(r, c) in inside_tiles.iter() {
+        visited[r][c] = true;
+    }
+    for &(r, c) in path.iter() {
+        visited[r][c] = true;
+    }
+
+    let mut edge_tiles = Vec::with_capacity(path.len() * 2);
+    for &(r, c) in path.iter() {
+        if r > 0 && !visited[r - 1][c] && !tiles[r - 1][c].visited {
+            edge_tiles.push((r - 1, c));
+            visited[r - 1][c] = true;
+        }
+
+        if r + 1 < max_rows && !visited[r + 1][c] && !tiles[r + 1][c].visited {
+            edge_tiles.push((r + 1, c));
+            visited[r + 1][c] = true;
+        }
+
+        if c > 0 && !visited[r][c - 1] && !tiles[r][c - 1].visited {
+            edge_tiles.push((r, c - 1));
+            visited[r][c - 1] = true;
+        }
+
+        if c + 1 < max_cols && !visited[r][c + 1] && !tiles[r][c + 1].visited {
+            edge_tiles.push((r, c + 1));
+            visited[r][c + 1] = true;
+        }
+
+        if r > 0 && c > 0 && !visited[r - 1][c - 1] && !tiles[r - 1][c - 1].visited {
+            edge_tiles.push((r - 1, c - 1));
+            visited[r - 1][c - 1] = true;
+        }
+
+        if r > 0 && c + 1 < max_cols && !visited[r - 1][c + 1] && !tiles[r - 1][c + 1].visited {
+            edge_tiles.push((r - 1, c + 1));
+            visited[r - 1][c + 1] = true;
+        }
+
+        if r + 1 < max_rows && c > 0 && !visited[r + 1][c - 1] && !tiles[r + 1][c - 1].visited {
+            edge_tiles.push((r + 1, c - 1));
+            visited[r + 1][c - 1] = true;
+        }
+
+        if r + 1 < max_rows && c + 1 < max_cols && !visited[r + 1][c + 1] && !tiles[r + 1][c + 1].visited {
+            edge_tiles.push((r + 1, c + 1));
+            visited[r + 1][c + 1] = true;
+        }
+    }
+    
+    return edge_tiles;
 }

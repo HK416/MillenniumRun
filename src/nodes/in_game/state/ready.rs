@@ -133,7 +133,10 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 카메라를 바인드 합니다.
         // (English Translation) Bind the camera. 
         camera.bind(&mut rpass);
-        ui_brush.draw(&mut rpass, [&this.background, &this.stage_image].into_iter());
+        ui_brush.draw(&mut rpass, [
+            &this.background, 
+            &this.stage_images[this.result_star_index], 
+        ].into_iter());
         tile_brush.draw(&mut rpass);
     }
 

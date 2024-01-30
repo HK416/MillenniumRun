@@ -117,7 +117,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             [
                 &this.background, 
-                &this.stage_image, 
+                &this.stage_images[this.result_star_index], 
                 &this.player_faces[&this.player.face_state], 
                 &this.boss_faces[&this.boss.face_state], 
             ].into_iter()
@@ -192,7 +192,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         // (English Translation) Bind the camera. 
         camera.bind(&mut rpass);
         sprite_brush.draw(&mut rpass, [&this.player.sprite, &this.boss.sprite].into_iter());
-        bullet_brush.draw(&mut rpass, [&this.player_bullet, &this.enemy_bullet].into_iter());
+        bullet_brush.draw(&mut rpass, [&this.enemy_bullet].into_iter());
     }
 
     {
@@ -276,12 +276,26 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
     Ok(())
 }
 
-fn handle_keyboard_input(this: &mut InGameScene, _shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
+fn handle_keyboard_input(this: &mut InGameScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
+    // (한국어) 사용할 공유 객체들을 가져옵니다.
+    // (English Translation) Get shared objects to use.
+    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+
     match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput { event, .. } => 
             if let PhysicalKey::Code(code) = event.physical_key {
                 if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
+                    // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
+                    // (English Translation) Returns the color of the selected ui to its original color.
+                    let mut guard = FOCUSED_PAUSE_BTN.lock().expect("Failed to access variable.");
+                    if let Some((tag, ui_color, text_color)) = guard.take() {
+                        if let Some((ui, text)) = this.pause_buttons.get(&tag) {
+                            ui.update(queue, |data| data.color = (ui_color, data.color.w).into());
+                            text.update(queue, |data| data.color = (text_color, data.color.w).into());
+                        }
+                    }
+
                     // (한국어) 다음 게임 장면 상태로 변경합니다.
                     // (English Translation) Change to the next game scene state. 
                     this.timer = 0.0;
@@ -396,6 +410,11 @@ fn btn_released(tag: utils::PauseButton, this: &mut InGameScene, shared: &mut Sh
             this.state = InGameState::ExitPause;
             Ok(())
         },
+        utils::PauseButton::Exit => {
+            this.timer = 0.0;
+            this.state = InGameState::EnterMsgBox;
+            Ok(())
+        }
         _ => Ok(())
     }
 }

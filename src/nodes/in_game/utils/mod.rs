@@ -13,7 +13,7 @@ use crate::{
         sprite::SpriteBrush, 
         text::{TextBrush, Text, TextBuilder},
         ui::{UiBrush, UiObject, UiObjectBuilder}, 
-        player::{Actor, Player, PlayerFaceState}, 
+        player::{self, Actor, Player, PlayerFaceState}, 
         boss::{Boss, BossFaceState}, 
         table::{Table, TileBrush}, 
         anchor::Anchor, margin::Margin, 
@@ -46,6 +46,18 @@ pub enum PauseButton {
     Resume = 0, 
     Setting = 1, 
     Exit = 3, 
+}
+
+/// #### 한국어 </br>
+/// 종료 창의 버튼 목록입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is the list of buttons in the exit window.
+/// 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ExitWndButton {
+    Yes = 0,
+    No = 1, 
 }
 
 
@@ -167,10 +179,10 @@ pub fn create_game_scene(
             size: wgpu::Extent3d {
                 width: 2048, 
                 height: 2048, 
-                depth_or_array_layers: 1,
+                depth_or_array_layers: 5,
             }, 
             dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bgra8Unorm, 
+            format: wgpu::TextureFormat::   Bc7RgbaUnorm, 
             mip_level_count: 12, 
             sample_count: 1, 
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
@@ -178,71 +190,16 @@ pub fn create_game_scene(
             device, 
             queue
         })?;
-    let texture_view = texture.create_view(
-        &wgpu::TextureViewDescriptor {
-            ..Default::default()
-        }
-    );
 
     // (한국어) 사용완료한 에셋을 해제합니다.
     // (English Translation) Release assets that have been used. 
     asset_bundle.release(image_rel_path);
 
-    let stage_image = create_stage_image(
+    let stage_images = create_stage_image(
         device, 
         tex_sampler, 
-        &texture_view, 
+        &texture,  
         ui_brush
-    );
-
-
-
-    // (한국어) 이미지 파일을 불러오고, 텍스처를 생성합니다. 
-    // (English Translation) Load an image file and create a texture. 
-    let rel_path = match actor {
-        Actor::Aris => path::ARIS_BULLET_TEXTURE_PATH, 
-        Actor::Yuzu => path::YUZU_BULLET_TEXTURE_PATH, 
-        Actor::Momoi => path::MOMOI_BULLET_TEXTURE_PATH, 
-        Actor::Midori => path::MIDORI_BULLET_TEXTURE_PATH, 
-    };
-
-    let texture = asset_bundle.get(rel_path)?
-        .read(&DdsTextureDecoder {
-            name: Some("Bullet(Player)"), 
-            size: match actor {
-                Actor::Aris => wgpu::Extent3d { width: 256, height: 128, depth_or_array_layers: 1 }, 
-                _ => wgpu::Extent3d { width: 128, height: 128, depth_or_array_layers: 1 },
-            }, 
-            dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bgra8Unorm, 
-            mip_level_count: match actor {
-                Actor::Aris => 9,
-                _ => 8,
-            }, 
-            sample_count: 1,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
-            view_formats: &[], 
-            device, 
-            queue, 
-        })?;
-    let texture_view = texture.create_view(
-        &wgpu::TextureViewDescriptor {
-            ..Default::default()
-        }
-    );
-
-    // (한국어) 사용완료한 에셋을 해제합니다.
-    // (English Translation) Release assets that have been used. 
-    asset_bundle.release(rel_path);
-
-    // (한국어) 총알 스프라이트들을 생성합니다.
-    // (English Translation) Create bullet sprites.
-    let player_bullet = Bullet::with_capacity(
-        device, 
-        tex_sampler, 
-        &texture_view, 
-        bullet_brush, 
-        64
     );
 
 
@@ -489,6 +446,139 @@ pub fn create_game_scene(
         text_brush
     );
 
+    let pause_exit_window = create_exit_window(
+        nexon_lv2_gothic_medium, 
+        script, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush, 
+        text_brush
+    )?;
+
+
+    // (한국어) `dds`이미지 파일로부터 버튼 텍스처를 생성합니다.
+    // (English Translation) Create a button texture from a `dds`image file. 
+    let texture = asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("MediumButton"),
+            size: wgpu::Extent3d {
+                width: 768,
+                height: 256,
+                depth_or_array_layers: 1,
+            },
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            mip_level_count: 10,
+            sample_count: 1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            device,
+            queue,
+        })?;
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
+    
+    // (한국어) 사용을 완료한 에셋을 정리합니다.
+    // (English Translation) Release assets that have been used.
+    asset_bundle.release(path::BUTTON_MEDIUM_TEXTURE_PATH);
+
+    let result_window_btn = create_result_window_btn(
+        nexon_lv2_gothic_medium, 
+        script, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush, 
+        text_brush
+    )?;
+
+    let result_condition_texts = create_result_condition_texts(
+        nexon_lv2_gothic_bold, 
+        script, 
+        device, 
+        queue, 
+        text_brush
+    )?;
+
+    let pause_exit_buttons = create_exit_buttons(
+        nexon_lv2_gothic_medium, 
+        script, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush, 
+        text_brush
+    )?;
+
+
+    // (한국어) `dds`이미지 파일로부터 버튼 텍스처를 생성합니다.
+    // (English Translation) Create a button texture from a `dds`image file. 
+    let texture = asset_bundle.get(path::FINISH_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("Finish"),
+            size: wgpu::Extent3d {
+                width: 1024,
+                height: 512,
+                depth_or_array_layers: 1,
+            },
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            mip_level_count: 11,
+            sample_count: 1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            device,
+            queue,
+        })?;
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
+    
+    // (한국어) 사용을 완료한 에셋을 정리합니다.
+    // (English Translation) Release assets that have been used.
+    asset_bundle.release(path::FINISH_TEXTURE_PATH);
+
+    let result_title = create_result_title(
+        device, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush
+    );
+
+
+    // (한국어) `dds`이미지 파일로부터 버튼 텍스처를 생성합니다.
+    // (English Translation) Create a button texture from a `dds`image file. 
+    let texture = asset_bundle.get(path::STAR_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("Star"),
+            size: wgpu::Extent3d {
+                width: 1024,
+                height: 512,
+                depth_or_array_layers: 5,
+            },
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            mip_level_count: 11,
+            sample_count: 1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            device,
+            queue,
+        })?;
+    let result_stars = create_result_stars(
+        device, 
+        tex_sampler, 
+        &texture, 
+        ui_brush
+    );
+
 
 
     // (한국어) 이미지 파일을 불러오고, 텍스처를 생성합니다. 
@@ -520,9 +610,9 @@ pub fn create_game_scene(
     // (English Translation) Release assets that have been used. 
     asset_bundle.release(path::HEART_TEXTURE_PATH);
 
-    let lost_hearts = VecDeque::with_capacity(3);
+    let lost_hearts = VecDeque::with_capacity(player::MAX_PLAYER_HEARTS);
     let owned_hearts = create_player_hearts(
-        3, 
+        player::MAX_PLAYER_HEARTS as u32, 
         device, 
         tex_sampler, 
         &texture_view, 
@@ -622,38 +712,34 @@ pub fn create_game_scene(
 
     let player_damage_sounds = match actor {
         Actor::Aris => vec![
+            path::YUUKA_ATTACK0_SOUND_PATH, 
             path::ARIS_DAMAGE_0_SOUND_PATH, 
             path::ARIS_DAMAGE_1_SOUND_PATH, 
             path::ARIS_DAMAGE_2_SOUND_PATH
         ], 
         Actor::Momoi => vec![
+            path::YUUKA_ATTACK0_SOUND_PATH, 
             path::MOMOI_DAMAGE_0_SOUND_PATH, 
             path::MOMOI_DAMAGE_1_SOUND_PATH, 
             path::MOMOI_DAMAGE_2_SOUND_PATH, 
         ], 
         Actor::Midori => vec![
+            path::YUUKA_ATTACK0_SOUND_PATH, 
             path::MIDORI_DAMAGE_0_SOUND_PATH, 
             path::MIDORI_DAMAGE_1_SOUND_PATH, 
             path::MIDORI_DAMAGE_2_SOUND_PATH, 
         ], 
         Actor::Yuzu => vec![
+            path::YUUKA_ATTACK0_SOUND_PATH, 
             path::YUZU_DAMAGE_0_SOUND_PATH, 
             path::YUZU_DAMAGE_1_SOUND_PATH, 
             path::YUZU_DAMAGE_2_SOUND_PATH, 
         ],
     };
 
-    let player_fire_sound = match actor {
-        Actor::Aris => path::ARIS_FIRE_SOUND_PATH, 
-        Actor::Momoi => path::MOMOI_FIRE_SOUND_PATH, 
-        Actor::Midori => path::MIDORI_FIRE_SOUND_PATH, 
-        Actor::Yuzu => path::YUZU_FIRE_SOUND_PATH, 
-    };
-
     let mut candidates = [path::THEME18_SOUND_PATH, path::THEME19_SOUND_PATH, path::THEME30_SOUND_PATH];
     candidates.shuffle(&mut rand::thread_rng());
     let bgm_sound = candidates[0];
-
 
     // (한국어) 현재 게임 장면에서 사용되는 에셋들을 로드합니다.
     // (English Translation) Loads assets used in the current game scene. 
@@ -664,19 +750,18 @@ pub fn create_game_scene(
     for rel_path in player_damage_sounds.iter() {
         asset_bundle.get(rel_path)?;
     }
-    asset_bundle.get(player_fire_sound)?;
     asset_bundle.get(bgm_sound)?;
 
 
 
     Ok(InGameScene {
-        mouse_pressed: false, 
-        keyboard_pressed: false, 
         timer: 0.0, 
         remaining_time: in_game::GAME_DURATION_SEC, 
         state: InGameState::default(), 
         pause_text, 
         pause_buttons, 
+        pause_exit_window, 
+        pause_exit_buttons, 
         percent, 
         percent_timer: in_game::PERCENT_DURATION, 
         num_total_tiles: in_game::NUM_TILES as u32, 
@@ -686,21 +771,24 @@ pub fn create_game_scene(
         lost_hearts, 
         foreground, 
         background, 
-        stage_image, 
+        stage_images, 
         menu_button, 
         remaining_timer_bg, 
         remaining_timer_text, 
+        result_window_btn, 
+        result_title, 
+        result_stars, 
+        result_star_index: 0, 
+        result_condition_texts, 
         table, 
         player, 
         player_faces, 
-        player_bullet, 
         boss, 
         boss_faces, 
         enemy_bullet, 
         player_startup_sound, 
         player_smile_sounds, 
         player_damage_sounds, 
-        player_fire_sound, 
         bgm_sound, 
     })
 }
@@ -763,23 +851,114 @@ fn create_background(
 fn create_stage_image(
     device: &wgpu::Device, 
     tex_sampler: &wgpu::Sampler, 
-    texture_view: &wgpu::TextureView, 
+    texture: &wgpu::Texture, 
     ui_brush: &UiBrush
-) -> UiObject {
-    UiObjectBuilder::new(
-        Some("StageImage"), 
-        tex_sampler, 
-        texture_view, 
-        ui_brush
-    )
-    .with_anchor(Anchor::new(
-        0.9166666667, 
-        0.0625, 
-        0.0833333333, 
-        0.6875
-    ))
-    .with_global_translation((0.0, 0.0, 0.75).into())
-    .build(device)
+) -> Vec<UiObject> {
+    let global_translation = Vec3::new(0.0, 0.0, 0.75);
+    let anchor = Anchor::new(0.9166666667, 0.0625, 0.0833333333, 0.6875);
+    let mut stage_images = Vec::with_capacity(5);
+
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 0, 
+            array_layer_count: Some(1), 
+            ..Default::default()
+        }
+    );
+    stage_images.push(
+        UiObjectBuilder::new(
+            Some("StageImage0"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_global_translation(global_translation)
+        .build(device)
+    );
+
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 1, 
+            array_layer_count: Some(1), 
+            ..Default::default()
+        }
+    );
+    stage_images.push(
+        UiObjectBuilder::new(
+            Some("StageImage1"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_global_translation(global_translation)
+        .build(device)
+    );
+
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 2, 
+            array_layer_count: Some(1), 
+            ..Default::default()
+        }
+    );
+    stage_images.push(
+        UiObjectBuilder::new(
+            Some("StageImage2"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_global_translation(global_translation)
+        .build(device)
+    );
+
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 3, 
+            array_layer_count: Some(1), 
+            ..Default::default()
+        }
+    );
+    stage_images.push(
+        UiObjectBuilder::new(
+            Some("StageImage3"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_global_translation(global_translation)
+        .build(device)
+    );
+
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 4, 
+            array_layer_count: Some(1), 
+            ..Default::default()
+        }
+    );
+    stage_images.push(
+        UiObjectBuilder::new(
+            Some("StageImage4"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_global_translation(global_translation)
+        .build(device)
+    );
+
+    return stage_images;
 }
 
 /// #### 한국어 </br>
@@ -949,7 +1128,7 @@ fn create_boss_face(
     ui_brush: &UiBrush
 ) -> HashMap<BossFaceState, UiObject> {
     let scale = Vec3::new(0.0, 0.0, 0.0);
-    let anchor = Anchor::new(0.45 + 0.1333333333, 0.72, 0.45, 0.82);
+    let anchor = Anchor::new(0.55 + 0.1333333333, 0.72, 0.55, 0.82);
 
     // (한국어) `Idle` 상태의 보스 얼굴 인터페이스를 생성합니다.
     // (English Transalation) Creates a boss face interface in the `Idle` state. 
@@ -1037,7 +1216,7 @@ fn create_player_hearts(
     let left = 0.72;
     let right = 0.98;
     let gap = 0.02;
-    let height = 0.75;
+    let height = 0.78;
     let width = ((right - left) - gap * (life_count - 1) as f32) / life_count as f32;
 
     let mut hearts = VecDeque::with_capacity(life_count as usize);
@@ -1080,7 +1259,7 @@ fn create_percent_text(
         "0%", 
         text_brush
     )
-    .with_anchor(Anchor::new(0.1 + 0.3, 0.72, 0.1, 0.98))
+    .with_anchor(Anchor::new(0.15 + 0.3, 0.72, 0.15, 0.98))
     .with_translation((0.0, 0.0, 0.25).into())
     .build(device, queue)
 }
@@ -1198,4 +1377,395 @@ fn create_pause_buttons(
         (PauseButton::Setting, (setting_btn, setting_text)), 
         (PauseButton::Exit, (exit_button, exit_text)), 
     ]));
+}
+
+/// #### 한국어 </br>
+/// 결과 화면의 `나가기` 버튼을 생성합니다. </br>
+///  
+/// #### English (Translation) </br>
+/// Creates an `Exit` button in the results screen. </br>
+/// 
+fn create_result_window_btn(
+    font: &FontArc, 
+    script: &Script,
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush
+) -> AppResult<(UiObject, Text)> {
+    let anchor = Anchor::new(0.075 + 0.1155555556, 0.72, 0.075, 0.98);
+    Ok((
+        UiObjectBuilder::new(
+            Some("ExitButton"), 
+            tex_sampler, 
+            texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_color((255.0 / 255.0, 103.0 / 255.0, 105.0 / 255.0, 0.0).into())
+        .build(device), 
+        TextBuilder::new(
+            Some("ExitButton"), 
+            font, 
+            script.get(ScriptTags::ExitButton)?, 
+            text_brush
+        )
+        .with_anchor(anchor)
+        .with_color((0.0, 0.0, 0.0, 0.0).into())
+        .build(device, queue)
+    ))
+}
+
+/// #### 한국어 </br>
+/// 결과 화면의 타이틀을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a title for the results screen. </br>
+/// 
+fn create_result_title(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush
+) -> UiObject {
+    UiObjectBuilder::new(
+        Some("Finish"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.8 + 0.1733333333, 0.72, 0.8, 0.98))
+    .with_local_scale((0.0, 0.0, 0.0).into())
+    .build(device)
+}
+
+/// #### 한국어 </br>
+/// 결과 화면의 점수를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates scores for the results screen. </br>
+/// 
+fn create_result_stars(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    texture: &wgpu::Texture, 
+    ui_brush: &UiBrush
+) -> Vec<UiObject> {
+    let scale = Vec3::new(0.0, 0.0, 0.0);
+    let anchor = Anchor::new(0.7 + 0.1333333333, 0.75, 0.7, 0.95);
+    let mut stars = Vec::with_capacity(5);
+    
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 0, 
+            array_layer_count: Some(1), 
+            ..Default::default()
+        }
+    );
+    stars.push(
+        UiObjectBuilder::new(
+            Some("EmptyStar"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_local_scale(scale)
+        .build(device)
+    );
+
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 1, 
+            array_layer_count: Some(1),
+            ..Default::default()
+        }
+    );
+    stars.push(
+        UiObjectBuilder::new(
+            Some("OneStar"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_local_scale(scale)
+        .build(device)
+    );
+
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 2, 
+            array_layer_count: Some(1),
+            ..Default::default()
+        }
+    );
+    stars.push(
+        UiObjectBuilder::new(
+            Some("TwoStar"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_local_scale(scale)
+        .build(device)
+    );
+
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 3, 
+            array_layer_count: Some(1),
+            ..Default::default()
+        }
+    );
+    stars.push(
+        UiObjectBuilder::new(
+            Some("ThreeStar"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_local_scale(scale)
+        .build(device)
+    );
+
+    let texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2), 
+            base_array_layer: 4, 
+            array_layer_count: Some(1),
+            ..Default::default()
+        }
+    );
+    stars.push(
+        UiObjectBuilder::new(
+            Some("PerfectStar"), 
+            tex_sampler, 
+            &texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_local_scale(scale)
+        .build(device)
+    );
+
+    return stars;
+}
+
+fn create_result_condition_texts(
+    font: &FontArc, 
+    script: &Script,
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    text_brush: &TextBrush
+) -> AppResult<Vec<Text>> {
+    let mut texts = Vec::with_capacity(3);
+    texts.push(
+        TextBuilder::new(
+            Some("Condition0"), 
+            font, 
+            script.get(ScriptTags::ResultConditionText0)?,
+            text_brush
+        )
+        .with_anchor(Anchor::new(0.625, 0.72, 0.55, 0.98))
+        .with_color((162.0 / 255.0, 162.0 / 255.0, 160.0 / 255.0, 0.0).into())
+        .build(device, queue)
+    );
+
+    texts.push(
+        TextBuilder::new(
+            Some("Condition1"), 
+            font, 
+            script.get(ScriptTags::ResultConditionText1)?, 
+            text_brush
+        )
+        .with_anchor(Anchor::new(0.55, 0.72, 0.475, 0.98))
+        .with_color((162.0 / 255.0, 162.0 / 255.0, 160.0 / 255.0, 0.0).into())
+        .build(device, queue)
+    );
+
+    texts.push(
+        TextBuilder::new(
+            Some("Condition2"), 
+            font, 
+            script.get(ScriptTags::ResultConditionText2)?, 
+            text_brush
+        )
+        .with_anchor(Anchor::new(0.475, 0.72, 0.4, 0.98))
+        .with_color((162.0 / 255.0, 162.0 / 255.0, 160.0 / 255.0, 0.0).into())
+        .build(device, queue)
+    );
+
+    return Ok(texts);
+}
+
+/// #### 한국어 </br>
+/// 종료 창을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates a exit window. </br>
+/// 
+fn create_exit_window(
+    font: &FontArc, 
+    script: &Script,
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush
+) -> AppResult<(UiObject, Text)> {
+    const ANCHOR_TOP: f32 = 0.5;
+    const ANCHOR_LEFT: f32 = 0.5;
+    const ANCHOR_BOTTOM: f32 = 0.5;
+    const ANCHOR_RIGHT: f32 = 0.5;
+
+    const WND_WIDTH: i32 = 400;
+    const WND_HEIGHT: i32 = WND_WIDTH / 4 * 3;
+    
+    let anchor = Anchor::new(ANCHOR_TOP, ANCHOR_LEFT, ANCHOR_BOTTOM, ANCHOR_RIGHT);
+    let wnd_margin = Margin::new(WND_HEIGHT / 2, -WND_WIDTH / 2, -WND_HEIGHT / 2, WND_WIDTH / 2);
+    let text_margin = Margin::new(WND_HEIGHT / 5, -WND_WIDTH / 2, 0, WND_WIDTH / 2);
+    let ui = UiObjectBuilder::new(
+        Some("ExitWindow"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(anchor)
+    .with_margin(wnd_margin)
+    .with_color((1.0, 1.0, 1.0, 1.0).into())
+    .with_global_scale((0.0, 0.0, 0.0).into())
+    .with_global_translation((0.0, 0.0, 0.75).into())
+    .build(device);
+
+    let text = TextBuilder::new(
+        Some("ExitWindowText"), 
+        font, 
+        script.get(ScriptTags::ExitMessage)?, 
+        text_brush
+    )
+    .with_anchor(anchor)
+    .with_margin(text_margin)
+    .with_scale((0.0, 0.0, 0.0).into())
+    .with_color((0.0, 0.0, 0.0, 1.0).into())
+    .with_translation((0.0, 0.0, 0.5).into())
+    .build(device, queue);
+
+    return Ok((ui, text));
+}
+
+/// #### 한국어 </br>
+/// 종료 창의 버튼들을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create buttons for the exit window. </br>
+/// 
+fn create_exit_buttons(
+    font: &FontArc, 
+    script: &Script, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush
+) -> AppResult<HashMap<ExitWndButton, (UiObject, Text)>> {
+    const ANCHOR_TOP: f32 = 0.5;
+    const ANCHOR_LEFT: f32 = 0.5;
+    const ANCHOR_BOTTOM: f32 = 0.5;
+    const ANCHOR_RIGHT: f32 = 0.5;
+
+    const WND_WIDTH: i32 = 400;
+    const WND_HEIGHT: i32 = WND_WIDTH / 4 * 3;
+
+    const BTN_WIDTH: i32 = 150;
+    const BTN_HEIGHT: i32 = BTN_WIDTH / 3;
+    const BTN_TRANSLATION: Vec3 = Vec3::new(0.0, 0.0, 0.5);
+
+    const YES_BTN_COLOR: Vec4 = Vec4::new(255.0 / 255.0, 103.0 / 255.0, 105.0 / 255.0, 1.0);
+    const NO_BTN_COLOR: Vec4 = Vec4::new(1.0, 1.0, 1.0, 1.0);
+
+    const TEXT_TRANSLATION: Vec3 = Vec3::new(0.0, 0.0, 0.25);
+    const TEXT_COLOR: Vec4 = Vec4::new(0.0, 0.0, 0.0, 1.0);
+
+    let anchor = Anchor::new(ANCHOR_TOP, ANCHOR_LEFT, ANCHOR_BOTTOM, ANCHOR_RIGHT);
+    let margin = Margin::new(
+        BTN_HEIGHT / 2 - WND_HEIGHT * 3 / 10,
+        -BTN_WIDTH / 2 - WND_WIDTH / 5,
+        -BTN_HEIGHT / 2 - WND_HEIGHT * 3 / 10,
+        BTN_WIDTH / 2 - WND_WIDTH / 5
+    );
+    let yes_btn = (
+        UiObjectBuilder::new(
+            Some("YesButton"), 
+            tex_sampler, 
+            texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_margin(margin)
+        .with_color(YES_BTN_COLOR)
+        .with_global_translation(BTN_TRANSLATION)
+        .build(device),
+        TextBuilder::new(
+            Some("YesButtonText"), 
+            font, 
+            script.get(ScriptTags::ExitButton)?, 
+            text_brush
+        )
+        .with_anchor(anchor)
+        .with_margin(margin)
+        .with_color(TEXT_COLOR)
+        .with_translation(TEXT_TRANSLATION)
+        .build(device, queue)
+    );
+
+    let anchor = Anchor::new(ANCHOR_TOP, ANCHOR_LEFT, ANCHOR_BOTTOM, ANCHOR_RIGHT);
+    let margin = Margin::new(
+        BTN_HEIGHT / 2 - WND_HEIGHT * 3 / 10,
+        -BTN_WIDTH / 2 + WND_WIDTH / 5,
+        -BTN_HEIGHT / 2 - WND_HEIGHT * 3 / 10,
+        BTN_WIDTH / 2 + WND_WIDTH / 5
+    );
+    let no_btn = (
+        UiObjectBuilder::new(
+            Some("NoButton"), 
+            tex_sampler, 
+            texture_view, 
+            ui_brush
+        )
+        .with_anchor(anchor)
+        .with_margin(margin)
+        .with_color(NO_BTN_COLOR)
+        .with_global_translation(BTN_TRANSLATION)
+        .build(device), 
+        TextBuilder::new(
+            Some("NoButtonText"), 
+            font, 
+            script.get(ScriptTags::NoExitButton)?, 
+            text_brush
+        )
+        .with_anchor(anchor)
+        .with_margin(margin)
+        .with_color(TEXT_COLOR)
+        .with_translation(TEXT_TRANSLATION)
+        .build(device, queue)
+    );
+
+    return Ok([
+            (ExitWndButton::Yes, yes_btn), 
+            (ExitWndButton::No, no_btn),
+        ]
+        .into_iter()
+        .collect()
+    )
 }
