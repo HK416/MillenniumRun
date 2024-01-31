@@ -1,4 +1,4 @@
-use std::sync::{Arc, Once};
+use std::sync::Arc;
 use std::collections::VecDeque;
 
 use winit::event::Event;
