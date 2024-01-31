@@ -69,7 +69,7 @@ fn game_loop(
     event_loop_proxy: EventLoopProxy<AppEvent>,
     asset_bundle: AssetBundle,
     instance: Arc<wgpu::Instance>,
-    surface: Arc<wgpu::Surface>,
+    surface: Arc<wgpu::Surface<'static>>,
     adapter: Arc<wgpu::Adapter>,
     device: Arc<wgpu::Device>,
     queue: Arc<wgpu::Queue>,
@@ -87,6 +87,7 @@ fn game_loop(
         width: window.inner_size().width,
         height: window.inner_size().height,
         present_mode: wgpu::PresentMode::AutoVsync,
+        desired_maximum_frame_latency: 2,
         alpha_mode: wgpu::CompositeAlphaMode::Auto,
         view_formats: vec![],
     };
@@ -322,7 +323,7 @@ fn main() {
         device,
         queue,
         depth_buffer,
-    ) = setup_render_ctx(&window)
+    ) = setup_render_ctx(window.clone())
         .unwrap_or_else(|err| popup_err_msg_and_abort(err));
 
 

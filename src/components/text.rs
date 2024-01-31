@@ -514,6 +514,7 @@ fn create_characters(
                             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
                             view_formats: &[]
                         }, 
+                        wgpu::util::TextureDataOrder::LayerMajor,
                         &data
                     );
                     let texture_view = texture.create_view(

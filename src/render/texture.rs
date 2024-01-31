@@ -51,6 +51,7 @@ impl<'a> AssetDecoder for DdsTextureDecoder<'a> {
                 usage: self.usage,
                 view_formats: self.view_formats,
             }, 
+            wgpu::util::TextureDataOrder::LayerMajor,
             &dds.data
         );
 

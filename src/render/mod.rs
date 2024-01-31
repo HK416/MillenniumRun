@@ -27,19 +27,19 @@ use crate::{
 /// If an error occurs while executing this function, it returns `GameError`. </br>
 /// 
 #[inline]
-pub fn setup_render_ctx(window: &Window) -> AppResult<(
+pub fn setup_render_ctx(window: Arc<Window>) -> AppResult<(
     Arc<wgpu::Instance>,
-    Arc<wgpu::Surface>,
+    Arc<wgpu::Surface<'static>>,
     Arc<wgpu::Adapter>,
     Arc<wgpu::Device>,
     Arc<wgpu::Queue>,
     Arc<depth::DepthBuffer>
 )> {
     let instance = create_render_instance();
-    let surface = create_render_surface(&instance, window)?;
+    let surface = create_render_surface(&instance, window.clone())?;
     let adapter = create_render_adapter(&instance, &surface)?;
     let (device, queue) = create_render_device_and_queue(&adapter)?;
-    let depth_buffer = create_depth_buffer(window, &device);
+    let depth_buffer = create_depth_buffer(&window, &device);
     Ok((instance, surface, adapter, device, queue, depth_buffer))
 }
 
@@ -90,9 +90,9 @@ fn create_render_instance() -> Arc<wgpu::Instance> {
 #[inline]
 fn create_render_surface(
     instance: &wgpu::Instance, 
-    window: &Window
-) -> AppResult<Arc<wgpu::Surface>> {
-    unsafe { instance.create_surface(window) }
+    window: Arc<Window>
+) -> AppResult<Arc<wgpu::Surface<'static>>> {
+    instance.create_surface(wgpu::SurfaceTarget::from(window))
         .map(|surface| surface.into())
         .map_err(|err| game_err!(
             "Failed to create rendering context",
@@ -146,8 +146,8 @@ fn create_render_device_and_queue(
         adapter.request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("Rendering device"),
-                features: wgpu::Features::TEXTURE_COMPRESSION_BC,
-                limits: wgpu::Limits::downlevel_defaults()
+                required_features: wgpu::Features::TEXTURE_COMPRESSION_BC,
+                required_limits: wgpu::Limits::downlevel_defaults()
                     .using_resolution(adapter.limits())
             }, 
             None

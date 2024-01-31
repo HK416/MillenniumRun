@@ -1,8 +1,8 @@
 [package]
 name = "MillenniumRun"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
-rust-version = "1.73"
+rust-version = "1.75"
 authors = ["HK416 <powerspirit127@gmail.com>", ]
 description = """
     KOR: Nexon Games가 제작한 Blue Archive의 팬 제작 2차 창작 게임.
@@ -14,7 +14,7 @@ publish = false
 
 [dependencies]
 log = "0.4.*" # MIT or Apache-2.0 license.
-env_logger = "0.10.*" # MIT or Apache-2.0 license.
+env_logger = "0.11.*" # MIT or Apache-2.0 license.
 rand = "0.8.*" # MIT or Apache-2.0 license.
 ron = "0.8.*" # MIT or Apache-2.0 license.
 serde = { version = "1.0.*", features = ["derive"] } # MIT or Apache-2.0 license.
@@ -28,7 +28,7 @@ sha2 = "0.10.*" # MIT or Apache-2.0 license.
 
 image = "0.24.*" # MIT license.
 ddsfile = "0.5.*" # MIT license. 
-wgpu = { version = "0.18.*", features = ["spirv"] } # Graphics crate / MIT or Apache-2.0 license.
+wgpu = { version = "0.19.*", features = ["spirv"] } # Graphics crate / MIT or Apache-2.0 license.
 winit = { version = "0.29.*", features = ["rwh_05"] } # Window crate / Apache-2.0 license.
 rodio = "0.17.*" # Sound crate / MIT or Apache-2.0 license.
 ab_glyph = "0.2.*" # Font crate / Apache-2.0 license.
