@@ -139,7 +139,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             [
                 &this.background, 
-                &this.stage_images[this.result_star_index], 
+                &this.stage_images[this.result_star_index.min(3)], 
                 &this.player_faces[&this.player.face_state], 
                 &this.boss_faces[&this.boss.face_state], 
             ].into_iter()

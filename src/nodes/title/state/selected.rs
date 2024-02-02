@@ -74,6 +74,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
+    let actor = shared.get::<Actor>().unwrap();
 
     
     // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
@@ -229,6 +230,10 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             this.stage_window.iter()
             .map(|(it, _)| it)
         );
+        ui_brush.draw(&mut rpass, [
+            &this.stage_images[&actor].0, 
+            &this.stage_images[&actor].1
+        ].into_iter());
         text_brush.draw(
             &mut rpass, 
             this.stage_window.iter()
@@ -236,6 +241,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             .flatten()
             .map(|it| it)
         );
+        text_brush.draw(&mut rpass, [&this.stage_images[&actor].2].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -309,7 +315,7 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                     // (한국어) 다음 게임 장면 상태로 변경합니다.
                     // (English Translation) Change to the next game scene state.
                     this.state = TitleState::ExitSelected;
-                    this.elapsed_time = 0.0;
+                    this.timer = 0.0;
                 } else if KeyCode::Enter == code && !event.repeat && event.state.is_pressed() {
                     sound::play_click_sound(shared)?;
                     let state = shared.get_mut::<SceneState>().unwrap();
@@ -608,7 +614,7 @@ fn sys_ui_released(btn: utils::SystemButtons, this: &mut TitleScene, shared: &mu
             }
 
             this.state = TitleState::ExitSelected;
-            this.elapsed_time = 0.0;
+            this.timer = 0.0;
             Ok(())
         },
         _ => Ok(())

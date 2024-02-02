@@ -193,7 +193,7 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
 
                     // (한국어) 다음 게임 장면 상태로 변경합니다.
                     // (English Translation) Change to the next game scene state.
-                    this.elapsed_time = 0.0;
+                    this.timer = 0.0;
                     this.state = TitleState::ExitSetting;
                 };
             },
@@ -342,7 +342,7 @@ fn ui_released(btn: utils::SettingWindow, this: &mut TitleScene, shared: &mut Sh
         },
         utils::SettingWindow::Exit => {
             this.state = TitleState::ExitSetting;
-            this.elapsed_time = 0.0;
+            this.timer = 0.0;
             Ok(())
         },
         _ => Ok(())

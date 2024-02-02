@@ -49,13 +49,13 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
 
     // (한국어) 경과한 시간을 갱신합니다.
     // (English Translation) Updates the elapsed time.
-    this.elapsed_time += elapsed_time;
+    this.timer += elapsed_time;
     
     // (한국어) 카메라와 사용자 인터페이스를 갱신합니다.
     // (English Translation) Updates the camera and user interfaces.
-    let delta = delta_time(this.elapsed_time.min(HIDE_TIME), HIDE_TIME).min(1.0);
+    let delta = delta_time(this.timer.min(HIDE_TIME), HIDE_TIME).min(1.0);
     let menu_alpha = 1.0 - 1.0 * delta;
-    let delta = delta_time(this.elapsed_time, MOVING_TIME).min(1.0);
+    let delta = delta_time(this.timer, MOVING_TIME).min(1.0);
     let stage_alpha = 1.0 * delta;
     update_button_alpha(this.menu_buttons.iter_mut(), &queue, menu_alpha);
     update_button_alpha(this.system_buttons.iter_mut(), &queue, stage_alpha);
@@ -63,9 +63,9 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) changes to the next state if it is greater than the duration.
-    if this.elapsed_time >= DURATION {
+    if this.timer >= DURATION {
         this.state = TitleState::Stage;
-        this.elapsed_time = 0.0;
+        this.timer = 0.0;
         return Ok(());
     }
 

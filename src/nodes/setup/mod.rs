@@ -19,6 +19,7 @@ use crate::{
         camera::CameraCreator,
         font::FontDecoder,
         script::{Script, ScriptDecoder},
+        save::{SaveDecoder, SaveEncoder},
         user::{Language, Settings, SettingsEncoder, SettingsDecoder},
     },
     nodes::{
@@ -58,9 +59,15 @@ impl SceneNode for SetupScene {
         // (한국어) 게임에서 사용되는 에셋 파일들을 로드합니다. 
         // (English Translation) Load asset files used in the game. 
         self.loading = Some(thread::spawn(move || {
+            asset_bundle.get(path::SAVE_PATH)?;
             asset_bundle.get(path::SETTINGS_PATH)?;
 
             asset_bundle.get(path::DUMMY_TEXTURE_PATH)?;
+            asset_bundle.get(path::ARIS_IMG_TEXTURE_PATH)?;
+            asset_bundle.get(path::MOMOI_IMG_TEXTURE_PATH)?;
+            asset_bundle.get(path::MIDORI_IMG_TEXTURE_PATH)?;
+            asset_bundle.get(path::YUZU_IMG_TEXTURE_PATH)?;
+            asset_bundle.get(path::YUUKA_IMG_TEXTURE_PATH)?;
 
             asset_bundle.get(path::NEXON_LV2_GOTHIC_PATH)?;
             asset_bundle.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)?;
@@ -112,6 +119,8 @@ impl SceneNode for SetupScene {
         let sprite_brush = setup_sprite_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
         let textures = setup_texture_map(device, queue, asset_bundle)?;
         let (settings, script) = setup_window(window, asset_bundle)?;
+        let save = asset_bundle.get(path::SAVE_PATH)?
+            .read_or_default(&SaveEncoder, &SaveDecoder)?;
 
         // (한국어) 공유할 객체들을 공유 객체에 등록합니다.
         // (English Translation) Register objects to be shared as shared objects.
@@ -126,6 +135,7 @@ impl SceneNode for SetupScene {
         shared.push(sprite_brush);
         shared.push(textures);
         shared.push(settings);
+        shared.push(save);
         if let Some(script) = script {
             shared.push(Arc::new(script));
         };
@@ -340,12 +350,144 @@ fn setup_texture_map(
             queue
         })?;
 
+    // (한국어) 기본 스테이지 이미지 텍스처를 생성합니다.
+    // (English Translation) Create an default stage image texture.
+    let default_img = asset_bundle.get(path::DEF_IMG_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("DefaultImage"), 
+            size: wgpu::Extent3d {
+                width: 2048, 
+                height: 2048, 
+                depth_or_array_layers: 1,
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+            mip_level_count: 12, 
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue
+        })?;
+
+    // (한국어) Aris 이미지 텍스처를 생성합니다.
+    // (English Translation) Create an Aris image texture.
+    let aris_img = asset_bundle.get(path::ARIS_IMG_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("ArisImage"), 
+            size: wgpu::Extent3d {
+                width: 2048, 
+                height: 2048, 
+                depth_or_array_layers: 3,
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+            mip_level_count: 12, 
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue
+        })?;
+
+    // (한국어) Momoi 이미지 텍스처를 생성합니다.
+    // (English Translation) Create an Momoi image texture.
+    let momoi_img = asset_bundle.get(path::MOMOI_IMG_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("MomoiImage"), 
+            size: wgpu::Extent3d {
+                width: 2048, 
+                height: 2048, 
+                depth_or_array_layers: 3,
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+            mip_level_count: 12, 
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue
+        })?;
+
+    // (한국어) Midori 이미지 텍스처를 생성합니다.
+    // (English Translation) Create an Midori image texture.
+    let midori_img = asset_bundle.get(path::MIDORI_IMG_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("MidoriImage"), 
+            size: wgpu::Extent3d {
+                width: 2048, 
+                height: 2048, 
+                depth_or_array_layers: 3,
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+            mip_level_count: 12, 
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue
+        })?;
+
+    // (한국어) Yuzu 이미지 텍스처를 생성합니다.
+    // (English Translation) Create an Yuzu image texture.
+    let yuzu_img = asset_bundle.get(path::YUZU_IMG_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("YuzuImage"), 
+            size: wgpu::Extent3d {
+                width: 2048, 
+                height: 2048, 
+                depth_or_array_layers: 3,
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+            mip_level_count: 12, 
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue
+        })?;
+
+    // (한국어) Yuuka 이미지 텍스처를 생성합니다.
+    // (English Translation) Create an Yuuka image texture.
+    let yuuka_img = asset_bundle.get(path::YUUKA_IMG_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("YuukaImage"), 
+            size: wgpu::Extent3d {
+                width: 2048, 
+                height: 2048, 
+                depth_or_array_layers: 1,
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+            mip_level_count: 12, 
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device, 
+            queue
+        })?;
+
     // (한국어) 사용완료한 에셋을 해제합니다.
     // (English Translation)  Release assets that have been used. 
     asset_bundle.release(path::DUMMY_TEXTURE_PATH);
+    asset_bundle.release(path::DEF_IMG_TEXTURE_PATH);
+    asset_bundle.release(path::ARIS_IMG_TEXTURE_PATH);
+    asset_bundle.release(path::MOMOI_IMG_TEXTURE_PATH);
+    asset_bundle.release(path::MIDORI_IMG_TEXTURE_PATH);
+    asset_bundle.release(path::YUZU_IMG_TEXTURE_PATH);
+    asset_bundle.release(path::YUUKA_IMG_TEXTURE_PATH);
 
     return Ok(HashMap::from_iter([
         (path::DUMMY_TEXTURE_PATH.to_string(), dummy), 
+        (path::DEF_IMG_TEXTURE_PATH.to_string(), default_img), 
+        (path::ARIS_IMG_TEXTURE_PATH.to_string(), aris_img), 
+        (path::MOMOI_IMG_TEXTURE_PATH.to_string(), momoi_img),
+        (path::MIDORI_IMG_TEXTURE_PATH.to_string(), midori_img),
+        (path::YUZU_IMG_TEXTURE_PATH.to_string(), yuzu_img),
+        (path::YUUKA_IMG_TEXTURE_PATH.to_string(), yuuka_img),
     ]).into());
 }
 

@@ -13,11 +13,12 @@ use crate::{
         sprite::SpriteBrush, 
         camera::GameCamera, 
         bullet::{self, BulletBrush}, 
-        player, 
+        player::{self, Actor}, 
         table::TileBrush, 
         user::Settings, 
         interpolation, 
         sound, 
+        save::{SaveData, SaveEncoder}, 
     },
     nodes::in_game::{
         utils,
@@ -81,6 +82,49 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, total_time: f64, elap
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) If it is greater than the duration, it changes to the next state. 
     if this.timer >= DURATION {
+        // (한국어) 세이브 파일에 결과를 저장합니다.
+        // (English Translation) Save the results in a save file.
+        let asset_bundle = shared.get::<AssetBundle>().unwrap().clone();
+        let save = shared.get_mut::<SaveData>().unwrap();
+        let updated = match this.player.actor {
+            Actor::Aris => { 
+                if save.stage_aris < this.num_owned_tiles as u16 {
+                    save.stage_aris = this.num_owned_tiles as u16;
+                    true
+                } else {
+                    false
+                }
+            }, 
+            Actor::Momoi => {
+                if save.stage_momoi < this.num_owned_tiles as u16 {
+                    save.stage_momoi = this.num_owned_tiles as u16;
+                    true
+                } else {
+                    false
+                }
+            }, 
+            Actor::Midori => { 
+                if save.stage_midori < this.num_owned_tiles as u16 {
+                    save.stage_midori = this.num_owned_tiles as u16;
+                    true
+                } else {
+                    false
+                }
+            }, 
+            Actor::Yuzu => { 
+                if save.stage_yuzu < this.num_owned_tiles as u16 {
+                    save.stage_yuzu = this.num_owned_tiles as u16;
+                    true
+                } else {
+                    false
+                }
+            }
+        };
+        if updated {
+            asset_bundle.get(path::SAVE_PATH)?
+                .write(&SaveEncoder, save)?;
+        }
+
         // (한국어) 사용할 공유 객체들을 가져옵니다.
         // (English Translation) Get shared object to use.
         let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
@@ -180,7 +224,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             [
                 &this.background, 
-                &this.stage_images[this.result_star_index], 
+                &this.stage_images[this.result_star_index.min(3)], 
                 &this.player_faces[&this.player.face_state], 
                 &this.boss_faces[&this.boss.face_state], 
             ].into_iter()

@@ -1,4 +1,4 @@
-# Millennium Run (ver 0.7.0)
+# Millennium Run (ver 0.8.0)
 
 [한국어](#개요) </br>
 [English (Translation)](#overview) </br>
@@ -15,7 +15,7 @@ Blue Archive의 2차 창작 가이드라인을 준수하며, \"Nexon Games\"또�
 ### 실행 확인 표
 |Windows|Linux|macOS|
 |:---:|:---:|:---:|
-|✅|❓|✅|
+|❓|❓|✅|
 
 # 개발 현황
 - 한국어 지원
@@ -23,7 +23,7 @@ Blue Archive의 2차 창작 가이드라인을 준수하며, \"Nexon Games\"또�
 
 # 해야 할 목록
 - 게임 스테이지 이미지 리소스 확보 (진행중)
-- 세이브 파일 구현
+- ~~세이브 파일 구현~~ (완료)
 - 게임 설정 구현
 - 튜토리얼 구현
 - 다국어 지원
@@ -42,7 +42,7 @@ Blue Archive의 2차 창작 가이드라인을 준수하며, \"Nexon Games\"또�
 ### Execution check table
 |Windows|Linux|macOS|
 |:---:|:---:|:---:|
-|✅|❓|✅|
+|❓|❓|✅|
 
 # Development status
 - Korean language support
@@ -50,7 +50,7 @@ Blue Archive의 2차 창작 가이드라인을 준수하며, \"Nexon Games\"또�
 
 # TODO list
 - Securing game stage image resources (in progress)
-- Save file implementation
+- ~~Save file implementation~~ (complete)
 - Implementing game settings
 - Tutorial Implementation
 - Multilingual support

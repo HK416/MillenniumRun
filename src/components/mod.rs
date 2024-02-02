@@ -13,6 +13,7 @@ pub mod script;
 pub mod sound;
 pub mod transform;
 pub mod user;
+pub mod save;
 
 pub mod bullet;
 pub mod player;

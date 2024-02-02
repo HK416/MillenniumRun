@@ -141,7 +141,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             [
                 &this.background, 
-                &this.stage_images[this.result_star_index], 
+                &this.stage_images[this.result_star_index.min(3)], 
                 &this.player_faces[&this.player.face_state], 
                 &this.boss_faces[&this.boss.face_state], 
             ].into_iter()
@@ -622,28 +622,28 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
             } else if 20.0 <= percent && percent < 50.0 {
                 for text in this.result_condition_texts[0..=0].iter() {
                     text.update(queue, |data| {
-                        data.color = (255.0 / 255.0, 233.0 / 255.0, 10.0 / 255.0, 0.0).into();
+                        data.color = (255.0 / 255.0, 215.0 / 255.0, 0.0 / 255.0, 0.0).into();
                     });
                 }
                 this.result_star_index = 1;
             } else if 50.0 <= percent && percent < 80.0 {
                 for text in this.result_condition_texts[0..=1].iter() {
                     text.update(queue, |data| {
-                        data.color = (255.0 / 255.0, 233.0 / 255.0, 10.0 / 255.0, 0.0).into();
+                        data.color = (255.0 / 255.0, 215.0 / 255.0, 0.0 / 255.0, 0.0).into();
                     });
                 }
                 this.result_star_index = 2;
             } else if 80.0 <= percent  && percent < 100.0 {
                 for text in this.result_condition_texts[0..=2].iter() {
                     text.update(queue, |data| {
-                        data.color = (255.0 / 255.0, 233.0 / 255.0, 10.0 / 255.0, 0.0).into();
+                        data.color = (255.0 / 255.0, 215.0 / 255.0, 0.0 / 255.0, 0.0).into();
                     });
                 }
                 this.result_star_index = 3;
             } else {
                 for text in this.result_condition_texts[0..=2].iter() {
                     text.update(queue, |data| {
-                        data.color = (255.0 / 255.0, 233.0 / 255.0, 10.0 / 255.0, 0.0).into();
+                        data.color = (255.0 / 255.0, 215.0 / 255.0, 0.0 / 255.0, 0.0).into();
                     });
                 }
                 this.result_star_index = 4;

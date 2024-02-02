@@ -13,16 +13,19 @@ use ab_glyph::FontArc;
 use crate::{
     assets::bundle::AssetBundle, 
     components::{
-        text::TextBrush, 
         ui::{UiBrush, UiObject, UiObjectBuilder},
+        text::{Text, TextBrush, TextBuilder}, 
         script::Script,
         sprite::SpriteBrush, 
         anchor::Anchor, 
+        player::Actor, 
+        save::SaveData, 
     },
     nodes::{
         path, 
         title::TitleScene,
         title::state::TitleState,  
+        in_game::NUM_TILES, 
         consts::PIXEL_PER_METER, 
     },
     render::texture::DdsTextureDecoder,
@@ -44,6 +47,7 @@ pub const STAGE_RIGHT: f32 = 4.0 * PIXEL_PER_METER;
 
 
 pub fn create_title_scene(
+    save: &SaveData, 
     nexon_lv2_gothic_medium: &FontArc, 
     device: &wgpu::Device, 
     queue: &wgpu::Queue, 
@@ -544,9 +548,38 @@ pub fn create_title_scene(
     );
 
 
+    let star_texture = asset_bundle.get(path::STAR_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("Star"),
+            size: wgpu::Extent3d {
+                width: 1024,
+                height: 512,
+                depth_or_array_layers: 5,
+            },
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            mip_level_count: 11,
+            sample_count: 1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            device,
+            queue,
+        })?;
+    let stage_images = create_stage_image(
+        nexon_lv2_gothic_medium, 
+        &save, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &star_texture, 
+        texture_map, 
+        ui_brush, 
+        text_brush
+    );
+
+
     return Ok(TitleScene {
-        light_timer: 0.0, 
-        elapsed_time: 0.0, 
+        timer: 0.0, 
         state: TitleState::Enter,
         foreground, 
         background, 
@@ -556,6 +589,7 @@ pub fn create_title_scene(
         exit_msg_box, 
         setting_window, 
         stage_window, 
+        stage_images, 
     })
 }
 
@@ -583,4 +617,138 @@ fn create_foreground(
     .with_anchor(Anchor::new(1.0, 0.0, 0.0, 1.0))
     .with_color((1.0, 1.0, 1.0, 1.0).into())
     .build(device)
+}
+
+/// #### 한국어 </br>
+/// 스테이지 이미지들을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates a stage images. </br>
+/// 
+fn create_stage_image(
+    font: &FontArc, 
+    save: &SaveData, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue,
+    tex_sampler: &wgpu::Sampler, 
+    star_texture: &wgpu::Texture, 
+    texture_map: &HashMap<String, wgpu::Texture>, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush
+) -> HashMap<Actor, (UiObject, UiObject, Text)> {
+    const MAP: [(Actor, &'static str, &'static str); 4] = [
+        (Actor::Aris, "Aris", path::ARIS_IMG_TEXTURE_PATH), 
+        (Actor::Momoi, "Momoi", path::MOMOI_IMG_TEXTURE_PATH), 
+        (Actor::Midori, "Midori", path::MIDORI_IMG_TEXTURE_PATH), 
+        (Actor::Yuzu, "Yuzu", path::YUZU_IMG_TEXTURE_PATH)
+    ];
+
+    let mut stage_image = HashMap::new();
+    for (actor, label, rel_path) in MAP {
+        let percent = match actor {
+            Actor::Aris => save.stage_aris,
+            Actor::Momoi => save.stage_momoi, 
+            Actor::Midori => save.stage_midori, 
+            Actor::Yuzu => save.stage_yuzu
+        } as f32 / NUM_TILES as f32 * 100.0;
+
+        let stage_img_texture_view = if percent < 20.0 {
+            let texture = texture_map.get(path::DEF_IMG_TEXTURE_PATH)
+                .expect("Registered texture not found!");
+            texture.create_view(
+                &wgpu::TextureViewDescriptor {
+                    ..Default::default()
+                }
+            )
+        } else {
+            let texture = texture_map.get(rel_path)
+                .expect("Registered texture not found!");
+            texture.create_view(
+                &wgpu::TextureViewDescriptor {
+                    base_array_layer: 
+                        if 20.0 <= percent && percent < 50.0 {
+                            0
+                        } else if 50.0 <= percent && percent < 80.0 {
+                            1
+                        } else {
+                            2
+                        },
+                    array_layer_count: Some(1),
+                    dimension: Some(wgpu::TextureViewDimension::D2), 
+                    ..Default::default()
+                }
+            )
+        };
+
+        let star_img_texture_view = star_texture.create_view(
+            &wgpu::TextureViewDescriptor {
+                base_array_layer: if percent < 20.0 {
+                    0
+                } else if 20.0 <= percent && percent < 50.0 {
+                    1
+                } else if 50.0 <= percent && percent < 80.0 {
+                    2
+                } else if 80.0 <= percent && percent < 100.0 {
+                    3
+                } else {
+                    4
+                },
+                array_layer_count: Some(1), 
+                dimension: Some(wgpu::TextureViewDimension::D2), 
+                ..Default::default()
+            }
+        );
+
+        stage_image.insert(
+            actor, 
+            (
+                UiObjectBuilder::new(
+                    Some(&format!("{}StageImage", label)), 
+                    tex_sampler, 
+                    &stage_img_texture_view, 
+                    ui_brush
+                )
+                .with_anchor(Anchor::new(
+                    1.0 - 0.05, 
+                    0.5 - 0.225, 
+                    1.0 - 0.35, 
+                    0.5 - 0.225 + 0.225
+                ))
+                .with_color((1.0, 1.0, 1.0, 0.0).into())
+                .with_global_translation((0.0, 0.0, 0.3).into())
+                .build(device), 
+                UiObjectBuilder::new(
+                    Some(&format!("{}StageResult", label)), 
+                    tex_sampler, 
+                    &star_img_texture_view, 
+                    ui_brush
+                )
+                .with_anchor(Anchor::new(
+                    1.0 - 0.05, 
+                    0.55, 
+                    1.0 - 0.15, 
+                    0.55 + 0.15))
+                .with_color((1.0, 1.0, 1.0, 0.0).into())
+                .with_global_translation((0.0, 0.0, 0.3).into())
+                .build(device), 
+                TextBuilder::new(
+                    Some(&format!("{}StagePercentText", label)), 
+                    font, 
+                    &format!("{}%", percent.floor()), 
+                    text_brush
+                )
+                .with_anchor(Anchor::new(
+                    1.0 - 0.2, 
+                    0.55, 
+                    1.0 - 0.3, 
+                    0.55 + 0.15
+                ))
+                .with_color((0.0, 0.0, 0.0, 0.0).into())
+                .with_translation((0.0, 0.0, 0.3).into())
+                .build(device, queue)
+            )
+        );
+    }
+
+    return stage_image;
 }

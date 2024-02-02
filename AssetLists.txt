@@ -92,7 +92,12 @@ textures/bg/ingame_background.dds Static
 #-------#
 # Image #
 #-------#
-textures/img/temp.dds Static
+textures/img/default.dds Static 
+textures/img/aris.dds Static # Test Image
+textures/img/momoi.dds Static # Test Image
+textures/img/midori.dds Static # Test Image
+textures/img/yuzu.dds Static # Test Image
+textures/img/yuuka.dds Static # Test Image
 
 #------------------#
 # Character Voices #

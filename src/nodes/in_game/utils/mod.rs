@@ -170,35 +170,19 @@ pub fn create_game_scene(
 
     // (한국어) 이미지 파일을 불러오고, 텍스처를 생성합니다. 
     // (English Translation) Load an image file and create a texture. 
-    let image_rel_path = match actor {
-        _ => path::TEMP_STAGE_TEXTURE_PATH, 
-    };
-    let texture = asset_bundle.get(image_rel_path)?
-        .read(&DdsTextureDecoder {
-            name: Some("Image"), 
-            size: wgpu::Extent3d {
-                width: 2048, 
-                height: 2048, 
-                depth_or_array_layers: 5,
-            }, 
-            dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::   Bc7RgbaUnorm, 
-            mip_level_count: 12, 
-            sample_count: 1, 
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
-            view_formats: &[], 
-            device, 
-            queue
-        })?;
-
-    // (한국어) 사용완료한 에셋을 해제합니다.
-    // (English Translation) Release assets that have been used. 
-    asset_bundle.release(image_rel_path);
-
+    let default_texture = texture_map.get(path::DEF_IMG_TEXTURE_PATH)
+        .expect("Registered image not found!");
+    let stage_texture = texture_map.get(match actor {
+        Actor::Aris => path::ARIS_IMG_TEXTURE_PATH, 
+        Actor::Momoi => path::MOMOI_IMG_TEXTURE_PATH, 
+        Actor::Midori => path::MIDORI_IMG_TEXTURE_PATH, 
+        Actor::Yuzu => path::YUZU_IMG_TEXTURE_PATH, 
+    }).expect("Registered image not found!");
     let stage_images = create_stage_image(
         device, 
         tex_sampler, 
-        &texture,  
+        default_texture, 
+        stage_texture,
         ui_brush
     );
 
@@ -851,18 +835,16 @@ fn create_background(
 fn create_stage_image(
     device: &wgpu::Device, 
     tex_sampler: &wgpu::Sampler, 
-    texture: &wgpu::Texture, 
+    default_texture: &wgpu::Texture, 
+    stage_texture: &wgpu::Texture, 
     ui_brush: &UiBrush
 ) -> Vec<UiObject> {
     let global_translation = Vec3::new(0.0, 0.0, 0.75);
     let anchor = Anchor::new(0.9166666667, 0.0625, 0.0833333333, 0.6875);
     let mut stage_images = Vec::with_capacity(5);
 
-    let texture_view = texture.create_view(
+    let texture_view = default_texture.create_view(
         &wgpu::TextureViewDescriptor {
-            dimension: Some(wgpu::TextureViewDimension::D2), 
-            base_array_layer: 0, 
-            array_layer_count: Some(1), 
             ..Default::default()
         }
     );
@@ -878,10 +860,10 @@ fn create_stage_image(
         .build(device)
     );
 
-    let texture_view = texture.create_view(
+    let texture_view = stage_texture.create_view(
         &wgpu::TextureViewDescriptor {
             dimension: Some(wgpu::TextureViewDimension::D2), 
-            base_array_layer: 1, 
+            base_array_layer: 0, 
             array_layer_count: Some(1), 
             ..Default::default()
         }
@@ -898,10 +880,10 @@ fn create_stage_image(
         .build(device)
     );
 
-    let texture_view = texture.create_view(
+    let texture_view = stage_texture.create_view(
         &wgpu::TextureViewDescriptor {
             dimension: Some(wgpu::TextureViewDimension::D2), 
-            base_array_layer: 2, 
+            base_array_layer: 1, 
             array_layer_count: Some(1), 
             ..Default::default()
         }
@@ -918,10 +900,10 @@ fn create_stage_image(
         .build(device)
     );
 
-    let texture_view = texture.create_view(
+    let texture_view = stage_texture.create_view(
         &wgpu::TextureViewDescriptor {
             dimension: Some(wgpu::TextureViewDimension::D2), 
-            base_array_layer: 3, 
+            base_array_layer: 2, 
             array_layer_count: Some(1), 
             ..Default::default()
         }
@@ -929,26 +911,6 @@ fn create_stage_image(
     stage_images.push(
         UiObjectBuilder::new(
             Some("StageImage3"), 
-            tex_sampler, 
-            &texture_view, 
-            ui_brush
-        )
-        .with_anchor(anchor)
-        .with_global_translation(global_translation)
-        .build(device)
-    );
-
-    let texture_view = texture.create_view(
-        &wgpu::TextureViewDescriptor {
-            dimension: Some(wgpu::TextureViewDimension::D2), 
-            base_array_layer: 4, 
-            array_layer_count: Some(1), 
-            ..Default::default()
-        }
-    );
-    stage_images.push(
-        UiObjectBuilder::new(
-            Some("StageImage4"), 
             tex_sampler, 
             &texture_view, 
             ui_brush

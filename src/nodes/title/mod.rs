@@ -24,6 +24,7 @@ use crate::{
         script::Script,
         user::Settings,
         player::Actor, 
+        save::SaveData, 
     },
     render::depth::DepthBuffer, 
     nodes::{
@@ -68,6 +69,7 @@ impl SceneNode for TitleLoading {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 사용할 공유 객체를 가져옵니다.
         // (English Translation) Get shared object to use.
+        let save = shared.get::<SaveData>().unwrap().clone();
         let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap().clone();
         let script = shared.get::<Arc<Script>>().unwrap().clone();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
@@ -84,6 +86,7 @@ impl SceneNode for TitleLoading {
             // (English Translation) Loads assets to be used in the current game scene. 
             asset_bundle.get(path::CLICK_SOUND_PATH)?;
             asset_bundle.get(path::CANCEL_SOUND_PATH)?;
+            asset_bundle.get(path::STAR_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_RETURN_TEXTURE_PATH)?;
@@ -96,14 +99,12 @@ impl SceneNode for TitleLoading {
             asset_bundle.get(path::MOMOI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::MIDORI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::YUZU_STANDING_TEXTURE_PATH)?;
-        
-            // TODO: 스테이지 이미지들을 추가하세요.
-            asset_bundle.get(path::TEMP_STAGE_TEXTURE_PATH)?;
 
             let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
             .expect("A registered font could not be found.");
 
             utils::create_title_scene(
+                &save, 
                 &nexon_lv2_gothic_medium, 
                 &device, 
                 &queue, 
@@ -298,8 +299,7 @@ impl Default for TitleLoading {
 /// 
 #[derive(Debug)]
 pub struct TitleScene {
-    pub light_timer: f64,
-    pub elapsed_time: f64,
+    pub timer: f64,
     pub state: state::TitleState,
     pub foreground: UiObject, 
     pub background: Sprite,
@@ -309,6 +309,7 @@ pub struct TitleScene {
     pub exit_msg_box: Vec<(UiObject, Vec<Text>)>,
     pub setting_window: Vec<(UiObject, Vec<Text>)>,
     pub stage_window: Vec<(UiObject, Vec<Text>)>,
+    pub stage_images: HashMap<Actor, (UiObject, UiObject, Text)>, 
 }
 
 impl SceneNode for TitleScene {

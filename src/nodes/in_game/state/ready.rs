@@ -135,7 +135,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
         camera.bind(&mut rpass);
         ui_brush.draw(&mut rpass, [
             &this.background, 
-            &this.stage_images[this.result_star_index], 
+            &this.stage_images[this.result_star_index.min(3)], 
         ].into_iter());
         tile_brush.draw(&mut rpass);
     }

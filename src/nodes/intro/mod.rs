@@ -269,6 +269,7 @@ impl SceneNode for IntroScene {
             // (English Translation) Loads assets to be used in `Title` game scene. 
             asset_bundle.get(path::CLICK_SOUND_PATH)?;
             asset_bundle.get(path::CANCEL_SOUND_PATH)?;
+            asset_bundle.get(path::STAR_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_RETURN_TEXTURE_PATH)?;
@@ -281,10 +282,7 @@ impl SceneNode for IntroScene {
             asset_bundle.get(path::MOMOI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::MIDORI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::YUZU_STANDING_TEXTURE_PATH)?;
-
-            // TODO: 스테이지 이미지들을 추가하세요.
-            asset_bundle.get(path::TEMP_STAGE_TEXTURE_PATH)?;
-
+            
             Ok(())
         }));
         Ok(())

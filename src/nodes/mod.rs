@@ -9,6 +9,7 @@ pub mod consts {
 }
 
 pub mod path {
+    pub const SAVE_PATH: &'static str = "user.sav";
     pub const SETTINGS_PATH: &'static str = "user.settings";
 
     // Fonts ------------------------------------------------------------------
@@ -46,8 +47,12 @@ pub mod path {
     pub const TITLE_BACKGROUND_TEXTURE_PATH: &'static str = "textures/bg/title_background.dds";
     pub const INGAME_BACKGROUND_TEXTURE_PATH: &'static str = "textures/bg/ingame_background.dds";
 
-
-    pub const TEMP_STAGE_TEXTURE_PATH: &'static str = "textures/img/temp.dds";
+    pub const DEF_IMG_TEXTURE_PATH: &'static str = "textures/img/default.dds";
+    pub const ARIS_IMG_TEXTURE_PATH: &'static str = "textures/img/aris.dds";
+    pub const MOMOI_IMG_TEXTURE_PATH: &'static str = "textures/img/momoi.dds";
+    pub const MIDORI_IMG_TEXTURE_PATH: &'static str = "textures/img/midori.dds";
+    pub const YUZU_IMG_TEXTURE_PATH: &'static str = "textures/img/yuzu.dds";
+    pub const YUUKA_IMG_TEXTURE_PATH: &'static str = "textures/img/yuuka.dds";
 
     pub const ARIS_STANDING_TEXTURE_PATH: &'static str = "textures/character/aris_standing.dds";
     pub const ARIS_PLAYER_TEXTURE_PATH: &'static str = "textures/character/aris_player.dds";

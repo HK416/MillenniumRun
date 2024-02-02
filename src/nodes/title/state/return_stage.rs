@@ -42,17 +42,17 @@ pub fn handle_events(_this: &mut TitleScene, _shared: &mut Shared, _event: Event
 pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 경과 시간을 갱신합니다.
     // (English Translation) Updates the elapsed time.
-    this.elapsed_time += elapsed_time;
+    this.timer += elapsed_time;
 
     // (한국어) 스프라이트 객체의 알파 값을 시간에 따라 갱신합니다.
     // (English Translation) Updates the alpha value of the sprite object over time.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    let alpha = 1.0 - 1.0 * interpolation::f64::linear(this.elapsed_time, DURATION) as f32;
+    let alpha = 1.0 - 1.0 * interpolation::f64::linear(this.timer, DURATION) as f32;
     this.foreground.update(queue, |data| {
         data.color.w = alpha;
     });
 
-    let alpha = 1.0 * interpolation::f64::linear(this.elapsed_time, DURATION) as f32;
+    let alpha = 1.0 * interpolation::f64::linear(this.timer, DURATION) as f32;
     for (ui, texts) in this.system_buttons.iter() {
         ui.update(queue, |data| data.color.w = alpha);
         for text in texts.iter() {
@@ -62,9 +62,9 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) changes to the next state if it is greater than the duration.
-    if this.elapsed_time >= DURATION {
+    if this.timer >= DURATION {
         this.state = TitleState::Stage;
-        this.elapsed_time = 0.0;
+        this.timer = 0.0;
         return Ok(());
     }
 
