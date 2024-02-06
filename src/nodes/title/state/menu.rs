@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use rodio::OutputStreamHandle;
 use glam::{Vec4, Vec3, Vec4Swizzles};
 use winit::{
     event::{Event, WindowEvent, MouseButton},
@@ -15,6 +16,7 @@ use crate::{
         ui::UiBrush, 
         sprite::SpriteBrush,
         camera::GameCamera, 
+        sound, 
     },
     nodes::title::{
         utils,
@@ -35,7 +37,7 @@ use crate::{
 /// #### English (Translation) </br>
 /// Contains the original color data of the currently pressed menu button. </br>
 /// 
-static FOCUSED_MENU_BTN: Mutex<Option<(usize, Vec3, Vec<Vec3>)>> = Mutex::new(None);
+static FOCUSED_MENU_BTN: Mutex<Option<(usize, Vec3, Vec3)>> = Mutex::new(None);
 
 
 
@@ -148,8 +150,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             this.menu_buttons.iter()
             .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
         );
     }
 
@@ -163,8 +163,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
 
 fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    use crate::components::sound;
-    
     // (한국어) 사용할 공유 객체를 가져옵니다.
     // (English Translation) Get shared object to use.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -179,16 +177,14 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                     // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다. 
                     // (English Translation) Returns the color of the selected ui to its original color.
                     let mut guard = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
-                    if let Some((index, ui_color, section_colors)) = guard.take() {
-                        if let Some((ui, sections)) = this.menu_buttons.get(index) {
+                    if let Some((index, ui_color, text_color)) = guard.take() {
+                        if let Some((ui, text)) = this.menu_buttons.get(index) {
                             ui.update(queue, |data| {
                                 data.color = (ui_color, data.color.w).into();
                             });
-                            for (section_color, section) in section_colors.into_iter().zip(sections.iter()) {
-                                section.update(queue, |data| {
-                                    data.color = (section_color, data.color.w).into();
-                                });
-                            }
+                            text.update(queue, |data| {
+                                data.color = (text_color, data.color.w).into();
+                            });
                         }
                     }
 
@@ -238,42 +234,36 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
                     // 2. Change the color of the ui and the color of the text.
                     // 3. Calls the ui pressed function.
                     //
-                    if let Some((index, (ui, sections))) = select {
+                    if let Some((index, (ui, text))) = select {
                         // <1>
                         let ui_color = ui.data.lock().expect("Failed to access variable.").color.xyz();
-                        let section_colors = sections.iter().map(|it| {
-                            it.data.lock().expect("Failed to access variable.").color.xyz()
-                        }).collect();
+                        let text_color = text.data.lock().expect("Failed to access variable.").color.xyz();
                         let mut gaurd = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
-                        *gaurd = Some((index, ui_color, section_colors));
+                        *gaurd = Some((index, ui_color, text_color));
 
                         // <2>
                         ui.update(queue, |data| {
                             data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
                         });
-                        for section in sections.iter() {
-                            section.update(queue, |data| {
-                                data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
-                            });
-                        }
+                        text.update(queue, |data| {
+                            data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
+                        });
 
                         // <3>
                         ui_pressed(utils::MenuButtons::from(index), this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
                     let mut guard = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
-                    if let Some((index, ui_color, section_colors)) = guard.take() {
+                    if let Some((index, ui_color, text_color)) = guard.take() {
                         // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
                         // (English Translation) Returns the color of the selected ui to its original color.
-                        if let Some((ui, sections)) = this.menu_buttons.get(index) {
+                        if let Some((ui, text)) = this.menu_buttons.get(index) {
                             ui.update(queue, |data| {
                                 data.color = (ui_color, data.color.w).into();
                             });
-                            for (section_color, section) in section_colors.into_iter().zip(sections.iter()) {
-                                section.update(queue, |data| {
-                                    data.color = (section_color, data.color.w).into();
-                                });
-                            }
+                            text.update(queue, |data| {
+                                data.color = (text_color, data.color.w).into();
+                            });
                         };
                         
                         // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
@@ -320,8 +310,6 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
 fn ui_pressed(btn: utils::MenuButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    use crate::components::sound;
-    
     match btn {
         utils::MenuButtons::Start => {
             sound::play_click_sound(shared)
@@ -347,6 +335,10 @@ fn ui_released(btn: utils::MenuButtons, this: &mut TitleScene, shared: &mut Shar
             Ok(())
         },
         utils::MenuButtons::Setting => {
+            let stream = shared.get::<OutputStreamHandle>().unwrap();
+            let sink = sound::create_sink(stream)?;
+            shared.push((1usize, sink));
+
             this.state = TitleState::EnterSetting;
             this.timer = 0.0;
             Ok(())

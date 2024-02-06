@@ -82,6 +82,7 @@ textures/ui/title_button_start.dds Static
 textures/ui/title_button_setting.dds Static
 textures/ui/title_button_exit.dds Static
 textures/ui/window_ratio_4_3.dds Static
+textures/ui/window_ratio_8_1.dds Static 
 
 #-------------#
 # Backgrounds #
@@ -134,12 +135,14 @@ sounds/yuzu/yuzu_damage_0.ogg Static
 sounds/yuzu/yuzu_damage_1.ogg Static 
 sounds/yuzu/yuzu_damage_2.ogg Static
 
+sounds/yuuka/yuuka_title.ogg Static 
 sounds/yuuka/yuuka_attack_0.ogg Static 
 sounds/yuuka/yuuka_attack_1.ogg Static 
 sounds/yuuka/yuuka_attack_2.ogg Static 
 sounds/yuuka/yuuka_attack_3.ogg Static 
 sounds/yuuka/yuuka_victory.ogg Static 
 sounds/yuuka/yuuka_defeat.ogg Static 
+sounds/yuuka/yuuka_hidden.ogg Static
 
 #--------#
 # Sounds #

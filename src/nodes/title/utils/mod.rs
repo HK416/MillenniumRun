@@ -20,6 +20,7 @@ use crate::{
         anchor::Anchor, 
         player::Actor, 
         save::SaveData, 
+        user::Settings, 
     },
     nodes::{
         path, 
@@ -48,7 +49,9 @@ pub const STAGE_RIGHT: f32 = 4.0 * PIXEL_PER_METER;
 
 pub fn create_title_scene(
     save: &SaveData, 
+    settings: &Settings, 
     nexon_lv2_gothic_medium: &FontArc, 
+    nexon_lv2_gothic_bold: &FontArc, 
     device: &wgpu::Device, 
     queue: &wgpu::Queue, 
     tex_sampler: &wgpu::Sampler, 
@@ -381,16 +384,12 @@ pub fn create_title_scene(
     let texture_views = SystemButtonTextureViews {
         return_btn_texture_view: &return_btn_texture_view,  
     };
-    let system_buttons = create_system_buttons(
-        nexon_lv2_gothic_medium, 
+    let return_button = create_system_buttons(
         device, 
-        queue, 
         tex_sampler, 
         texture_views, 
-        script, 
         ui_brush, 
-        text_brush, 
-    )?;
+    );
 
 
     // (한국어) `dds`이미지 파일로부터 윈도우 배경 텍스처를 생성합니다.
@@ -420,6 +419,37 @@ pub fn create_title_scene(
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
     asset_bundle.release(path::WINDOW_RATIO_4_3_TEXTURE_PATH);
+
+
+
+    // (한국어) `dds`이미지 파일로부터 하위 윈도우 배경 텍스처를 생성합니다.
+    // (English Translation) Create a sub window background texture from a `dds`image file. 
+    let texture = asset_bundle.get(path::WINDOW_RATIO_8_1_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("ExitMessageBoxBackground"),
+            size: wgpu::Extent3d {
+                width: 1024,
+                height: 128,
+                depth_or_array_layers: 1,
+            },
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            mip_level_count: 11,
+            sample_count: 1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            device,
+            queue,
+        })?;
+    let sub_window_texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
+
+    // (한국어) 사용을 완료한 에셋을 정리합니다.
+    // (English Translation) Release assets that have been used.
+    asset_bundle.release(path::WINDOW_RATIO_8_1_TEXTURE_PATH);
+
 
 
     // (한국어) `dds`이미지 파일로부터 버튼 텍스처를 생성합니다.
@@ -500,28 +530,81 @@ pub fn create_title_scene(
 
     // (한국어) 설정 윈도우를 생성합니다.
     // (English Translation) Create a setting window.
-    let texture_views = SettingWindowTextureView {
-        window_texture_view: &window_texture_view,
-        store_btn_texture_view: &btn_texture_view,
-        exit_btn_texture_view: &btn_texture_view, 
-    };
-    let setting_window = create_setting_window(
+    let setting_windows = create_setting_windows(
+        device, 
+        tex_sampler, 
+        &window_texture_view, 
+        &sub_window_texture_view, 
+        ui_brush
+    );
+    let setting_titles = create_setting_window_titles(
+        nexon_lv2_gothic_medium, 
+        nexon_lv2_gothic_bold, 
+        script, 
+        device, 
+        queue, 
+        text_brush
+    )?;
+    let setting_languages = create_setting_languages(
         nexon_lv2_gothic_medium, 
         device, 
         queue, 
         tex_sampler, 
-        texture_views, 
+        &btn_texture_view, 
+        ui_brush, 
+        text_brush
+    );
+    let setting_resolutions = create_setting_resolutions(
+        nexon_lv2_gothic_medium, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &btn_texture_view, 
+        ui_brush, 
+        text_brush
+    );
+    let setting_return_button = create_setting_return_button(
+        nexon_lv2_gothic_medium, 
         script, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &btn_texture_view, 
         ui_brush, 
         text_brush
     )?;
+
+    let texture = texture_map.get(path::DUMMY_TEXTURE_PATH)
+        .expect("Registered texture not found!");
+    let dummy_texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        }
+    );
+    let setting_volume_background = create_setting_volume_background(
+        nexon_lv2_gothic_medium, 
+        script, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &dummy_texture_view, 
+        ui_brush, 
+        text_brush
+    )?;
+    let setting_volume_bar = create_setting_volume_bar(
+        settings, 
+        device, 
+        tex_sampler, 
+        &dummy_texture_view, 
+        ui_brush
+    );
 
 
     let texture_views = StageWindowTextureView {
         window_texture_view: &window_texture_view,
         enter_btn_texture_view: &wide_btn_texture_view, 
     };
-    let stage_window = create_stage_window(
+    let (stage_window, stage_enter_button) = create_stage_window(
         nexon_lv2_gothic_medium, 
         device, 
         queue, 
@@ -585,11 +668,18 @@ pub fn create_title_scene(
         background, 
         sprites,
         menu_buttons, 
-        system_buttons, 
+        return_button, 
         exit_msg_box, 
-        setting_window, 
         stage_window, 
+        stage_enter_button, 
         stage_images, 
+        setting_titles, 
+        setting_windows, 
+        setting_languages, 
+        setting_resolutions, 
+        setting_return_button, 
+        setting_volume_background, 
+        setting_volume_bar, 
     })
 }
 

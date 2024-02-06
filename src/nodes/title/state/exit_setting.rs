@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rodio::Sink;
 use winit::event::Event;
 
 use crate::{
@@ -51,13 +52,40 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     // (English Translation) Updates the scale over time.
     let delta = smooth_step(this.timer, DURATION);
     let alpha = 1.0 * delta;
-    let scale = 1.0 - 1.0 * delta;
     update_ui_alpha(this.menu_buttons.iter_mut(), queue, alpha);
-    update_ui_scale(this.setting_window.iter_mut(), queue, scale);
+
+    let scale = 1.0 - 1.0 * delta;
+    let iter = [
+            &this.setting_return_button.0, 
+        ].into_iter()
+        .chain(this.setting_windows.iter())
+        .chain(this.setting_languages.values().map(|(it, _)| it))
+        .chain(this.setting_resolutions.values().map(|(it, _)| it))
+        .chain(this.setting_volume_background.values().map(|(it, _)| it))
+        .chain(this.setting_volume_bar.values());
+    for ui in iter {
+        ui.update(queue, |data| {
+            data.global_scale = (scale, scale, scale).into() 
+        });
+    }
+
+    let iter = [
+            &this.setting_return_button.1, 
+        ].into_iter()
+        .chain(this.setting_titles.iter())
+        .chain(this.setting_languages.values().map(|(_, it)| it))
+        .chain(this.setting_resolutions.values().map(|(_, it)| it))
+        .chain(this.setting_volume_background.values().map(|(_, it)| it));
+    for text in iter {
+        text.update(queue, |data| {
+            data.scale = (scale, scale, scale).into()
+        });
+    }
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) Changes to the next state if it is greater than the duration. 
     if this.timer >= DURATION {
+        shared.pop::<(usize, Sink)>().unwrap();
         this.state = TitleState::Menu;
         this.timer = 0.0;
         return Ok(());
@@ -164,8 +192,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             this.menu_buttons.iter()
             .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
         );
     }
 
@@ -196,18 +222,24 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         
         // (한국어) 사용자 인터페이스 그리기.
         // (English Translation) Drawing the user interface.
-        ui_brush.draw(
-            &mut rpass, 
-            this.setting_window.iter()
-            .map(|(ui, _)| ui)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.setting_window.iter()
-            .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
-        );
+        let iter = [
+                &this.setting_return_button.0, 
+            ].into_iter()
+            .chain(this.setting_windows.iter())
+            .chain(this.setting_languages.values().map(|(it, _)| it))
+            .chain(this.setting_resolutions.values().map(|(it, _)| it))
+            .chain(this.setting_volume_background.values().map(|(it, _)| it))
+            .chain(this.setting_volume_bar.values());
+        ui_brush.draw(&mut rpass, iter);
+
+        let iter = [
+                &this.setting_return_button.1, 
+            ].into_iter()
+            .chain(this.setting_titles.iter())
+            .chain(this.setting_languages.values().map(|(_, it)| it))
+            .chain(this.setting_resolutions.values().map(|(_, it)| it))
+            .chain(this.setting_volume_background.values().map(|(_, it)| it));
+        text_brush.draw(&mut rpass, iter);
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -227,41 +259,19 @@ fn smooth_step(elapsed_time: f64, duration: f64) -> f32 {
 
 
 /// #### 한국어 </br>
-/// 사용자 인터페이스 객체의 크기 값을 갱신합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Updates the scale value of the user interface object.
-/// 
-fn update_ui_scale<'a, Iter>(iter: Iter, queue: &wgpu::Queue, s: f32) 
-where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
-    for (ui, sections) in iter {
-        ui.update(queue, |data| {
-            data.global_scale = (s, s, s).into();
-        });
-        for section in sections.iter_mut() {
-            section.update(queue, |data| {
-                data.scale = (s, s, s).into()
-            });
-        }
-    }
-}
-
-/// #### 한국어 </br>
 /// 사용자 인터페이스 객체의 알파 값을 갱신합니다. </br>
 /// 
 /// #### English (Translation) </br>
 /// Updates the alpha value of the user interface object.
 /// 
 fn update_ui_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
-where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
-    for (ui, sections) in iter {
+where Iter: Iterator<Item = &'a mut (UiObject, Text)> {
+    for (ui, text) in iter {
         ui.update(queue, |data| {
             data.color.w = alpha;
         });
-        for section in sections.iter_mut() {
-            section.update(queue, |data| {
-                data.color.w = alpha;
-            });
-        }
+        text.update(queue, |data| {
+            data.color.w = alpha;
+        });
     }
 }

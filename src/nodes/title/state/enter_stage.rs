@@ -58,7 +58,9 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     let delta = delta_time(this.timer, MOVING_TIME).min(1.0);
     let stage_alpha = 1.0 * delta;
     update_button_alpha(this.menu_buttons.iter_mut(), &queue, menu_alpha);
-    update_button_alpha(this.system_buttons.iter_mut(), &queue, stage_alpha);
+    this.return_button.update(queue, |data| {
+        data.color.w = stage_alpha;
+    });
     update_camera(camera, queue, delta);
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
@@ -201,24 +203,11 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             this.menu_buttons.iter()
             .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
         );
 
         // (한국어) 시스템 버튼 그리기.
         // (English Translation) Drawing system buttons.
-        ui_brush.draw(
-            &mut rpass, 
-            this.system_buttons.iter()
-            .map(|(it, _)| it)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.system_buttons.iter()
-            .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
-        );
+        ui_brush.draw(&mut rpass, [&this.return_button].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -264,15 +253,13 @@ fn update_camera(camera: &GameCamera, queue: &wgpu::Queue, delta: f32) {
 /// Updates the alpha value of the user interface object. </br>
 /// 
 fn update_button_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
-where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
-    for (ui, sections) in iter {
+where Iter: Iterator<Item = &'a mut (UiObject, Text)> {
+    for (ui, text) in iter {
         ui.update(queue, |data| {
             data.color.w = alpha;
         });
-        for section in sections.iter_mut() {
-            section.update(queue, |data| {
-                data.color.w = alpha;
-            });
-        }
+        text.update(queue, |data| {
+            data.color.w = alpha;
+        });
     }
 }

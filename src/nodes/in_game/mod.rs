@@ -25,7 +25,7 @@ use crate::{
         boss::{Boss, BossFaceState},
         sound::SoundDecoder, 
         script::Script, 
-        user::Settings, 
+        user::{Language, Resolution, Settings}, 
     },
     nodes::{path, consts::PIXEL_PER_METER}, 
     scene::{node::SceneNode, state::SceneState},
@@ -261,6 +261,7 @@ fn prepare_in_game_scene(this: &mut InGameLoading, shared: &mut Shared) -> AppRe
     // (English Translation) Get shared object to use.
     let actor = shared.get::<Actor>().cloned().unwrap_or_default();
     let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap().clone();
+    let settings = shared.get::<Settings>().unwrap().clone();
     let script = shared.get::<Arc<Script>>().unwrap().clone();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap().clone();
@@ -285,12 +286,15 @@ fn prepare_in_game_scene(this: &mut InGameLoading, shared: &mut Shared) -> AppRe
         asset_bundle.get(path::FINISH_SOUND_PATH)?;
         asset_bundle.get(path::THEME23_SOUND_PATH)?;
         asset_bundle.get(path::THEME27_SOUND_PATH)?;
+        asset_bundle.get(path::YUUKA_TITLE_SOUND_PATH)?;
         asset_bundle.get(path::YUUKA_DEFEAT_SOUND_PATH)?;
         asset_bundle.get(path::YUUKA_VICTORY_SOUND_PATH)?;
+        asset_bundle.get(path::YUUKA_HIDDEN_SOUND_PATH)?;
 
         utils::create_game_scene(
             actor, 
             &fonts, 
+            &settings, 
             &script,
             &device, 
             &queue, 
@@ -365,7 +369,7 @@ pub struct InGameScene {
     pub result_title: UiObject, 
     pub result_stars: Vec<UiObject>, 
     pub result_star_index: usize, 
-    pub result_condition_texts: Vec<Text>, 
+    pub result_challenge_texts: Vec<Text>, 
 
     pub table: Table, 
     pub player: Player, 
@@ -380,6 +384,14 @@ pub struct InGameScene {
     pub player_damage_sounds: Vec<&'static str>,
 
     pub bgm_sound: &'static str, 
+
+    pub setting_titles: Vec<Text>, 
+    pub setting_windows: Vec<UiObject>, 
+    pub setting_languages: HashMap<Language, (UiObject, Text)>, 
+    pub setting_resolutions: HashMap<Resolution, (UiObject, Text)>, 
+    pub setting_return_button: (UiObject, Text), 
+    pub setting_volume_background: HashMap<utils::VolumeOptions, (UiObject, Text)>,
+    pub setting_volume_bar: HashMap<utils::VolumeOptions, UiObject>, 
 }
 
 impl SceneNode for InGameScene {
@@ -431,6 +443,10 @@ impl SceneNode for InGameScene {
         asset_bundle.release(path::FINISH_SOUND_PATH);
         asset_bundle.release(path::THEME23_SOUND_PATH);
         asset_bundle.release(path::THEME27_SOUND_PATH);
+        asset_bundle.release(path::YUUKA_TITLE_SOUND_PATH);
+        asset_bundle.release(path::YUUKA_DEFEAT_SOUND_PATH);
+        asset_bundle.release(path::YUUKA_VICTORY_SOUND_PATH);
+        asset_bundle.release(path::YUUKA_HIDDEN_SOUND_PATH);
         asset_bundle.release(self.bgm_sound);
         for rel_path in self.player_damage_sounds.iter() {
             asset_bundle.release(rel_path);

@@ -5,7 +5,6 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        text::TextBrush,
         ui::UiBrush,
         sprite::SpriteBrush,
         camera::GameCamera,
@@ -53,12 +52,9 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     });
 
     let alpha = 1.0 * interpolation::f64::linear(this.timer, DURATION) as f32;
-    for (ui, texts) in this.system_buttons.iter() {
-        ui.update(queue, |data| data.color.w = alpha);
-        for text in texts.iter() {
-            text.update(queue, |data| data.color.w = alpha);
-        }
-    }
+    this.return_button.update(queue, |data| {
+        data.color.w = alpha;
+    });
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) changes to the next state if it is greater than the duration.
@@ -75,7 +71,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -191,18 +186,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 시스템 버튼 그리기.
         // (English Translation) Drawing the system buttons.
-        ui_brush.draw(
-            &mut rpass, 
-            this.system_buttons.iter()
-            .map(|(ui, _)| ui)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.system_buttons.iter()
-            .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
-        );
+        ui_brush.draw(&mut rpass, [&this.return_button].into_iter());
     }
 
     {

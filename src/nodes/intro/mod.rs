@@ -269,6 +269,8 @@ impl SceneNode for IntroScene {
             // (English Translation) Loads assets to be used in `Title` game scene. 
             asset_bundle.get(path::CLICK_SOUND_PATH)?;
             asset_bundle.get(path::CANCEL_SOUND_PATH)?;
+            asset_bundle.get(path::YUUKA_TITLE_SOUND_PATH)?;
+            asset_bundle.get(path::YUUKA_HIDDEN_SOUND_PATH)?;
             asset_bundle.get(path::STAR_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?;
@@ -278,6 +280,7 @@ impl SceneNode for IntroScene {
             asset_bundle.get(path::TITLE_BUTTON_EXIT_TEXTURE_PATH)?;
             asset_bundle.get(path::TITLE_BACKGROUND_TEXTURE_PATH)?;
             asset_bundle.get(path::WINDOW_RATIO_4_3_TEXTURE_PATH)?;
+            asset_bundle.get(path::WINDOW_RATIO_8_1_TEXTURE_PATH)?;
             asset_bundle.get(path::ARIS_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::MOMOI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::MIDORI_STANDING_TEXTURE_PATH)?;
@@ -313,7 +316,7 @@ fn create_notify_title(
     script: &Script, 
     text_brush: &TextBrush
 ) -> AppResult<Text> {
-    let text = script.get(ScriptTags::NotifyTitle)?;
+    let text = script.get(ScriptTags::IntroTitle)?;
     let notify_title = TextBuilder::new(
         Some("Notify Title"), 
         font, 
@@ -341,7 +344,7 @@ fn create_notify_texts(
     script: &Script, 
     text_brush: &TextBrush
 ) -> AppResult<Vec<Text>> {
-    let text = script.get(ScriptTags::NotifyTextLine0)?;
+    let text = script.get(ScriptTags::IntroText)?;
     let notify_line0 = TextBuilder::new(
         Some("Notify Text Line0"), 
         font, 

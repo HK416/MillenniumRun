@@ -327,8 +327,7 @@ impl Text {
         text: &str, 
         device: &wgpu::Device, 
         queue: &wgpu::Queue, 
-        tex_sampler: &wgpu::Sampler, 
-        texture_layout: &wgpu::BindGroupLayout
+        text_brush: &TextBrush
     ) {
         self.characters = create_characters(
             &self.name, 
@@ -336,8 +335,8 @@ impl Text {
             text, 
             device, 
             queue, 
-            tex_sampler, 
-            texture_layout, 
+            &text_brush.tex_sampler, 
+            &text_brush.texture_layout, 
             &mut self.texture_bind_groups
         );
     }

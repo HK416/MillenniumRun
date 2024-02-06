@@ -36,7 +36,7 @@ use crate::{
 /// #### English (Translation) </br>
 /// Contains the original color data of the currently pressed exit message box button. </br>
 /// 
-static FOCUSED_MSG_BTN: Mutex<Option<(usize, Vec3, Vec<Vec3>)>> = Mutex::new(None);
+static FOCUSED_MSG_BTN: Mutex<Option<(usize, Vec3, Vec3)>> = Mutex::new(None);
 
 
 
@@ -149,8 +149,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             this.exit_msg_box.iter()
             .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
         );
     }
 
@@ -182,16 +180,14 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                     // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
                     // (English Translation) Returns the color of the selected ui to its original color.
                     let mut guard = FOCUSED_MSG_BTN.lock().expect("Failed to access variable.");
-                    if let Some((index, ui_color, section_colors)) = guard.take() {
-                        if let Some((ui, sections)) = this.exit_msg_box.get(index) {
+                    if let Some((index, ui_color, text_color)) = guard.take() {
+                        if let Some((ui, text)) = this.exit_msg_box.get(index) {
                             ui.update(queue, |data| {
                                 data.color = (ui_color, data.color.w).into();
                             });
-                            for (section_color, section) in section_colors.into_iter().zip(sections.iter()) {
-                                section.update(queue, |data| {
-                                    data.color = (section_color, data.color.w).into();
-                                });
-                            }
+                            text.update(queue, |data| {
+                                data.color = (text_color, data.color.w).into();
+                            });
                         }
                     }
 
@@ -244,42 +240,36 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
                     // 2. Change the color of the ui and the color of the text.
                     // 3. Call the ui pressed function.
                     //
-                    if let Some((index, (ui, sections))) = select {
+                    if let Some((index, (ui, text))) = select {
                         // <1>
                         let ui_color = ui.data.lock().expect("Failed to access variable.").color.xyz();
-                        let section_colors = sections.iter().map(|it| {
-                            it.data.lock().expect("Failed to access variable.").color.xyz()
-                        }).collect();
+                        let text_color = text.data.lock().expect("Failed to access variable.").color.xyz();
                         let mut gaurd = FOCUSED_MSG_BTN.lock().expect("Failed to access variable.");
-                        *gaurd = Some((index, ui_color, section_colors));
+                        *gaurd = Some((index, ui_color, text_color));
 
                         // <2>
                         ui.update(queue, |data| {
                             data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
                         });
-                        for section in sections.iter() {
-                            section.update(queue, |data| {
-                                data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
-                            });
-                        }
+                        text.update(queue, |data| {
+                            data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
+                        });
 
                         // <3>
                         ui_pressed(utils::ExitMessageBox::from(index), this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
                     let mut guard = FOCUSED_MSG_BTN.lock().expect("Failed to access variable.");
-                    if let Some((index, ui_color, section_colors)) = guard.take() {
+                    if let Some((index, ui_color, text_color)) = guard.take() {
                         // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
                         // (English Translation) Returns the color of the selected ui to its original color.
-                        if let Some((ui, texts)) = this.exit_msg_box.get(index) {
+                        if let Some((ui, text)) = this.exit_msg_box.get(index) {
                             ui.update(queue, |data| {
                                 data.color = (ui_color, data.color.w).into();
                             });
-                            for (section_color, section) in section_colors.into_iter().zip(texts.iter()) {
-                                section.update(queue, |data| {
-                                    data.color = (section_color, data.color.w).into();
-                                });
-                            }
+                            text.update(queue, |data| {
+                                data.color = (text_color, data.color.w).into();
+                            });
                         };
                         
                         // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.

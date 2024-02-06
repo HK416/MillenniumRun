@@ -162,8 +162,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             this.menu_buttons.iter()
             .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
         );
     }
 

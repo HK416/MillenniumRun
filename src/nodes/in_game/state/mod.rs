@@ -8,6 +8,9 @@ mod exit_pause;
 mod enter_msgbox;
 mod msgbox;
 mod exit_msgbox;
+mod enter_setting;
+mod setting;
+mod exit_setting;
 mod wait_for_finish;
 mod disappear_run;
 mod appear_result;
@@ -45,6 +48,9 @@ pub enum InGameState {
     EnterMsgBox,
     MsgBox,
     ExitMsgBox,
+    EnterSetting,
+    Setting,
+    ExitSetting,
     WaitForFinish, 
     DisappearRun, 
     AppearResult, 
@@ -55,7 +61,7 @@ type HandleEventsFn = dyn Fn(&mut InGameScene, &mut Shared, Event<AppEvent>) -> 
 type UpdateFn = dyn Fn(&mut InGameScene, &mut Shared, f64, f64) -> AppResult<()>;
 type DrawFn = dyn Fn(&InGameScene, &mut Shared) -> AppResult<()>;
 
-pub const HANDLE_EVENTS: [&'static HandleEventsFn; 14] = [
+pub const HANDLE_EVENTS: [&'static HandleEventsFn; 17] = [
     &enter::handle_events, 
     &spawn::handle_events, 
     &ready::handle_events, 
@@ -66,13 +72,16 @@ pub const HANDLE_EVENTS: [&'static HandleEventsFn; 14] = [
     &enter_msgbox::handle_events, 
     &msgbox::handle_events, 
     &exit_msgbox::handle_events, 
+    &enter_setting::handle_events,
+    &setting::handle_events,
+    &exit_setting::handle_events,
     &wait_for_finish::handle_events, 
     &disappear_run::handle_events, 
     &appear_result::handle_events, 
     &result::handle_events, 
 ];
 
-pub const UPDATES: [&'static UpdateFn; 14] = [
+pub const UPDATES: [&'static UpdateFn; 17] = [
     &enter::update, 
     &spawn::update, 
     &ready::update, 
@@ -83,13 +92,16 @@ pub const UPDATES: [&'static UpdateFn; 14] = [
     &enter_msgbox::update, 
     &msgbox::update, 
     &exit_msgbox::update, 
+    &enter_setting::update,
+    &setting::update,
+    &exit_setting::update,
     &wait_for_finish::update, 
     &disappear_run::update, 
     &appear_result::update, 
     &result::update, 
 ];
 
-pub const DRAWS: [&'static DrawFn; 14] = [
+pub const DRAWS: [&'static DrawFn; 17] = [
     &enter::draw, 
     &spawn::draw, 
     &ready::draw, 
@@ -100,6 +112,9 @@ pub const DRAWS: [&'static DrawFn; 14] = [
     &enter_msgbox::draw, 
     &msgbox::draw, 
     &exit_msgbox::draw, 
+    &enter_setting::draw,
+    &setting::draw,
+    &exit_setting::draw,
     &wait_for_finish::draw, 
     &disappear_run::draw, 
     &appear_result::draw, 

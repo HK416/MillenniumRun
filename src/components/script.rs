@@ -22,24 +22,49 @@ use crate::{
 #[derive(Serialize, Deserialize)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ScriptTags {
-    NotifyTitle,
-    NotifyTextLine0,
-    StartMenuButton,
-    SettingMenuButton,
-    ExitMenuButton,
-    ExitButton,
-    NoExitButton,
-    StoreButton,
-    ExitMessage,
-    EnterStageButton,
-    PauseTitle, 
-    PauseResumeButton,
-    PuaseSettingButton,  
-    PauseRetryButton, 
-    PauseExitButton, 
-    ResultConditionText0,
-    ResultConditionText1,
-    ResultConditionText2,
+    Language,
+    BackgroundVolume, 
+    EffectVolume, 
+    VoiceVolume, 
+
+    /* Intro */
+    IntroTitle,
+    IntroText,
+    
+    /* Title */
+    TitleStartButton,
+    TitleSettingButton,
+    TitleExitButton,
+    TitleStageEnterButton,
+
+    /* Setting */
+    SettingTitle, 
+    SettingResetButton, 
+    SettingReturnButton, 
+    SettingLanguageOptionTitle, 
+    SettingLanguageOptionSubTitle, 
+    SettingResolutionOptionTitle, 
+    SettingResolutionOptionSubTitle, 
+    SettingVolumeOptionTitle,
+    SettingVolumeOptionSubTitle,  
+
+    /* Exit Message Box */
+    GameExitReconfirmMessage,
+    GameExitOkayButton,
+    GameExitCancelButton,
+
+    /* InGame */
+    InGamePauseTitle, 
+    InGameResumeButton,
+    InGameSettingButton, 
+    InGameGiveUpButton, 
+    InGameChallenge0,
+    InGameChallenge1,
+    InGameChallenge2,
+    InGameExitButton, 
+    InGameGiveUpReconfirmMessage, 
+    InGameGiveUpOkayButton, 
+    InGameGiveUpCancelButton, 
 }
 
 

@@ -94,8 +94,7 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, ela
             &format!("{}%", per.floor() as u32), 
             device, 
             queue, 
-            &text_brush.tex_sampler, 
-            &text_brush.texture_layout
+            &text_brush
         );
 
         this.timer = 0.0;

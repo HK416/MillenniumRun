@@ -5,8 +5,8 @@ use winit::event::Event;
 use crate::{
     game_err,
     components::{
-        ui::{UiBrush, UiObject}, 
-        text::{TextBrush, Text}, 
+        ui::UiBrush, 
+        text::TextBrush, 
         camera::GameCamera, 
         transform::Projection, 
         sprite::SpriteBrush, 
@@ -88,7 +88,15 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     // (한국어) 스테이지 윈도우 알파 값을 갱신합니다.
     // (English Translation) Updates the stage window alpha value.
     let alpha = 1.0 * delta;
-    update_ui_alpha(this.stage_window.iter_mut(), &queue, alpha);
+    this.stage_window.update(queue, |data| {
+        data.color.w = alpha;
+    });
+    this.stage_enter_button.0.update(queue, |data| {
+        data.color.w = alpha;
+    });
+    this.stage_enter_button.1.update(queue, |data| {
+        data.color.w = alpha;
+    });
 
     // (한국어) 스테이지 이미지의 알파 값을 갱신합니다.
     // (English Translation) Updates the stage image alpha value.
@@ -234,18 +242,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 버튼 그리기.
         // (English Translation) Drawing the buttons.
-        ui_brush.draw(
-            &mut rpass, 
-            this.system_buttons.iter()
-            .map(|(it, _)| it)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.system_buttons.iter()
-            .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
-        );
+        ui_brush.draw(&mut rpass, [&this.return_button].into_iter());
     }
 
     {
@@ -275,23 +272,20 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 스테이지 윈도우 창을 그립니다. 
         // (English Translation) Drawing the stage window.
-        ui_brush.draw(
-            &mut rpass, 
-            this.stage_window.iter()
-            .map(|(it, _)| it)
-        );
+
+
         ui_brush.draw(&mut rpass, [
-            &this.stage_images[&actor].0, 
-            &this.stage_images[&actor].1
-        ].into_iter());
-        text_brush.draw(
-            &mut rpass, 
-            this.stage_window.iter()
-            .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
+                &this.stage_window, 
+                &this.stage_enter_button.0, 
+                &this.stage_images[&actor].0, 
+                &this.stage_images[&actor].1, 
+            ].into_iter()
         );
-        text_brush.draw(&mut rpass, [&this.stage_images[&actor].2].into_iter());
+        text_brush.draw(&mut rpass, [
+                &this.stage_enter_button.1, 
+                &this.stage_images[&actor].2, 
+            ].into_iter()
+        );
     }
     
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -307,25 +301,4 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 fn smooth_step(elapsed_time: f64, duration: f64) -> f32 {
     let t = (elapsed_time / duration).clamp(0.0, 1.0) as f32;
     return 3.0 * t * t - 2.0 * t * t * t;
-}
-
-
-/// #### 한국어 </br>
-/// 사용자 인터페이스 객체의 알파 값을 갱신합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Updates the alpha value of the user interface object. </br>
-/// 
-fn update_ui_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
-where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
-    for (ui, sections) in iter {
-        ui.update(queue, |data| {
-            data.color.w = alpha;
-        });
-        for section in sections.iter_mut() {
-            section.update(queue, |data| {
-                data.color.w = alpha;
-            })
-        }
-    }
 }

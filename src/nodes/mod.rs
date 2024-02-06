@@ -43,6 +43,7 @@ pub mod path {
     pub const TITLE_BUTTON_SETTING_TEXTURE_PATH: &'static str = "textures/ui/title_button_setting.dds";
     pub const TITLE_BUTTON_EXIT_TEXTURE_PATH: &'static str = "textures/ui/title_button_exit.dds";
     pub const WINDOW_RATIO_4_3_TEXTURE_PATH: &'static str = "textures/ui/window_ratio_4_3.dds";
+    pub const WINDOW_RATIO_8_1_TEXTURE_PATH: &'static str = "textures/ui/window_ratio_8_1.dds";
 
     pub const TITLE_BACKGROUND_TEXTURE_PATH: &'static str = "textures/bg/title_background.dds";
     pub const INGAME_BACKGROUND_TEXTURE_PATH: &'static str = "textures/bg/ingame_background.dds";
@@ -116,10 +117,12 @@ pub mod path {
     pub const YUZU_DAMAGE_1_SOUND_PATH: &'static str = "sounds/yuzu/yuzu_damage_1.ogg";
     pub const YUZU_DAMAGE_2_SOUND_PATH: &'static str = "sounds/yuzu/yuzu_damage_2.ogg";
 
+    pub const YUUKA_TITLE_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_title.ogg";
     pub const YUUKA_ATTACK0_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_attack_0.ogg";
     pub const YUUKA_ATTACK1_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_attack_1.ogg";
     pub const YUUKA_ATTACK2_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_attack_2.ogg";
     pub const YUUKA_ATTACK3_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_attack_3.ogg";
     pub const YUUKA_VICTORY_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_victory.ogg";
     pub const YUUKA_DEFEAT_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_defeat.ogg";
+    pub const YUUKA_HIDDEN_SOUND_PATH: &'static str = "sounds/yuuka/yuuka_hidden.ogg";
 }

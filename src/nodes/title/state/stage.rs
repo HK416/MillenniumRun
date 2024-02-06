@@ -11,14 +11,12 @@ use crate::{
     game_err,
     components::{
         ui::UiBrush, 
-        text::TextBrush, 
         sprite::SpriteBrush,
         collider2d::Collider2d,
         camera::GameCamera,
         player::Actor, 
     },
     nodes::title::{
-        utils,
         TitleScene,
         state::TitleState, 
     },
@@ -44,7 +42,7 @@ static FOCUSED_SPRITE: Mutex<Option<(usize, Vec<Vec3>)>> = Mutex::new(None);
 /// #### English (Translation) </br>
 /// Contains the original color data of the currently pressed system button. </br>
 /// 
-static FOCUSED_SYS_BTN: Mutex<Option<(usize, Vec3, Vec<Vec3>)>> = Mutex::new(None);
+static FOCUSED_SYS_BTN: Mutex<Option<Vec3>> = Mutex::new(None);
 
 
 
@@ -63,7 +61,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (English Translation) Get shared object to use.
     let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
     let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -178,18 +175,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 시스템 버튼 그리기.
         // (English Translation) Drawing the system buttons.
-        ui_brush.draw(
-            &mut rpass, 
-            this.system_buttons.iter()
-            .map(|(ui, _)| ui)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.system_buttons.iter()
-            .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
-        );
+        ui_brush.draw(&mut rpass, [&this.return_button].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -234,17 +220,10 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                     // (English Translation) Returns the color of the selected ui to its original color.
                     {
                         let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                        if let Some((index, ui_color, section_colors)) = guard.take() {
-                            if let Some((ui, sections)) = this.system_buttons.get(index) {
-                                ui.update(queue, |data| {
-                                    data.color = (ui_color, data.color.w).into();
-                                });
-                                for (section_color, section) in section_colors.into_iter().zip(sections.iter()) {
-                                    section.update(queue, |data| {
-                                        data.color = (section_color, data.color.w).into();
-                                    });
-                                }
-                            }
+                        if let Some(ui_color) = guard.take() {
+                            this.return_button.update(queue, |data| {
+                                data.color = (ui_color, data.color.w).into();
+                            });
                         }
                     }
 
@@ -401,11 +380,7 @@ fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: 
                 if MouseButton::Left == *button && state.is_pressed() {
                     // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                     // (English Translation) Make sure the mouse cursor is inside the ui area.
-                    let select = this.system_buttons.iter()
-                        .enumerate()
-                        .find(|(_, (ui, _))| {
-                            ui.test(&(cursor_pos, camera))
-                        });
+                    let selected = this.return_button.test(&(cursor_pos, camera));
 
                     // (한국어)
                     // 마우스 커서가 ui 영역 안에 있는 경우:
@@ -419,58 +394,39 @@ fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: 
                     // 2. Change the color of the ui and the color of the text.
                     // 3. Calls the ui pressed function.
                     //
-                    if let Some((index, (ui, sections))) = select {
+                    if selected {
                         // <1>
-                        let ui_color = ui.data.lock().expect("Failed to access variable.").color.xyz();
-                        let section_colors = sections.iter().map(|it| {
-                            it.data.lock().expect("Failed to get variable").color.xyz()
-                        }).collect();
+                        let ui_color = this.return_button.data.lock().expect("Failed to access variable.").color.xyz();
                         let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                        *guard = Some((index, ui_color, section_colors));
+                        *guard = Some(ui_color);
 
                         // <2>
-                        ui.update(queue, |data| {
+                        this.return_button.update(queue, |data| {
                             data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
                         });
-                        for section in sections.iter() {
-                            section.update(queue, |data| {
-                                data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
-                            });
-                        }
 
                         // <3>
-                        ui_pressed(utils::SystemButtons::from(index), this, shared)?;
+                        ui_pressed(this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
                     let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                    if let Some((index, ui_color, section_colors)) = guard.take() {
+                    if let Some(ui_color) = guard.take() {
                         // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
                         // (English Translation) Returns the color of the selected ui to its original color.
-                        if let Some((ui, sections)) = this.system_buttons.get_mut(index) {
-                            ui.update(queue, |data| {
-                                data.color = (ui_color, data.color.w).into();
-                            });
-                            for (section_color, section) in section_colors.into_iter().zip(sections.iter()) {
-                                section.update(queue, |data| {
-                                    data.color = (section_color, data.color.w).into();
-                                });
-                            }
-                        };
+                        this.return_button.update(queue, |data| {
+                            data.color = (ui_color, data.color.w).into();
+                        });
                         
                         // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                         // (English Translation) Make sure the mouse cursor is inside the ui area.
-                        let select = this.system_buttons.iter()
-                            .enumerate()
-                            .find_map(|(idx, (ui, _))| {
-                                if ui.test(&(cursor_pos, camera)) { Some(idx) } else { None }
-                            });
+                        let selected = this.return_button.test(&(cursor_pos, camera));
 
                         // (한국어) 선택된 ui가 이전에 선택된 ui와 일치하는 경우:
                         // (English Translation) If the selected ui matches a previously selected ui:
-                        if select.is_some_and(|select| index == select) {
+                        if selected {
                             // (한국어) ui 떼어짐 함수를 호출합니다.
                             // (English Translation) Calls the ui released function.
-                            ui_released(utils::SystemButtons::from(index), this, shared)?;
+                            ui_released(this, shared)?;
                         }
                     }
                 }
@@ -479,10 +435,10 @@ fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: 
                 // (한국어) 선택된 ui가 있는 경우:
                 // (English Translation) If there is a selected ui:
                 let guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                if let Some((index, _, _)) = guard.as_ref() {
+                if let Some(_) = guard.as_ref() {
                     // (한국어) ui 끌림 함수를 호출합니다.
                     // (English Translation) Calls the ui dragged function.
-                    ui_dragged(utils::SystemButtons::from(*index), this, shared)?;
+                    ui_dragged(this, shared)?;
                 }
             },
             _ => { /* empty */ }
@@ -504,16 +460,9 @@ fn sprite_pressed(sp: Actor, this: &mut TitleScene, shared: &mut Shared) -> AppR
 
 
 #[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn ui_pressed(btn: utils::SystemButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+fn ui_pressed(this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     use crate::components::sound;
-
-    match btn {
-        utils::SystemButtons::Return => {
-            sound::play_cancel_sound(shared)
-        },
-        _ => Ok(())
-    }
+    sound::play_cancel_sound(shared)
 }
 
 
@@ -561,16 +510,10 @@ fn sprite_released(sp: Actor, this: &mut TitleScene, shared: &mut Shared) -> App
 
 
 #[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn ui_released(btn: utils::SystemButtons, this: &mut TitleScene, _shared: &mut Shared) -> AppResult<()> {
-    match btn {
-        utils::SystemButtons::Return => {
-            this.state = TitleState::ExitStage;
-            this.timer = 0.0;
-            Ok(())
-        },
-        _ => Ok(())
-    }
+fn ui_released(this: &mut TitleScene, _shared: &mut Shared) -> AppResult<()> {
+    this.state = TitleState::ExitStage;
+    this.timer = 0.0;
+    Ok(())
 }
 
 
@@ -584,9 +527,6 @@ fn sprite_dragged(sp: Actor, this: &mut TitleScene, shared: &mut Shared) -> AppR
 
 
 #[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn ui_dragged(btn: utils::SystemButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    match btn {
-        _ => Ok(())
-    }
+fn ui_dragged(this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    Ok(())
 }

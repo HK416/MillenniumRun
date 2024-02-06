@@ -467,8 +467,7 @@ fn update_remaining_time(this: &mut InGameScene, shared: &mut Shared, _total_tim
         &format!("{}:{:0>2}", min, sec), 
         device, 
         queue, 
-        &text_brush.tex_sampler, 
-        &text_brush.texture_layout
+        &text_brush
     );
 
     if this.remaining_time <= 0.0 {
@@ -620,28 +619,28 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
             if percent < 20.0 {
                 this.result_star_index = 0;
             } else if 20.0 <= percent && percent < 50.0 {
-                for text in this.result_condition_texts[0..=0].iter() {
+                for text in this.result_challenge_texts[0..=0].iter() {
                     text.update(queue, |data| {
                         data.color = (255.0 / 255.0, 215.0 / 255.0, 0.0 / 255.0, 0.0).into();
                     });
                 }
                 this.result_star_index = 1;
             } else if 50.0 <= percent && percent < 80.0 {
-                for text in this.result_condition_texts[0..=1].iter() {
+                for text in this.result_challenge_texts[0..=1].iter() {
                     text.update(queue, |data| {
                         data.color = (255.0 / 255.0, 215.0 / 255.0, 0.0 / 255.0, 0.0).into();
                     });
                 }
                 this.result_star_index = 2;
             } else if 80.0 <= percent  && percent < 100.0 {
-                for text in this.result_condition_texts[0..=2].iter() {
+                for text in this.result_challenge_texts[0..=2].iter() {
                     text.update(queue, |data| {
                         data.color = (255.0 / 255.0, 215.0 / 255.0, 0.0 / 255.0, 0.0).into();
                     });
                 }
                 this.result_star_index = 3;
             } else {
-                for text in this.result_condition_texts[0..=2].iter() {
+                for text in this.result_challenge_texts[0..=2].iter() {
                     text.update(queue, |data| {
                         data.color = (255.0 / 255.0, 215.0 / 255.0, 0.0 / 255.0, 0.0).into();
                     });
@@ -757,8 +756,7 @@ fn update_percent_text(this: &mut InGameScene, shared: &mut Shared, _total_time:
         &format!("{}%", per.floor() as u32), 
         device, 
         queue, 
-        &text_brush.tex_sampler, 
-        &text_brush.texture_layout
+        &text_brush
     );
     this.percent.update(queue, |data| {
         data.scale = (s, s, s).into();

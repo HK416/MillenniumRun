@@ -1,43 +1,44 @@
 use std::sync::{Arc, Mutex};
 
-use rodio::Sink;
-use glam::{Vec4, Vec3, Vec4Swizzles};
+use glam::{Vec4, Vec4Swizzles, Vec3};
 use winit::{
     window::Window, 
+    keyboard::{KeyCode, PhysicalKey}, 
     event::{Event, WindowEvent, MouseButton}, 
-    keyboard::{PhysicalKey, KeyCode},
-    dpi::PhysicalPosition,
+    dpi::PhysicalPosition, 
 };
 
 use crate::{
     game_err, 
     assets::bundle::AssetBundle, 
     components::{
-        camera::GameCamera, 
         collider2d::Collider2d, 
-        script::{ScriptDecoder, ScriptTags}, 
-        sprite::SpriteBrush, 
-        text::TextBrush, 
         ui::UiBrush, 
+        text::TextBrush, 
+        sprite::SpriteBrush, 
+        table::TileBrush, 
+        bullet::BulletBrush, 
+        camera::GameCamera, 
+        script::{ScriptDecoder, ScriptTags}, 
         sound, 
         user::{
             Language, 
             Resolution, 
             Settings, 
-            SettingsEncoder
-        }
+            SettingsEncoder, 
+        }, 
     },
-    nodes::title::{
+    nodes::in_game::{
         utils, 
-        TitleScene, 
-        state::TitleState, 
-    }, 
+        InGameScene, 
+        state::InGameState, 
+    },
     render::depth::DepthBuffer, 
     system::{
-        error::{AppResult, GameError},
-        event::AppEvent,
+        error::{AppResult, GameError}, 
+        event::AppEvent, 
         shared::Shared,
-    }
+    },
 };
 
 /// #### 한국어 </br>
@@ -63,28 +64,31 @@ enum Items {
     Return, 
 }
 
-pub fn handle_events(this: &mut TitleScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
+pub fn handle_events(this: &mut InGameScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
     handle_keyboard_input(this, shared, &event)?;
     handle_mouse_input(this, shared, &event)?;
     Ok(())
 }
 
-pub fn update(_this: &mut TitleScene, _shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
+pub fn update(_this: &mut InGameScene, _shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
     Ok(())
 }
 
-pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use.
-    let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
-    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
-    let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
+pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
+    // (한국어) 사용할 공유 객체들을 가져옵니다.
+    // (English Translation) Get shared objects to use.
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
-    
+    let ui_brush = shared.get::<Arc<UiBrush>>().unwrap();
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
+    let sprite_brush = shared.get::<Arc<SpriteBrush>>().unwrap();
+    let tile_brush = shared.get::<Arc<TileBrush>>().unwrap();
+    let bullet_brush = shared.get::<Arc<BulletBrush>>().unwrap();
+
+
     // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
     // (English Translation) Wait until the previous operation is finished.
     device.poll(wgpu::Maintain::Wait);
@@ -98,7 +102,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             err.to_string()
         ))?;
 
-    // (한국어) 프레임 버퍼의 텍스쳐 뷰를 생성합니다.
+    // (한국어) 프레임 버퍼의 텍스처 뷰를 생성합니다.
     // (English Translation) Creates a texture view of the framebuffer.
     let view = frame.texture.create_view(&wgpu::TextureViewDescriptor { ..Default::default() });
 
@@ -106,62 +110,153 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     // (English Translation) Creates a command buffer.
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
     {
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("RenderPass(TitleScene(SettingState(Background)))"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment { 
-                view: &view, 
-                resolve_target: None, 
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                }
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth.view(),
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
+        let mut rpass = encoder.begin_render_pass(
+            &wgpu::RenderPassDescriptor {
+                label: Some("RenderPass(InGameScene(Setting(Background)))"), 
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &view, 
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), 
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(
+                    wgpu::RenderPassDepthStencilAttachment {
+                        view: depth.view(), 
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0), 
+                            store: wgpu::StoreOp::Store, 
+                        }),
+                        stencil_ops: None,
+                    },
+                ),
+                timestamp_writes: None,
+                occlusion_query_set: None, 
+            },
+        );
 
         camera.bind(&mut rpass);
-        
-        // (한국어) 배경 오브젝트 그리기.
-        // (English Translation) Drawing background objects.
-        sprite_brush.draw(&mut rpass, [&this.background].into_iter());
+
+        let iter = [
+                &this.background, 
+                &this.stage_images[this.result_star_index.min(3)], 
+                &this.player_faces[&this.player.face_state], 
+                &this.boss_faces[&this.boss.face_state], 
+                &this.menu_button, 
+                &this.remaining_timer_bg, 
+            ].into_iter()
+            .chain(this.owned_hearts.iter())
+            .chain(this.lost_hearts.iter().map(|(_, it)| it));
+        ui_brush.draw(&mut rpass, iter);
+
+        text_brush.draw(&mut rpass, [
+            &this.remaining_timer_text, 
+            &this.percent, 
+        ].into_iter());
+
+        tile_brush.draw(&mut rpass);
     }
 
     {
-        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("RenderPass(TitleScene(SettingState(Ui)))"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment { 
-                view: &view, 
-                resolve_target: None, 
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                }
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth.view(),
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
+        let mut rpass = encoder.begin_render_pass(
+            &wgpu::RenderPassDescriptor {
+                label: Some("RenderPass(InGameScene(Setting(Sprite)))"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment { 
+                    view: depth.view(), 
+                    depth_ops: Some(wgpu::Operations { 
+                        load: wgpu::LoadOp::Clear(1.0), 
+                        store: wgpu::StoreOp::Store 
+                    }), 
+                    stencil_ops: None 
                 }),
-                stencil_ops: None,
-            }),
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            },
+        );
 
         camera.bind(&mut rpass);
         
-        // (한국어) 사용자 인터페이스 그리기.
-        // (English Translation) Drawing the user interface.
+        sprite_brush.draw(&mut rpass, [
+            &this.player.sprite, 
+            &this.boss.sprite, 
+        ].into_iter());
+
+        bullet_brush.draw(&mut rpass, [&this.enemy_bullet].into_iter());
+    }
+
+    {
+        let mut rpass = encoder.begin_render_pass(
+            &wgpu::RenderPassDescriptor {
+                label: Some("RenderPass(InGameScene(Setting(Foreground)))"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment { 
+                    view: depth.view(), 
+                    depth_ops: Some(wgpu::Operations { 
+                        load: wgpu::LoadOp::Clear(1.0), 
+                        store: wgpu::StoreOp::Store 
+                    }), 
+                    stencil_ops: None 
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            },
+        );
+
+        camera.bind(&mut rpass);
+        ui_brush.draw(&mut rpass, [&this.foreground].into_iter());
+    }
+
+    {
+        let mut rpass = encoder.begin_render_pass(
+            &wgpu::RenderPassDescriptor {
+                label: Some("RenderPass(InGameScene(Setting(SettingUI)))"),
+                color_attachments: &[
+                    Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    }),
+                ],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment { 
+                    view: depth.view(), 
+                    depth_ops: Some(wgpu::Operations { 
+                        load: wgpu::LoadOp::Clear(1.0), 
+                        store: wgpu::StoreOp::Store 
+                    }), 
+                    stencil_ops: None 
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            },
+        );
+
+        camera.bind(&mut rpass);
+
         let iter = [
                 &this.setting_return_button.0, 
             ].into_iter()
@@ -190,7 +285,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
     Ok(())
 }
 
-fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
+fn handle_keyboard_input(this: &mut InGameScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared objects to use.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -234,7 +329,7 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                     // (한국어) 다음 게임 장면 상태로 변경합니다. 
                     // (English Translation) Change to the next game scene state. 
                     this.timer = 0.0;
-                    this.state = TitleState::ExitSetting;
+                    this.state = InGameState::ExitSetting;
                 }
             }, 
             _ => { /* empty */ }
@@ -245,7 +340,7 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
     Ok(())
 }
 
-fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
+fn handle_mouse_input(this: &mut InGameScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared objects to use.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
@@ -397,7 +492,7 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_pressed(this: &mut TitleScene, shared: &mut Shared, item: Items) -> AppResult<()> {
+fn ui_pressed(this: &mut InGameScene, shared: &mut Shared, item: Items) -> AppResult<()> {
     match item {
         Items::Language(_) => {
             sound::play_click_sound(shared)
@@ -414,7 +509,7 @@ fn ui_pressed(this: &mut TitleScene, shared: &mut Shared, item: Items) -> AppRes
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_released(this: &mut TitleScene, shared: &mut Shared, item: Items) -> AppResult<()> {
+fn ui_released(this: &mut InGameScene, shared: &mut Shared, item: Items) -> AppResult<()> {
     use crate::nodes::path;
 
     match item {
@@ -432,9 +527,10 @@ fn ui_released(this: &mut TitleScene, shared: &mut Shared, item: Items) -> AppRe
 
                 // (한국어) 사용할 공유 객체들을 가져옵니다.
                 // (English Translation) Get shared objects to use.
-                let (cnt, sink) = shared.pop::<(usize, Sink)>().unwrap();
+                let cnt = shared.pop::<usize>().unwrap();
                 let settings = shared.get::<Settings>().unwrap();
                 let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
 
                 // (한국어) 캐릭터 목소리 데이터를 가져옵니다.
                 // (English Translation) Get character voice data. 
@@ -448,20 +544,20 @@ fn ui_released(this: &mut TitleScene, shared: &mut Shared, item: Items) -> AppRe
 
                 // (한국어) 캐릭터 목소리를 재생시킵니다.
                 // (English Translation) Play the character's voice.
-                sink.stop();
-                sink.set_volume(settings.voice_volume.norm());
-                sink.append(source);
+                audio.voice.stop();
+                audio.voice.set_volume(settings.voice_volume.norm());
+                audio.voice.append(source);
 
                 // (한국어) 사용한 공유 객체들 반환합니다.
                 // (English Translation) Returns the shared objects used. 
-                shared.push(((cnt + 1) % NUM_HIDDEN, sink));
+                shared.push((cnt + 1) % NUM_HIDDEN);
 
                 Ok(())
             },
         },
         Items::Return => {
             this.timer = 0.0;
-            this.state = TitleState::ExitSetting;
+            this.state = InGameState::ExitSetting;
             Ok(())
         },
         _ => Ok(())
@@ -470,7 +566,7 @@ fn ui_released(this: &mut TitleScene, shared: &mut Shared, item: Items) -> AppRe
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_dragged(this: &mut TitleScene, shared: &mut Shared, item: Items) -> AppResult<()> {
+fn ui_dragged(this: &mut InGameScene, shared: &mut Shared, item: Items) -> AppResult<()> {
     use crate::nodes::path;
 
     match item {
@@ -513,10 +609,15 @@ fn ui_dragged(this: &mut TitleScene, shared: &mut Shared, item: Items) -> AppRes
             match option {
                 utils::VolumeOptions::Background => {
                     settings.background_volume.set(volume);
-                    shared.get::<Sink>().unwrap().set_volume(settings.background_volume.norm());
+                    let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
+                    audio.background.set_volume(settings.background_volume.norm());
                 }, 
                 utils::VolumeOptions::Effect => settings.effect_volume.set(volume),
-                utils::VolumeOptions::Voice => settings.voice_volume.set(volume), 
+                utils::VolumeOptions::Voice => {
+                    settings.voice_volume.set(volume);
+                    let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
+                    audio.voice.set_volume(settings.voice_volume.norm());
+                }, 
             };
 
             // (한국어) 갱신된 설정을 저장합니다.
@@ -530,7 +631,7 @@ fn ui_dragged(this: &mut TitleScene, shared: &mut Shared, item: Items) -> AppRes
     }
 }
 
-fn change_language(this: &mut TitleScene, shared: &mut Shared, new: Language) -> AppResult<()> {    
+fn change_language(this: &mut InGameScene, shared: &mut Shared, new: Language) -> AppResult<()> {    
     use crate::nodes::path;
 
     // (한국어) 현재 설정된 언어와 같을 경우 실행하지 않습니다.
@@ -559,40 +660,67 @@ fn change_language(this: &mut TitleScene, shared: &mut Shared, new: Language) ->
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
-    const MENU: [(utils::MenuButtons, ScriptTags); 3] = [
-        (utils::MenuButtons::Start, ScriptTags::TitleStartButton), 
-        (utils::MenuButtons::Setting, ScriptTags::TitleSettingButton), 
-        (utils::MenuButtons::Exit, ScriptTags::TitleExitButton),
-    ];
-    for (idx, tag) in MENU {
-        this.menu_buttons[idx as usize].1.change(
-            script.get(tag)?, 
-            device, 
-            queue, 
-            text_brush
-        );
-    }
-
-    const MSG_BOX: [(utils::ExitMessageBox, ScriptTags); 3] = [
-        (utils::ExitMessageBox::Background, ScriptTags::GameExitReconfirmMessage), 
-        (utils::ExitMessageBox::No, ScriptTags::GameExitCancelButton), 
-        (utils::ExitMessageBox::Yes, ScriptTags::GameExitOkayButton),
-    ];
-    for (idx, tag) in MSG_BOX {
-        this.exit_msg_box[idx as usize].1.change(
-            script.get(tag)?, 
-            device, 
-            queue, 
-            text_brush
-        );
-    }
-
-    this.stage_enter_button.1.change(
-        script.get(ScriptTags::TitleStageEnterButton)?, 
+    this.pause_text.change(
+        script.get(ScriptTags::InGamePauseTitle)?, 
         device, 
         queue, 
         text_brush
     );
+
+    const PAUSE_BTN: [(utils::PauseButton, ScriptTags); 3] = [
+        (utils::PauseButton::Resume, ScriptTags::InGameResumeButton), 
+        (utils::PauseButton::Setting, ScriptTags::InGameSettingButton), 
+        (utils::PauseButton::GiveUp, ScriptTags::InGameGiveUpButton), 
+    ];
+    for (key, tag) in PAUSE_BTN {
+        this.pause_buttons.get_mut(&key).unwrap().1.change(
+            script.get(tag)?, 
+            device, 
+            queue, 
+            text_brush
+        );
+    }
+
+    const MSG_BOX: [(utils::ExitWndButton, ScriptTags); 2] = [
+        (utils::ExitWndButton::No, ScriptTags::InGameGiveUpCancelButton),
+        (utils::ExitWndButton::Yes, ScriptTags::InGameGiveUpOkayButton), 
+    ];
+    this.pause_exit_window.1.change(
+        script.get(ScriptTags::InGameGiveUpReconfirmMessage)?, 
+        device, 
+        queue, 
+        text_brush
+    );
+    for (key, tag) in MSG_BOX {
+        this.pause_exit_buttons.get_mut(&key).unwrap().1.change(
+            script.get(tag)?, 
+            device, 
+            queue, 
+            text_brush
+        );
+    }
+
+    this.result_window_btn.1.change(
+        script.get(ScriptTags::InGameExitButton)?, 
+        device, 
+        queue, 
+        text_brush
+    );
+    const CHALLENGE: [ScriptTags; 3] = [
+        ScriptTags::InGameChallenge0, 
+        ScriptTags::InGameChallenge1, 
+        ScriptTags::InGameChallenge2, 
+    ];
+    for (idx, tag) in CHALLENGE.into_iter().enumerate() {
+        this.result_challenge_texts[idx].change(
+            script.get(tag)?, 
+            device, 
+            queue, 
+            text_brush
+        );
+    }
+
+
 
     const SETTING_TITLES: [ScriptTags; 7] = [
         ScriptTags::SettingTitle, 
@@ -630,7 +758,7 @@ fn change_language(this: &mut TitleScene, shared: &mut Shared, new: Language) ->
     Ok(())
 }
 
-fn change_resolution(_this: &mut TitleScene, shared: &mut Shared, new: Resolution) -> AppResult<()> {
+fn change_resolution(_this: &mut InGameScene, shared: &mut Shared, new: Resolution) -> AppResult<()> {
     use crate::nodes::path;
     use crate::components::user::set_window_size;
 

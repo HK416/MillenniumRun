@@ -22,7 +22,7 @@ use crate::{
         transform::Projection, 
         sound::SoundDecoder,
         script::Script,
-        user::Settings,
+        user::{Language, Resolution, Settings},
         player::Actor, 
         save::SaveData, 
     },
@@ -70,6 +70,7 @@ impl SceneNode for TitleLoading {
         // (한국어) 사용할 공유 객체를 가져옵니다.
         // (English Translation) Get shared object to use.
         let save = shared.get::<SaveData>().unwrap().clone();
+        let settings = shared.get::<Settings>().unwrap().clone();
         let fonts = shared.get::<Arc<HashMap<String, FontArc>>>().unwrap().clone();
         let script = shared.get::<Arc<Script>>().unwrap().clone();
         let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
@@ -86,6 +87,8 @@ impl SceneNode for TitleLoading {
             // (English Translation) Loads assets to be used in the current game scene. 
             asset_bundle.get(path::CLICK_SOUND_PATH)?;
             asset_bundle.get(path::CANCEL_SOUND_PATH)?;
+            asset_bundle.get(path::YUUKA_TITLE_SOUND_PATH)?;
+            asset_bundle.get(path::YUUKA_HIDDEN_SOUND_PATH)?;
             asset_bundle.get(path::STAR_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?;
@@ -95,17 +98,22 @@ impl SceneNode for TitleLoading {
             asset_bundle.get(path::TITLE_BUTTON_EXIT_TEXTURE_PATH)?;
             asset_bundle.get(path::TITLE_BACKGROUND_TEXTURE_PATH)?;
             asset_bundle.get(path::WINDOW_RATIO_4_3_TEXTURE_PATH)?;
+            asset_bundle.get(path::WINDOW_RATIO_8_1_TEXTURE_PATH)?;
             asset_bundle.get(path::ARIS_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::MOMOI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::MIDORI_STANDING_TEXTURE_PATH)?;
             asset_bundle.get(path::YUZU_STANDING_TEXTURE_PATH)?;
 
             let nexon_lv2_gothic_medium = fonts.get(path::NEXON_LV2_GOTHIC_MEDIUM_PATH)
-            .expect("A registered font could not be found.");
+                .expect("A registered font could not be found.");
+            let nexon_lv2_gothic_bold = fonts.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)
+                .expect("A registered font could not be found.");
 
             utils::create_title_scene(
                 &save, 
+                &settings, 
                 &nexon_lv2_gothic_medium, 
+                &nexon_lv2_gothic_bold,
                 &device, 
                 &queue, 
                 &tex_sampler, 
@@ -301,15 +309,27 @@ impl Default for TitleLoading {
 pub struct TitleScene {
     pub timer: f64,
     pub state: state::TitleState,
+
     pub foreground: UiObject, 
     pub background: Sprite,
+
     pub sprites: Vec<(Sprite, AABB)>,
-    pub menu_buttons: Vec<(UiObject, Vec<Text>)>,
-    pub system_buttons: Vec<(UiObject, Vec<Text>)>,
-    pub exit_msg_box: Vec<(UiObject, Vec<Text>)>,
-    pub setting_window: Vec<(UiObject, Vec<Text>)>,
-    pub stage_window: Vec<(UiObject, Vec<Text>)>,
+    pub menu_buttons: Vec<(UiObject, Text)>,
+    pub return_button: UiObject,
+    
+    pub exit_msg_box: Vec<(UiObject, Text)>,
+
+    pub stage_window: UiObject,
+    pub stage_enter_button: (UiObject, Text), 
     pub stage_images: HashMap<Actor, (UiObject, UiObject, Text)>, 
+    
+    pub setting_titles: Vec<Text>, 
+    pub setting_windows: Vec<UiObject>, 
+    pub setting_languages: HashMap<Language, (UiObject, Text)>, 
+    pub setting_resolutions: HashMap<Resolution, (UiObject, Text)>, 
+    pub setting_return_button: (UiObject, Text), 
+    pub setting_volume_background: HashMap<utils::VolumeOptions, (UiObject, Text)>,
+    pub setting_volume_bar: HashMap<utils::VolumeOptions, UiObject>, 
 }
 
 impl SceneNode for TitleScene {
@@ -342,6 +362,12 @@ impl SceneNode for TitleScene {
     }
 
     fn exit(&mut self, shared: &mut Shared) -> AppResult<()> {
+        // (한국어) 사용을 완료한 에셋을 정리합니다.
+        // (English Translation) Release assets that have been used.
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        asset_bundle.release(path::YUUKA_TITLE_SOUND_PATH);
+        asset_bundle.release(path::YUUKA_HIDDEN_SOUND_PATH);
+        
         // (한국어) 배경 음악을 제거합니다.
         // (English Translation) Detach background music.
         shared.pop::<Sink>().unwrap().stop();

@@ -164,8 +164,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             this.menu_buttons.iter()
             .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
         );
     }
 
@@ -205,8 +203,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
             &mut rpass, 
             this.exit_msg_box.iter()
             .map(|(_, it)| it)
-            .flatten()
-            .map(|it| it)
         );
     }
 
@@ -233,16 +229,14 @@ fn smooth_step(elapsed_time: f64, duration: f64) -> f32 {
 /// Updates the scale value of the user interface object.
 /// 
 fn update_ui_scale<'a, Iter>(iter: Iter, queue: &wgpu::Queue, s: f32) 
-where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
-    for (ui, texts) in iter {
+where Iter: Iterator<Item = &'a mut (UiObject, Text)> {
+    for (ui, text) in iter {
         ui.update(queue, |data| {
             data.global_scale = (s, s, s).into();
         });
-        for text in texts.iter_mut() {
-            text.update(queue, |data| {
-                data.scale = (s, s, s).into();
-            });
-        }
+        text.update(queue, |data| {
+            data.scale = (s, s, s).into();
+        });
     }
 }
 
@@ -253,15 +247,13 @@ where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
 /// Updates the alpha value of the user interface object.
 /// 
 fn update_ui_alpha<'a, Iter>(iter: Iter, queue: &wgpu::Queue, alpha: f32) 
-where Iter: Iterator<Item = &'a mut (UiObject, Vec<Text>)> {
-    for (ui, texts) in iter {
+where Iter: Iterator<Item = &'a mut (UiObject, Text)> {
+    for (ui, text) in iter {
         ui.update(queue, |data| {
             data.color.w = alpha;
         });
-        for text in texts.iter_mut() {
-            text.update(queue, |data| {
-                data.color.w = alpha
-            });
-        }
+        text.update(queue, |data| {
+            data.color.w = alpha;
+        });
     }
 }

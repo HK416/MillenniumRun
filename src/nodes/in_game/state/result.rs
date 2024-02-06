@@ -159,7 +159,7 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
             &this.result_stars[this.result_star_index],
         ].into_iter());
         text_brush.draw(&mut rpass, [&this.percent, &this.result_window_btn.1].into_iter());
-        text_brush.draw(&mut rpass, this.result_condition_texts.iter());
+        text_brush.draw(&mut rpass, this.result_challenge_texts.iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

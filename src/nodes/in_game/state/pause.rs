@@ -9,12 +9,14 @@ use winit::{
 use crate::{
     game_err, 
     components::{
+        collider2d::Collider2d, 
         ui::UiBrush, 
         text::TextBrush, 
         sprite::SpriteBrush, 
         table::TileBrush, 
         bullet::BulletBrush, 
-        camera::GameCamera, collider2d::Collider2d, 
+        camera::GameCamera, 
+        sound, 
     },
     nodes::in_game::{
         utils, 
@@ -391,12 +393,10 @@ fn handle_mouse_input(this: &mut InGameScene, shared: &mut Shared, event: &Event
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
 fn btn_pressed(tag: utils::PauseButton, this: &mut InGameScene, shared: &mut Shared) -> AppResult<()> {
-    use crate::components::sound;
-
     match tag {
         utils::PauseButton::Resume => sound::play_cancel_sound(shared),
         utils::PauseButton::Setting => sound::play_click_sound(shared),
-        utils::PauseButton::Exit => sound::play_click_sound(shared), 
+        utils::PauseButton::GiveUp => sound::play_click_sound(shared), 
         _ => Ok(())
     }
 }
@@ -410,7 +410,13 @@ fn btn_released(tag: utils::PauseButton, this: &mut InGameScene, shared: &mut Sh
             this.state = InGameState::ExitPause;
             Ok(())
         },
-        utils::PauseButton::Exit => {
+        utils::PauseButton::Setting => {
+            shared.push(1usize);
+            this.timer = 0.0;
+            this.state = InGameState::EnterSetting;
+            Ok(())
+        },
+        utils::PauseButton::GiveUp => {
             this.timer = 0.0;
             this.state = InGameState::EnterMsgBox;
             Ok(())

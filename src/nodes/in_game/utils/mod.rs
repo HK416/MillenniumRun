@@ -18,7 +18,7 @@ use crate::{
         table::{Table, TileBrush}, 
         anchor::Anchor, margin::Margin, 
         script::{Script, ScriptTags}, 
-        user::Settings, 
+        user::{Language, Resolution, Settings}, 
     }, 
     nodes::{
         path, 
@@ -45,7 +45,7 @@ use crate::{
 pub enum PauseButton {
     Resume = 0, 
     Setting = 1, 
-    Exit = 3, 
+    GiveUp = 3, 
 }
 
 /// #### 한국어 </br>
@@ -60,6 +60,22 @@ pub enum ExitWndButton {
     No = 1, 
 }
 
+/// #### 한국어 </br>
+/// 사용자가 설정 할 수 있는 음향 옵션 목록입니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// This is a list of sound options that the user can set. </br>
+/// 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum VolumeOptions {
+    Background, 
+    Effect, 
+    Voice, 
+}
+
+pub const SETTING_VOLUME_RANGE_MAX: i32 = 272;
+pub const SETTING_VOLUME_RANGE_MIN: i32 = -240;
+pub const VOLUME_BAR_WIDTH: i32 = 8;
 
 
 /// #### 한국어 </br>
@@ -95,6 +111,7 @@ impl InGameAudio {
 pub fn create_game_scene(
     actor: Actor, 
     fonts: &HashMap<String, FontArc>, 
+    settings: &Settings,
     script: &Script, 
     device: &wgpu::Device, 
     queue: &wgpu::Queue, 
@@ -123,6 +140,24 @@ pub fn create_game_scene(
         }
     );
     let foreground = create_foreground(
+        device, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush
+    );
+
+    let setting_volume_background = create_setting_volume_background(
+        nexon_lv2_gothic_medium, 
+        script, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush, 
+        text_brush
+    )?;
+    let setting_volume_bar = create_setting_volume_bar(
+        settings, 
         device, 
         tex_sampler, 
         &texture_view, 
@@ -411,7 +446,7 @@ pub fn create_game_scene(
             device,
             queue,
         })?;
-    let texture_view = texture.create_view(
+    let window_texture_view = texture.create_view(
         &wgpu::TextureViewDescriptor {
             ..Default::default()
         });
@@ -420,12 +455,42 @@ pub fn create_game_scene(
     // (English Translation) Release assets that have been used.
     asset_bundle.release(path::WINDOW_RATIO_4_3_TEXTURE_PATH);
 
+
+    // (한국어) `dds`이미지 파일로부터 하위 윈도우 배경 텍스처를 생성합니다.
+    // (English Translation) Create a sub window background texture from a `dds`image file. 
+    let texture = asset_bundle.get(path::WINDOW_RATIO_8_1_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("ExitMessageBoxBackground"),
+            size: wgpu::Extent3d {
+                width: 1024,
+                height: 128,
+                depth_or_array_layers: 1,
+            },
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            mip_level_count: 11,
+            sample_count: 1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            device,
+            queue,
+        })?;
+    let sub_window_texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        });
+
+    // (한국어) 사용을 완료한 에셋을 정리합니다.
+    // (English Translation) Release assets that have been used.
+    asset_bundle.release(path::WINDOW_RATIO_8_1_TEXTURE_PATH);
+
+
     let (remaining_timer_bg, remaining_timer_text) = create_remaining_timer(
         nexon_lv2_gothic_bold, 
         device, 
         queue, 
         tex_sampler, 
-        &texture_view, 
+        &window_texture_view, 
         ui_brush, 
         text_brush
     );
@@ -436,8 +501,24 @@ pub fn create_game_scene(
         device, 
         queue, 
         tex_sampler, 
-        &texture_view, 
+        &window_texture_view, 
         ui_brush, 
+        text_brush
+    )?;
+
+    let setting_windows = create_setting_windows(
+        device, 
+        tex_sampler, 
+        &window_texture_view, 
+        &sub_window_texture_view, 
+        ui_brush
+    );
+    let setting_titles = create_setting_window_titles(
+        nexon_lv2_gothic_medium, 
+        nexon_lv2_gothic_bold, 
+        script, 
+        device, 
+        queue, 
         text_brush
     )?;
 
@@ -490,6 +571,35 @@ pub fn create_game_scene(
     )?;
 
     let pause_exit_buttons = create_exit_buttons(
+        nexon_lv2_gothic_medium, 
+        script, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush, 
+        text_brush
+    )?;
+
+    let setting_languages = create_setting_languages(
+        nexon_lv2_gothic_medium, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush, 
+        text_brush
+    );
+    let setting_resolutions = create_setting_resolutions(
+        nexon_lv2_gothic_medium, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &texture_view, 
+        ui_brush, 
+        text_brush
+    );
+    let setting_return_button = create_setting_return_button(
         nexon_lv2_gothic_medium, 
         script, 
         device, 
@@ -615,7 +725,7 @@ pub fn create_game_scene(
     );
 
 
-    
+
     // (한국어) 일시정지 버튼 텍스처를 생성합니다.
     // (English Translation) Creates a pause window. 
     let texture = asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?
@@ -763,7 +873,7 @@ pub fn create_game_scene(
         result_title, 
         result_stars, 
         result_star_index: 0, 
-        result_condition_texts, 
+        result_challenge_texts: result_condition_texts, 
         table, 
         player, 
         player_faces, 
@@ -774,6 +884,13 @@ pub fn create_game_scene(
         player_smile_sounds, 
         player_damage_sounds, 
         bgm_sound, 
+        setting_windows, 
+        setting_titles, 
+        setting_languages, 
+        setting_resolutions, 
+        setting_return_button, 
+        setting_volume_background, 
+        setting_volume_bar, 
     })
 }
 
@@ -1239,7 +1356,7 @@ fn create_pause_text(
     text_brush: &TextBrush, 
     script: &Script
 ) -> AppResult<Text> {
-    let text = script.get(ScriptTags::PauseTitle)?;
+    let text = script.get(ScriptTags::InGamePauseTitle)?;
     return Ok(TextBuilder::new(
         Some("PuaseWindow"), 
         font, 
@@ -1278,7 +1395,7 @@ fn create_pause_buttons(
     .with_margin(Margin::new(100, -160, 40, 160))
     .with_color((1.0, 1.0, 1.0, 0.0).into())
     .build(device);
-    let text = script.get(ScriptTags::PauseResumeButton)?;
+    let text = script.get(ScriptTags::InGameResumeButton)?;
     let resume_text = TextBuilder::new(
         Some("ResumeText"), 
         font, 
@@ -1300,7 +1417,7 @@ fn create_pause_buttons(
     .with_margin(Margin::new(10, -160, -50, 160))
     .with_color((1.0, 1.0, 1.0, 0.0).into())
     .build(device);
-    let text = script.get(ScriptTags::PuaseSettingButton)?;
+    let text = script.get(ScriptTags::InGameSettingButton)?;
     let setting_text = TextBuilder::new(
         Some("SettingText"), 
         font, 
@@ -1322,7 +1439,7 @@ fn create_pause_buttons(
     .with_margin(Margin::new(-80, -160, -140, 160))
     .with_color((255.0 / 255.0, 103.0 / 255.0, 105.0 / 255.0, 0.0).into())
     .build(device);
-    let text = script.get(ScriptTags::PauseExitButton)?;
+    let text = script.get(ScriptTags::InGameGiveUpButton)?;
     let exit_text =  TextBuilder::new(
         Some("ExitText"), 
         font, 
@@ -1337,7 +1454,7 @@ fn create_pause_buttons(
     return Ok(HashMap::from_iter([
         (PauseButton::Resume, (resume_btn, resume_text)), 
         (PauseButton::Setting, (setting_btn, setting_text)), 
-        (PauseButton::Exit, (exit_button, exit_text)), 
+        (PauseButton::GiveUp, (exit_button, exit_text)), 
     ]));
 }
 
@@ -1371,7 +1488,7 @@ fn create_result_window_btn(
         TextBuilder::new(
             Some("ExitButton"), 
             font, 
-            script.get(ScriptTags::ExitButton)?, 
+            script.get(ScriptTags::InGameExitButton)?, 
             text_brush
         )
         .with_anchor(anchor)
@@ -1534,7 +1651,7 @@ fn create_result_condition_texts(
         TextBuilder::new(
             Some("Condition0"), 
             font, 
-            script.get(ScriptTags::ResultConditionText0)?,
+            script.get(ScriptTags::InGameChallenge0)?,
             text_brush
         )
         .with_anchor(Anchor::new(0.625, 0.72, 0.55, 0.98))
@@ -1546,7 +1663,7 @@ fn create_result_condition_texts(
         TextBuilder::new(
             Some("Condition1"), 
             font, 
-            script.get(ScriptTags::ResultConditionText1)?, 
+            script.get(ScriptTags::InGameChallenge1)?, 
             text_brush
         )
         .with_anchor(Anchor::new(0.55, 0.72, 0.475, 0.98))
@@ -1558,7 +1675,7 @@ fn create_result_condition_texts(
         TextBuilder::new(
             Some("Condition2"), 
             font, 
-            script.get(ScriptTags::ResultConditionText2)?, 
+            script.get(ScriptTags::InGameChallenge2)?, 
             text_brush
         )
         .with_anchor(Anchor::new(0.475, 0.72, 0.4, 0.98))
@@ -1612,7 +1729,7 @@ fn create_exit_window(
     let text = TextBuilder::new(
         Some("ExitWindowText"), 
         font, 
-        script.get(ScriptTags::ExitMessage)?, 
+        script.get(ScriptTags::InGameGiveUpReconfirmMessage)?, 
         text_brush
     )
     .with_anchor(anchor)
@@ -1681,7 +1798,7 @@ fn create_exit_buttons(
         TextBuilder::new(
             Some("YesButtonText"), 
             font, 
-            script.get(ScriptTags::ExitButton)?, 
+            script.get(ScriptTags::InGameGiveUpOkayButton)?, 
             text_brush
         )
         .with_anchor(anchor)
@@ -1713,7 +1830,7 @@ fn create_exit_buttons(
         TextBuilder::new(
             Some("NoButtonText"), 
             font, 
-            script.get(ScriptTags::NoExitButton)?, 
+            script.get(ScriptTags::InGameGiveUpCancelButton)?, 
             text_brush
         )
         .with_anchor(anchor)
@@ -1730,4 +1847,551 @@ fn create_exit_buttons(
         .into_iter()
         .collect()
     )
+}
+
+/// #### 한국어 </br>
+/// 설정 창의 배경 인터페이스를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates a background interface for the settings window. </br>
+/// 
+fn create_setting_windows(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    window_texture_view: &wgpu::TextureView, 
+    sub_window_texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush
+) -> Vec<UiObject> {
+    let background = UiObjectBuilder::new(
+        Some("SettingBackground"), 
+        tex_sampler, 
+        window_texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(300, -400, -300, 400))
+    .with_color(Vec4::new(1.0, 1.0, 1.0, 1.0))
+    .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_global_translation(Vec3::new(0.0, 0.0, 0.9))
+    .build(device);
+
+    let item0 = UiObjectBuilder::new(
+        Some("SettingSubBackground"), 
+        tex_sampler, 
+        sub_window_texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(204, -368, 108, 368))
+    .with_color(Vec4::new(222.0 / 255.0, 226.0 / 255.0, 230.0 / 255.0, 1.0))
+    .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_global_translation(Vec3::new(0.0, 0.0, 0.8))
+    .build(device);
+
+    let item1 = UiObjectBuilder::new(
+        Some("SettingSubBackground"), 
+        tex_sampler, 
+        sub_window_texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(76, -368, -20, 368))
+    .with_color(Vec4::new(222.0 / 255.0, 226.0 / 255.0, 230.0 / 255.0, 1.0))
+    .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_global_translation(Vec3::new(0.0, 0.0, 0.8))
+    .build(device);
+
+    let item2 = UiObjectBuilder::new(
+        Some("SettingSubBackground"), 
+        tex_sampler, 
+        sub_window_texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(-52, -368, -204, 368))
+    .with_color(Vec4::new(222.0 / 255.0, 226.0 / 255.0, 230.0 / 255.0, 1.0))
+    .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_global_translation(Vec3::new(0.0, 0.0, 0.8))
+    .build(device);
+
+    return vec![
+        background, 
+        item0, 
+        item1, 
+        item2
+    ];
+}
+
+/// #### 한국어 </br>
+/// 설정 창의 타이틀 텍스트들을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates title texts for the settings window. </br>
+/// 
+fn create_setting_window_titles(
+    nexon_lv2_gothic_medium: &FontArc, 
+    nexon_lv2_gothic_bold: &FontArc, 
+    script: &Script, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    text_brush: &TextBrush
+) -> AppResult<Vec<Text>> {
+    let main_title = TextBuilder::new(
+        Some("SettingTitle"), 
+        nexon_lv2_gothic_bold, 
+        script.get(ScriptTags::SettingTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(292, -368, 244, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item0_title = TextBuilder::new(
+        Some("SettingItem0Title"), 
+        nexon_lv2_gothic_bold, 
+        script.get(ScriptTags::SettingLanguageOptionTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(236, -368, 204, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item0_sub_title = TextBuilder::new(
+        Some("SettingItem0SubTitle"), 
+        nexon_lv2_gothic_medium, 
+        script.get(ScriptTags::SettingLanguageOptionSubTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(204, -368, 172, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item1_title = TextBuilder::new(
+        Some("SettingItem1Title"), 
+        nexon_lv2_gothic_bold, 
+        script.get(ScriptTags::SettingResolutionOptionTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(108, -368, 76, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item1_sub_title = TextBuilder::new(
+        Some("SettingItem1SubTitle"), 
+        nexon_lv2_gothic_medium, 
+        script.get(ScriptTags::SettingResolutionOptionSubTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(76, -368, 44, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item2_title = TextBuilder::new(
+        Some("SettingItem2Title"), 
+        nexon_lv2_gothic_bold, 
+        script.get(ScriptTags::SettingVolumeOptionTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(-20, -368, -52, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item2_sub_title = TextBuilder::new(
+        Some("SettingItem2SubTitle"), 
+        nexon_lv2_gothic_medium, 
+        script.get(ScriptTags::SettingVolumeOptionSubTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(-52, -368, -84, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    return Ok(vec![
+        main_title, 
+        item0_title, 
+        item0_sub_title, 
+        item1_title, 
+        item1_sub_title, 
+        item2_title, 
+        item2_sub_title, 
+    ]);
+}
+
+/// #### 한국어 </br>
+/// 설정 창의 언어 선택 버튼들을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create language selection buttons in the setting window. </br>
+/// 
+pub(super) fn create_setting_languages(
+    font: &FontArc, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush
+) -> HashMap<Language, (UiObject, Text)> {
+    const TOP: i32 = 164;
+    const LEFT: i32 = -344;
+    const HEIGHT: i32 = 36;
+    const WIDTH: i32 = HEIGHT * 3;
+    const GAP: i32 = 8;
+
+    let mut left = LEFT;
+    let mut languages = HashMap::new();
+    const LANGUAGES: [(Language, &'static str); 1] = [
+        (Language::Korean, "한국어"), 
+    ];
+
+    for (language, text) in LANGUAGES {
+        languages.insert(
+            language, 
+            (
+                UiObjectBuilder::new(
+                    Some(&format!("{}_Button", text)), 
+                    tex_sampler, 
+                    texture_view, 
+                    ui_brush
+                )
+                .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+                .with_margin(Margin::new(TOP, left, TOP - HEIGHT, left + WIDTH))
+                .with_color(Vec4::new(1.0, 1.0, 1.0, 1.0))
+                .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+                .with_global_translation(Vec3::new(0.0, 0.0, 0.5))
+                .build(device), 
+                TextBuilder::new(
+                    Some(&format!("{}_ButtonText", text)), 
+                    font, 
+                    text, 
+                    text_brush
+                )
+                .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+                .with_margin(Margin::new(TOP, left, TOP - HEIGHT, left + WIDTH))
+                .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+                .with_scale(Vec3::new(0.0, 0.0, 0.0))
+                .with_translation(Vec3::new(0.0, 0.0, 0.4))
+                .build(device, queue)
+            )
+        );
+
+        left += GAP + WIDTH;
+    }
+
+    return languages;
+}
+
+/// #### 한국어 </br>
+/// 설정 창의 해상도 선택 버튼들을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create resolution selection buttons in the setting window. </br>
+/// 
+pub(super) fn create_setting_resolutions(
+    font: &FontArc, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush
+) -> HashMap<Resolution, (UiObject, Text)> {
+    const TOP: i32 = 36;
+    const LEFT: i32 = -344;
+    const HEIGHT: i32 = 36;
+    const WIDHT: i32 = HEIGHT * 3; 
+    const GAP: i32 = 8;
+
+    let mut left = LEFT;
+    let mut resolutions = HashMap::new();
+    const RESOLUTIONS: [(Resolution, &'static str); 6] = [
+        (Resolution::W800H600, "800x600"),
+        (Resolution::W1024H768, "1024x768"), 
+        (Resolution::W1152H864, "1152x864"), 
+        (Resolution::W1280H960, "1280x960"), 
+        (Resolution::W1400H1050, "1400x1050"), 
+        (Resolution::W1600H1200, "1600x1200"), 
+    ];
+
+    for (resolution, text) in RESOLUTIONS {
+        resolutions.insert(
+            resolution, 
+            (
+                UiObjectBuilder::new(
+                    Some(&format!("{}_Button", text)), 
+                    tex_sampler, 
+                    texture_view, 
+                    ui_brush
+                )
+                .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+                .with_margin(Margin::new(TOP, left, TOP - HEIGHT, left + WIDHT))
+                .with_color(Vec4::new(1.0, 1.0, 1.0, 1.0))
+                .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+                .with_global_translation(Vec3::new(0.0, 0.0, 0.5))
+                .build(device),
+                TextBuilder::new(
+                    Some(&format!("{}_ButtonText", text)), 
+                    font, 
+                    text, 
+                    text_brush
+                )
+                .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+                .with_margin(Margin::new(TOP, left, TOP - HEIGHT, left + WIDHT))
+                .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+                .with_scale(Vec3::new(0.0, 0.0, 0.0))
+                .with_translation(Vec3::new(0.0, 0.0, 0.4))
+                .build(device, queue)
+            )
+        );
+
+        left += GAP + WIDHT;
+    }
+
+    return resolutions;
+}
+
+/// #### 한국어 </br>
+/// 돌아가기 버튼을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates a return button. </br>
+/// 
+#[inline]
+pub(super) fn create_setting_return_button(
+    font: &FontArc, 
+    script: &Script,
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush
+) -> AppResult<(UiObject, Text)> {
+    return Ok((
+        UiObjectBuilder::new(
+            Some("SettingReturnButton"), 
+            tex_sampler, 
+            texture_view, 
+            ui_brush
+        )
+        .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+        .with_margin(Margin::new(-220, 224, -268, 368))
+        .with_color(Vec4::new(1.0, 1.0, 1.0, 1.0))
+        .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+        .with_global_translation(Vec3::new(0.0, 0.0, 0.5))
+        .build(device), 
+        TextBuilder::new(
+            Some("SettingReturnButtonText"), 
+            font, 
+            script.get(ScriptTags::SettingReturnButton)?, 
+            text_brush
+        )
+        .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+        .with_margin(Margin::new(-220, 224, -268, 368))
+        .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+        .with_scale(Vec3::new(0.0, 0.0, 0.0))
+        .with_translation(Vec3::new(0.0, 0.0, 0.4))
+        .build(device, queue)
+    ))
+}
+
+/// #### 한국어 </br>
+/// 설정 창 볼륨 조절 인터페이스를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a settings window volume control interface. </br>
+/// 
+pub(super) fn create_setting_volume_background(
+    font: &FontArc, 
+    script: &Script, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush
+) -> AppResult<HashMap<VolumeOptions, (UiObject, Text)>> {
+    let mut backgrounds = HashMap::new();
+    backgrounds.insert(
+        VolumeOptions::Background, 
+        (
+            UiObjectBuilder::new(
+                Some("BackgroundVolume"), 
+                tex_sampler, 
+                texture_view, 
+                ui_brush
+            )
+            .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+            .with_margin(Margin::new(-96, SETTING_VOLUME_RANGE_MIN, -104, SETTING_VOLUME_RANGE_MAX))
+            .with_color(Vec4::new(187.0 / 255.0, 239.0 / 255.0, 249.0 / 255.0, 1.0))
+            .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+            .with_global_translation(Vec3::new(0.0, 0.0, 0.5))
+            .build(device), 
+            TextBuilder::new(
+                Some("BackgroundVolumeText"), 
+                font, 
+                script.get(ScriptTags::BackgroundVolume)?, 
+                text_brush
+            )
+            .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+            .with_margin(Margin::new(-84, -368, -116, -240))
+            .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+            .with_scale(Vec3::new(0.0, 0.0, 0.0))
+            .with_translation(Vec3::new(0.0, 0.0, 0.4))
+            .build(device, queue)
+        )
+    );
+
+    backgrounds.insert(
+        VolumeOptions::Effect, 
+        (
+            UiObjectBuilder::new(
+                Some("EffectVolume"), 
+                tex_sampler, 
+                texture_view, 
+                ui_brush
+            )
+            .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+            .with_margin(Margin::new(-128, SETTING_VOLUME_RANGE_MIN, -136, SETTING_VOLUME_RANGE_MAX))
+            .with_color(Vec4::new(187.0 / 255.0, 239.0 / 255.0, 249.0 / 255.0, 1.0))
+            .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+            .with_global_translation(Vec3::new(0.0, 0.0, 0.5))
+            .build(device), 
+            TextBuilder::new(
+                Some("EffectVolumeText"), 
+                font, 
+                script.get(ScriptTags::EffectVolume)?, 
+                text_brush
+            )
+            .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+            .with_margin(Margin::new(-116, -368, -148, -240))
+            .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+            .with_scale(Vec3::new(0.0, 0.0, 0.0))
+            .with_translation(Vec3::new(0.0, 0.0, 0.4))
+            .build(device, queue)
+        )
+    );
+
+    backgrounds.insert(
+        VolumeOptions::Voice, 
+        (
+            UiObjectBuilder::new(
+                Some("VoiceVolume"), 
+                tex_sampler, 
+                texture_view, 
+                ui_brush
+            )
+            .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+            .with_margin(Margin::new(-160, SETTING_VOLUME_RANGE_MIN, -168, SETTING_VOLUME_RANGE_MAX))
+            .with_color(Vec4::new(187.0 / 255.0, 239.0 / 255.0, 249.0 / 255.0, 1.0))
+            .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+            .with_global_translation(Vec3::new(0.0, 0.0, 0.5))
+            .build(device), 
+            TextBuilder::new(
+                Some("VoiceVolumeText"), 
+                font, 
+                script.get(ScriptTags::VoiceVolume)?, 
+                text_brush
+            )
+            .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+            .with_margin(Margin::new(-148, -368, -180, -240))
+            .build(device, queue)
+        )
+    );
+
+    return Ok(backgrounds);
+}
+
+/// #### 한국어 </br>
+/// 설정 창의 볼륨 조절 막대기를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates a volume control bar in the setting window. </br>
+/// 
+pub(super) fn create_setting_volume_bar(
+    settings: &Settings, 
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush
+) -> HashMap<VolumeOptions, UiObject> {
+    const RANGE: i32 = SETTING_VOLUME_RANGE_MAX - SETTING_VOLUME_RANGE_MIN;
+    let mut bar = HashMap::new();
+
+    let delta = RANGE as f32 * settings.background_volume.norm().min(1.0);
+    let pos = SETTING_VOLUME_RANGE_MIN + delta as i32;
+    bar.insert(
+        VolumeOptions::Background, 
+        UiObjectBuilder::new(
+            Some("BackgroundVolumeBar"), 
+            tex_sampler, 
+            texture_view, 
+            ui_brush
+        )
+        .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+        .with_margin(Margin::new(-90, pos - VOLUME_BAR_WIDTH / 2, -110, pos + VOLUME_BAR_WIDTH / 2))
+        .with_color(Vec4::new(234.0 / 255.0, 250.0 / 255.0, 253.0 / 255.0, 1.0))
+        .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+        .with_global_translation(Vec3::new(0.0, 0.0, 0.3))
+        .build(device)
+    );
+
+    let delta = RANGE as f32 * settings.effect_volume.norm().min(1.0);
+    let pos = SETTING_VOLUME_RANGE_MIN + delta as i32;
+    bar.insert(
+        VolumeOptions::Effect, 
+        UiObjectBuilder::new(
+            Some("EffectVolumeBar"), 
+            tex_sampler, 
+            texture_view, 
+            ui_brush
+        )
+        .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+        .with_margin(Margin::new(-122, pos - VOLUME_BAR_WIDTH / 2, -142, pos + VOLUME_BAR_WIDTH / 2))
+        .with_color(Vec4::new(234.0 / 255.0, 250.0 / 255.0, 253.0 / 255.0, 1.0))
+        .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+        .with_global_translation(Vec3::new(0.0, 0.0, 0.3))
+        .build(device)
+    );
+
+    let delta = RANGE as f32 * settings.voice_volume.norm().min(1.0);
+    let pos = SETTING_VOLUME_RANGE_MIN + delta as i32;
+    bar.insert(
+        VolumeOptions::Voice, 
+        UiObjectBuilder::new(
+            Some("VoiceVolumeBar"), 
+            tex_sampler, 
+            texture_view, 
+            ui_brush
+        )
+        .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+        .with_margin(Margin::new(-154, pos - VOLUME_BAR_WIDTH / 2, -174, pos + VOLUME_BAR_WIDTH / 2))
+        .with_color(Vec4::new(234.0 / 255.0, 250.0 / 255.0, 253.0 / 255.0, 1.0))
+        .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+        .with_global_translation(Vec3::new(0.0, 0.0, 0.3))
+        .build(device)
+    );
+
+    return bar;
 }

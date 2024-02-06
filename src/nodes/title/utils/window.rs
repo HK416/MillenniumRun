@@ -69,7 +69,7 @@ pub(super) fn create_exit_message_box<'a>(
     script: &'a Script, 
     ui_brush: &'a UiBrush, 
     text_brush: &'a TextBrush, 
-) -> AppResult<Vec<(UiObject, Vec<Text>)>> {
+) -> AppResult<Vec<(UiObject, Text)>> {
     const ANCHOR_TOP: f32 = 0.5;
     const ANCHOR_LEFT: f32 = 0.5;
     const ANCHOR_BOTTOM: f32 = 0.5;
@@ -108,19 +108,17 @@ pub(super) fn create_exit_message_box<'a>(
         .with_color(WND_COLOR)
         .with_global_translation(WND_TRANSLATION)
         .build(device),
-        vec![
-            TextBuilder::new(
-                Some("ExitMessageBoxBackground"),
-                font,
-                script.get(ScriptTags::ExitMessage)?,
-                text_brush
-            )
-            .with_anchor(anchor)
-            .with_margin(text_margin)
-            .with_color(TEXT_COLOR)
-            .with_translation(TEXT_TRANSLATION)
-            .build(device, queue),
-        ]
+        TextBuilder::new(
+            Some("ExitMessageBoxBackground"),
+            font,
+            script.get(ScriptTags::GameExitReconfirmMessage)?,
+            text_brush
+        )
+        .with_anchor(anchor)
+        .with_margin(text_margin)
+        .with_color(TEXT_COLOR)
+        .with_translation(TEXT_TRANSLATION)
+        .build(device, queue),
     );
 
 
@@ -145,19 +143,17 @@ pub(super) fn create_exit_message_box<'a>(
         .with_color(YES_BTN_COLOR)
         .with_global_translation(BTN_TRANSLATION)
         .build(device),
-        vec![
-            TextBuilder::new(
-                Some("YesButton"),
-                font,
-                script.get(ScriptTags::ExitButton)?,
-                text_brush,
-            )
-            .with_anchor(anchor)
-            .with_margin(margin)
-            .with_color(TEXT_COLOR)
-            .with_translation(TEXT_TRANSLATION)
-            .build(device, queue),
-        ]
+        TextBuilder::new(
+            Some("YesButton"),
+            font,
+            script.get(ScriptTags::GameExitOkayButton)?,
+            text_brush,
+        )
+        .with_anchor(anchor)
+        .with_margin(margin)
+        .with_color(TEXT_COLOR)
+        .with_translation(TEXT_TRANSLATION)
+        .build(device, queue),
     );
 
 
@@ -182,19 +178,17 @@ pub(super) fn create_exit_message_box<'a>(
         .with_color(NO_BTN_COLOR)
         .with_global_translation(BTN_TRANSLATION)
         .build(device),
-        vec![
-            TextBuilder::new(
-                Some("NoButton"),
-                font,
-                script.get(ScriptTags::NoExitButton)?,
-                text_brush,
-            )
-            .with_anchor(anchor)
-            .with_margin(margin)
-            .with_color(TEXT_COLOR)
-            .with_translation(TEXT_TRANSLATION)
-            .build(device, queue),
-        ]
+        TextBuilder::new(
+            Some("NoButton"),
+            font,
+            script.get(ScriptTags::GameExitCancelButton)?,
+            text_brush,
+        )
+        .with_anchor(anchor)
+        .with_margin(margin)
+        .with_color(TEXT_COLOR)
+        .with_translation(TEXT_TRANSLATION)
+        .build(device, queue),
     );
 
     //-------------------------------------------------------------------------*
@@ -233,139 +227,6 @@ impl From<usize> for SettingWindow {
             _ => panic!("index out of range!") 
         }
     }
-}
-
-
-/// #### 한국어 </br>
-/// 설정 윈도우를 생성하는데 사용되는 텍스처 뷰 집합입니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// A set of texture views used to create the setting window. </br>
-/// 
-#[derive(Debug, Clone, Copy)]
-pub(super) struct SettingWindowTextureView<'a> {
-    pub window_texture_view: &'a wgpu::TextureView, 
-    pub store_btn_texture_view: &'a wgpu::TextureView, 
-    pub exit_btn_texture_view: &'a wgpu::TextureView, 
-}
-
-
-/// #### 한국어 </br>
-/// 설정 윈도우를 생성합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Create a setting window. </br>
-/// 
-pub(super) fn create_setting_window<'a>(
-    font: &'a FontArc, 
-    device: &'a wgpu::Device, 
-    queue: &'a wgpu::Queue, 
-    tex_sampler: &'a wgpu::Sampler, 
-    texture_views: SettingWindowTextureView<'a>, 
-    script: &'a Script, 
-    ui_brush: &'a UiBrush, 
-    text_brush: &'a TextBrush
-) -> AppResult<Vec<(UiObject, Vec<Text>)>> {
-    let anchor = Anchor::new(0.5, 0.5, 0.5, 0.5);
-    let margin = Margin::new(300, -400, -300, 400);
-    let ui_color = Vec4::new(1.0, 1.0, 1.0, 1.0);
-    let ui_translation = Vec3::new(0.0, 0.0, 0.5);
-    // let text_color = Vec4::new(0.0, 0.0, 0.0, 1.0);
-    // let text_translation = Vec3::new(0.0, 0.0, 0.25);
-    let background = (
-        UiObjectBuilder::new(
-            Some("SettingWindow"), 
-            tex_sampler, 
-            texture_views.window_texture_view, 
-            ui_brush
-        )
-        .with_anchor(anchor)
-        .with_margin(margin)
-        .with_color(ui_color)
-        .with_global_translation(ui_translation)
-        .build(device),
-        vec![
-            // TODO 
-        ]
-    );
-
-    let anchor = Anchor::new(0.5, 0.5, 0.5, 0.5);
-    let margin = Margin::new(-224, 0, -284, 180);
-    let ui_color = Vec4::new(255.0 / 255.0, 103.0 / 255.0, 105.0 / 255.0, 1.0);
-    let ui_translation = Vec3::new(0.0, 0.0, 0.5);
-    let text_color = Vec4::new(0.0, 0.0, 0.0, 1.0);
-    let text_translation = Vec3::new(0.0, 0.0, 0.25);
-    let store_button = (
-        UiObjectBuilder::new(
-            Some("StoreButton"),
-            tex_sampler,
-            texture_views.store_btn_texture_view, 
-            ui_brush
-        )
-        .with_anchor(anchor)
-        .with_margin(margin)
-        .with_color(ui_color)
-        .with_global_translation(ui_translation)
-        .build(device),
-        vec![
-            TextBuilder::new(
-                Some("StoreButton"), 
-                font, 
-                script.get(ScriptTags::StoreButton)?, 
-                text_brush
-            )
-            .with_anchor(anchor)
-            .with_margin(margin)
-            .with_color(text_color)
-            .with_translation(text_translation)
-            .build(device, queue),
-        ]
-    );
-
-
-    let anchor = Anchor::new(0.5, 0.5, 0.5, 0.5);
-    let margin = Margin::new(-224, 204, -284, 384);
-    let ui_color = Vec4::new(1.0, 1.0, 1.0, 1.0);
-    let ui_translation = Vec3::new(0.0, 0.0, 0.5);
-    let text_color = Vec4::new(0.0, 0.0, 0.0, 1.0);
-    let text_translation = Vec3::new(0.0, 0.0, 0.25);
-    let exit_button = (
-        UiObjectBuilder::new(
-            Some("ExitButton"),
-            tex_sampler, 
-            texture_views.exit_btn_texture_view, 
-            ui_brush
-        )
-        .with_anchor(anchor)
-        .with_margin(margin)
-        .with_color(ui_color)
-        .with_global_translation(ui_translation)
-        .build(device),
-        vec![
-            TextBuilder::new(
-                Some("ExitButton"), 
-                font, 
-                script.get(ScriptTags::ExitButton)?, 
-                text_brush
-            )
-            .with_anchor(anchor)
-            .with_margin(margin)
-            .with_color(text_color)
-            .with_translation(text_translation)
-            .build(device, queue),
-        ]
-    );
-    
-
-    //-------------------------------------------------------------------------*
-    // (한국어) 주의: 순서를 바꾸지 마세요.                                            |
-    // (English Translation) Caution: Do not change the order.                 |
-    //-------------------------------------------------------------------------*
-    return Ok(vec![
-        background, 
-        store_button, 
-        exit_button, 
-    ])
 }
 
 
@@ -422,7 +283,7 @@ pub(super) fn create_stage_window<'a>(
     script: &'a Script, 
     ui_brush: &'a UiBrush, 
     text_brush: &'a TextBrush
-) -> AppResult<Vec<(UiObject, Vec<Text>)>> {
+) -> AppResult<(UiObject, (UiObject, Text))> {
     let anchor = Anchor::new(
         1.0 - 0.01, 
         0.5 - 0.25, 
@@ -432,22 +293,17 @@ pub(super) fn create_stage_window<'a>(
     let margin = Margin::new(0, 0, 0, 0);
     let ui_color = Vec4::new(1.0, 1.0, 1.0, 0.0);
     let ui_translation = Vec3::new(0.0, 0.0, 0.75);
-    let background = (
-        UiObjectBuilder::new(
-            Some("StageWindow"),
-            tex_sampler,
-            texture_views.window_texture_view,
-            ui_brush
-        )
-        .with_anchor(anchor)
-        .with_margin(margin)
-        .with_color(ui_color)
-        .with_global_translation(ui_translation)
-        .build(device),
-        vec![
-            // TODO 
-        ]
-    );
+    let background = UiObjectBuilder::new(
+        Some("StageWindow"),
+        tex_sampler,
+        texture_views.window_texture_view,
+        ui_brush
+    )
+    .with_anchor(anchor)
+    .with_margin(margin)
+    .with_color(ui_color)
+    .with_global_translation(ui_translation)
+    .build(device);
 
 
     let anchor = Anchor::new(
@@ -473,23 +329,210 @@ pub(super) fn create_stage_window<'a>(
         .with_color(ui_color)
         .with_global_translation(ui_translation)
         .build(device),
-        vec![
-            TextBuilder::new(
-                Some("ReturnButton"),
-                font, 
-                script.get(ScriptTags::EnterStageButton)?, 
-                text_brush
-            )
-            .with_anchor(anchor)
-            .with_margin(margin)
-            .with_color(text_color)
-            .with_translation(text_translation)
-            .build(device, queue),
-        ]
+        TextBuilder::new(
+            Some("ReturnButton"),
+            font, 
+            script.get(ScriptTags::TitleStageEnterButton)?, 
+            text_brush
+        )
+        .with_anchor(anchor)
+        .with_margin(margin)
+        .with_color(text_color)
+        .with_translation(text_translation)
+        .build(device, queue)
     );
 
-    return Ok(vec![
+    return Ok((
         background, 
         enter_button, 
+    ));
+}
+
+/// #### 한국어 </br>
+/// 설정 창의 배경 인터페이스를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates a background interface for the settings window. </br>
+/// 
+pub(super) fn create_setting_windows(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    window_texture_view: &wgpu::TextureView, 
+    sub_window_texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush
+) -> Vec<UiObject> {
+    let background = UiObjectBuilder::new(
+        Some("SettingBackground"), 
+        tex_sampler, 
+        window_texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(300, -400, -300, 400))
+    .with_color(Vec4::new(1.0, 1.0, 1.0, 1.0))
+    .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_global_translation(Vec3::new(0.0, 0.0, 0.9))
+    .build(device);
+
+    let item0 = UiObjectBuilder::new(
+        Some("SettingSubBackground"), 
+        tex_sampler, 
+        sub_window_texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(204, -368, 108, 368))
+    .with_color(Vec4::new(222.0 / 255.0, 226.0 / 255.0, 230.0 / 255.0, 1.0))
+    .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_global_translation(Vec3::new(0.0, 0.0, 0.8))
+    .build(device);
+
+    let item1 = UiObjectBuilder::new(
+        Some("SettingSubBackground"), 
+        tex_sampler, 
+        sub_window_texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(76, -368, -20, 368))
+    .with_color(Vec4::new(222.0 / 255.0, 226.0 / 255.0, 230.0 / 255.0, 1.0))
+    .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_global_translation(Vec3::new(0.0, 0.0, 0.8))
+    .build(device);
+
+    let item2 = UiObjectBuilder::new(
+        Some("SettingSubBackground"), 
+        tex_sampler, 
+        sub_window_texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(-52, -368, -204, 368))
+    .with_color(Vec4::new(222.0 / 255.0, 226.0 / 255.0, 230.0 / 255.0, 1.0))
+    .with_global_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_global_translation(Vec3::new(0.0, 0.0, 0.8))
+    .build(device);
+
+    return vec![
+        background, 
+        item0, 
+        item1, 
+        item2
+    ];
+}
+
+/// #### 한국어 </br>
+/// 설정 창의 타이틀 텍스트들을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Creates title texts for the settings window. </br>
+/// 
+pub(super) fn create_setting_window_titles(
+    nexon_lv2_gothic_medium: &FontArc, 
+    nexon_lv2_gothic_bold: &FontArc, 
+    script: &Script, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    text_brush: &TextBrush
+) -> AppResult<Vec<Text>> {
+    let main_title = TextBuilder::new(
+        Some("SettingTitle"), 
+        nexon_lv2_gothic_bold, 
+        script.get(ScriptTags::SettingTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(292, -368, 244, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item0_title = TextBuilder::new(
+        Some("SettingItem0Title"), 
+        nexon_lv2_gothic_bold, 
+        script.get(ScriptTags::SettingLanguageOptionTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(236, -368, 204, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item0_sub_title = TextBuilder::new(
+        Some("SettingItem0SubTitle"), 
+        nexon_lv2_gothic_medium, 
+        script.get(ScriptTags::SettingLanguageOptionSubTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(204, -368, 172, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item1_title = TextBuilder::new(
+        Some("SettingItem1Title"), 
+        nexon_lv2_gothic_bold, 
+        script.get(ScriptTags::SettingResolutionOptionTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(108, -368, 76, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item1_sub_title = TextBuilder::new(
+        Some("SettingItem1SubTitle"), 
+        nexon_lv2_gothic_medium, 
+        script.get(ScriptTags::SettingResolutionOptionSubTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(76, -368, 44, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item2_title = TextBuilder::new(
+        Some("SettingItem2Title"), 
+        nexon_lv2_gothic_bold, 
+        script.get(ScriptTags::SettingVolumeOptionTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(-20, -368, -52, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    let item2_sub_title = TextBuilder::new(
+        Some("SettingItem2SubTitle"), 
+        nexon_lv2_gothic_medium, 
+        script.get(ScriptTags::SettingVolumeOptionSubTitle)?, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(-52, -368, -84, 368))
+    .with_color(Vec4::new(0.0, 0.0, 0.0, 1.0))
+    .with_scale(Vec3::new(0.0, 0.0, 0.0))
+    .with_translation(Vec3::new(0.0, 0.0, 0.75))
+    .build(device, queue);
+
+    return Ok(vec![
+        main_title, 
+        item0_title, 
+        item0_sub_title, 
+        item1_title, 
+        item1_sub_title, 
+        item2_title, 
+        item2_sub_title, 
     ]);
 }

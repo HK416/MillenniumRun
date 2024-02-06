@@ -328,8 +328,7 @@ fn update_percent_text(this: &mut InGameScene, shared: &mut Shared, _total_time:
         &format!("{}%", per.floor() as u32), 
         device, 
         queue, 
-        &text_brush.tex_sampler, 
-        &text_brush.texture_layout
+        &text_brush
     );
     this.percent.update(queue, |data| data.scale = (s, s, s).into());
 
