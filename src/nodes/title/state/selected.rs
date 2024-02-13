@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use glam::{Vec4, Vec3, Vec4Swizzles};
+use glam::{Vec3, Vec4, Vec4Swizzles};
 use winit::{
     event::{Event, WindowEvent, MouseButton}, 
     keyboard::{PhysicalKey, KeyCode},
@@ -34,21 +34,20 @@ use crate::{
     }, 
 };
 
-/// #### 한국어 </br>
-/// 현재 눌려져있는 스테이지 윈도우 ui의 원래 색상 데이터를 담고 있습니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Contains the original color data of the currently pressed stage window ui. </br>
-/// 
-static FOCUSED_STAGE_WND: Mutex<Option<(Vec3, Vec3)>> = Mutex::new(None);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum FocuseUi {
+    PreviewButton,
+    StageEnterButton, 
+    ReturnButton,
+}
 
 /// #### 한국어 </br>
-/// 현재 눌려져있는 시스템 버튼의 원래 색상 데이터를 담고 있습니다. </br>
+/// 현재 눌려있는 인터페이스의 데이터를 담고 있습니다. </br>
 /// 
 /// #### English (Translation) </br>
-/// Contains the original color data of the currently pressed system button. </br>
+/// Contains data for the currently pressed interface. </br>
 /// 
-static FOCUSED_SYS_BTN: Mutex<Option<Vec3>> = Mutex::new(None);
+static FOCUSED_UI: Mutex<Option<(FocuseUi, Vec3, Vec3)>> = Mutex::new(None);
 
 
 
@@ -237,7 +236,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
-    let sprite = shared.get::<Actor>().unwrap();
+    let actor = shared.get::<Actor>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
 
     match event {
@@ -249,7 +248,7 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                     
                     // (한국어) 선택된 스프라이트의 이미지를 변경합니다. 
                     // (English Translation) Changes the image of the selected sprite. 
-                    if let Some((sprite, _)) = this.sprites.get(*sprite as usize) {
+                    if let Some((sprite, _)) = this.sprites.get(*actor as usize) {
                         sprite.update(queue, |instances| {
                             for instance in instances.iter_mut() {
                                 instance.texture_index = 0;
@@ -257,28 +256,21 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                         });
                     }
 
-                    // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
-                    // (English Translation) Returns the color of the selected ui to its original color.
-                    {
-                        let mut guard = FOCUSED_STAGE_WND.lock().expect("Failed to access variable.");
-                        if let Some((ui_color, text_color)) = guard.take() {
-                            this.stage_enter_button.0.update(queue, |data| {
-                                data.color = (ui_color, data.color.w).into();
-                            });
-                            this.stage_enter_button.1.update(queue, |data| {
-                                data.color = (text_color, data.color.w).into();
-                            });
-                        }
-                    }
-
-                    // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
-                    // (English Translation) Returns the color of the selected ui to its original color.
-                    {
-                        let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                        if let Some(ui_color) = guard.take() {
-                            this.return_button.update(queue, |data| {
-                                data.color = (ui_color, data.color.w).into();
-                            });
+                    // (한국어) 선택된 인터페이스를 원래 상태로 되돌립니다.
+                    // (English Translation) Return the selected interface to its original state. 
+                    let mut guard = FOCUSED_UI.lock().expect("Failed to access variable.");
+                    if let Some((focuse, ui_color, text_color)) = guard.take() {
+                        match focuse {
+                            FocuseUi::PreviewButton => {
+                                this.stage_images[actor].0.update(queue, |data| data.color = (ui_color, data.color.w).into());
+                            },
+                            FocuseUi::StageEnterButton => {
+                                this.stage_enter_button.0.update(queue, |data| data.color = (ui_color, data.color.w).into());
+                                this.stage_enter_button.1.update(queue, |data| data.color = (text_color, data.color.w).into());
+                            },
+                            FocuseUi::ReturnButton => {
+                                this.return_button.update(queue, |data| data.color = (ui_color, data.color.w).into());
+                            },
                         }
                     }
 
@@ -302,26 +294,28 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
 
 
 fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    handle_mouse_input_for_ui(this, shared, event)?;
-    handle_mouse_input_for_sys(this, shared, event)?;
-    Ok(())
-}
-
-
-fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use.
+    // (한국어) 사용할 공유 객체들을 가져옵니다.
+    // (English Translation) Get shared objects to use.
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    
+    let actor = shared.get::<Actor>().unwrap();
+
     match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::MouseInput { state, button, .. } => {
                 if MouseButton::Left == *button && state.is_pressed() {
                     // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                     // (English Translation) Make sure the mouse cursor is inside the ui area.
-                    let selected = this.stage_enter_button.0.test(&(cursor_pos, camera));
+                    let buttons = [
+                        (FocuseUi::PreviewButton, &this.stage_images[actor].0), 
+                        (FocuseUi::StageEnterButton, &this.stage_enter_button.0), 
+                        (FocuseUi::ReturnButton, &this.return_button), 
+                    ];
+                    let selected = buttons.into_iter()
+                        .find_map(|(focuse, ui)| {
+                            ui.test(&(cursor_pos, camera)).then_some(focuse)
+                        });
 
                     // (한국어)
                     // 마우스 커서가 ui 영역 안에 있는 경우:
@@ -335,207 +329,134 @@ fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: 
                     // 2. Change the color of the ui and the color of the text.
                     // 3. Call the ui pressed function.
                     //
-                    if selected {
+                    if let Some(focuse) = selected {
                         // <1>
-                        let ui_color = this.stage_enter_button.0.data.lock().expect("Failed to access variable.").color.xyz();
-                        let text_color = this.stage_enter_button.1.data.lock().expect("Failed to access variable.").color.xyz();
-                        let mut guard = FOCUSED_STAGE_WND.lock().expect("Failed to access variable.");
-                        *guard = Some((ui_color, text_color));
+                        let (ui_color, text_color) = match focuse {
+                            FocuseUi::PreviewButton => {
+                                let ui_color = this.stage_images[actor].0.data.lock().expect("Failed to access variable.").color.xyz();
+                                (ui_color, Vec3::ZERO)
+                            },
+                            FocuseUi::StageEnterButton => {
+                                let ui_color = this.stage_enter_button.0.data.lock().expect("Failed to access variable.").color.xyz();
+                                let text_color = this.stage_enter_button.1.data.lock().expect("Failed to access variable.").color.xyz();
+                                (ui_color, text_color)
+                            }, 
+                            FocuseUi::ReturnButton => {
+                                let ui_color = this.return_button.data.lock().expect("Failed to access variable.").color.xyz();
+                                (ui_color, Vec3::ZERO)
+                            }
+                        };
+
+                        let mut guard = FOCUSED_UI.lock().expect("Failed to access variable.");
+                        *guard = Some((focuse, ui_color, text_color));
 
                         // <2>
-                        this.stage_enter_button.0.update(queue, |data| {
-                            data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
-                        });
-                        this.stage_enter_button.1.update(queue, |data| {
-                            data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
-                        });
+                        match focuse {
+                            FocuseUi::PreviewButton => {
+                                this.stage_images[actor].0.update(queue, |data| data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0));
+                            },
+                            FocuseUi::ReturnButton => {
+                                this.return_button.update(queue, |data| data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0));
+                            },
+                            FocuseUi::StageEnterButton => {
+                                this.stage_enter_button.0.update(queue, |data| data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0));
+                                this.stage_enter_button.1.update(queue, |data| data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0));
+                            },
+                        };
 
                         // <3>
-                        ui_pressed(this, shared)?;
+                        ui_pressed(focuse, this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
-                    let mut guard = FOCUSED_STAGE_WND.lock().expect("Failed to access variable.");
-                    if let Some((ui_color, text_color)) = guard.take() {
-                        // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
-                        // (English Translation) Returns the color of the selected ui to its original color.
-                        this.stage_enter_button.0.update(queue, |data| {
-                            data.color = (ui_color, data.color.w).into();
-                        });
-                        this.stage_enter_button.1.update(queue, |data| {
-                            data.color = (text_color, data.color.w).into();
-                        });
-                        
+                    // (한국어) 선택된 인터페이스를 원래 상태로 되돌립니다.
+                    // (English Translation) Return the selected interface to its original state. 
+                    let mut guard = FOCUSED_UI.lock().expect("Failed to access variable.");
+                    if let Some((focuse, ui_color, text_color)) = guard.take() {
+                        match focuse {
+                            FocuseUi::PreviewButton => {
+                                this.stage_images[actor].0.update(queue, |data| data.color = (ui_color, data.color.w).into());
+                            },
+                            FocuseUi::StageEnterButton => {
+                                this.stage_enter_button.0.update(queue, |data| data.color = (ui_color, data.color.w).into());
+                                this.stage_enter_button.1.update(queue, |data| data.color = (text_color, data.color.w).into());
+                            },
+                            FocuseUi::ReturnButton => {
+                                this.return_button.update(queue, |data| data.color = (ui_color, data.color.w).into());
+                            },
+                        }
+
                         // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                         // (English Translation) Make sure the mouse cursor is inside the ui area.
-                        let selected = this.stage_enter_button.0.test(&(cursor_pos, camera));
+                        let buttons = [
+                            (FocuseUi::PreviewButton, &this.stage_images[actor].0), 
+                            (FocuseUi::StageEnterButton, &this.stage_enter_button.0), 
+                            (FocuseUi::ReturnButton, &this.return_button), 
+                        ];
+                        let selected = buttons.into_iter()
+                            .find_map(|(focuse, ui)| {
+                                ui.test(&(cursor_pos, camera)).then_some(focuse)
+                            });
 
                         // (한국어) 선택된 ui가 이전에 선택된 ui와 일치하는 경우:
                         // (English Translation) If the selected ui matches a previously selected ui:
-                        if selected {
+                        if selected.is_some_and(|selected| selected == focuse) {
                             // (한국어) ui 떼어짐 함수를 호출합니다.
                             // (English Translation) Calls the ui released function.
-                            ui_released(this, shared)?;
+                            ui_released(focuse, this, shared)?;
                         }
                     }
                 }
             },
-            WindowEvent::CursorMoved { .. } => {
-                // (한국어) 선택된 ui가 있는 경우:
-                // (English Translation) If there is a selected ui:
-                let guard = FOCUSED_STAGE_WND.lock().expect("Failed to access variable.");
-                if let Some((_, _)) = guard.as_ref() {
-                    // (한국어) ui 끌림 함수를 호출합니다.
-                    // (English Translation) Calls the ui dragged function.
-                    ui_dragged(this, shared)?;
-                }
-            },
             _ => { /* empty */ }
-        },
+        }, 
         _ => { /* empty */ }
     };
 
     Ok(())
 }
 
-fn handle_mouse_input_for_sys(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use.
-    let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
-    let camera = shared.get::<Arc<GameCamera>>().unwrap();
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    
-    match event {
-        Event::WindowEvent { event, .. } => match event {
-            WindowEvent::MouseInput { state, button, .. } => {
-                if MouseButton::Left == *button && state.is_pressed() {
-                    // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
-                    // (English Translation) Make sure the mouse cursor is inside the ui area.
-                    let selected = this.return_button.test(&(cursor_pos, camera));
-
-                    // (한국어)
-                    // 마우스 커서가 ui 영역 안에 있는 경우:
-                    // 1. `FOCUSED`에 해당 ui의 태그, 색상, 텍스트 색상을 저장합니다.
-                    // 2. 해당 ui의 색상과 텍스트 색상을 변경합니다.
-                    // 3. ui 눌림 함수를 호출합니다.
-                    //
-                    // (English Translation)
-                    // If the mouse cursor is inside the ui area:
-                    // 1. Store the tag of the ui, ui color, and text color in `FOCUSED`.
-                    // 2. Change the color of the ui and the color of the text.
-                    // 3. Call the ui pressed function.
-                    //
-                    if selected {
-                        // <1>
-                        let ui_color = this.return_button.data.lock().expect("Failed to access variable.").color.xyz();
-                        let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                        *guard = Some(ui_color);
-
-                        // <2>
-                        this.return_button.update(queue, |data| {
-                            data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
-                        });
-
-                        // <3>
-                        sys_ui_pressed(this, shared)?;
-                    }
-                } else if MouseButton::Left == *button && !state.is_pressed() {
-                    let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                    if let Some(ui_color) = guard.take() {
-                        // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
-                        // (English Translation) Returns the color of the selected ui to its original color.
-                        this.return_button.update(queue, |data| {
-                            data.color = (ui_color, data.color.w).into();
-                        });
-                        
-                        // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
-                        // (English Translation) Make sure the mouse cursor is inside the ui area.
-                        let selected = this.return_button.test(&(cursor_pos, camera));
-
-                        // (한국어) 선택된 ui가 이전에 선택된 ui와 일치하는 경우:
-                        // (English Translation) If the selected ui matches a previously selected ui:
-                        if selected {
-                            // (한국어) ui 떼어짐 함수를 호출합니다.
-                            // (English Translation) Calls the ui released function.
-                            sys_ui_released(this, shared)?;
-                        }
-                    }
-                }
-            },
-            WindowEvent::CursorMoved { .. } => {
-                // (한국어) 선택된 ui가 있는 경우:
-                // (English Translation) If there is a selected ui:
-                let guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                if let Some(_) = guard.as_ref() {
-                    // (한국어) ui 끌림 함수를 호출합니다.
-                    // (English Translation) Calls the ui dragged function.
-                    sys_ui_dragged(this, shared)?;
-                }
-            },
-            _ => { /* empty */ }
-        },
-        _ => { /* empty */ }
-    };
-
-    Ok(())
-}
-
-
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_pressed(this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    sound::play_click_sound(shared)
-}
-
-
-#[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn sys_ui_pressed(this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    sound::play_cancel_sound(shared)
-}
-
-
-#[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn ui_released(this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    let state = shared.get_mut::<SceneState>().unwrap();
-    *state = SceneState::Change(Box::new(InGameLoading::default()));
-    Ok(())
-}
-
-
-#[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn sys_ui_released(this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use.
-    let sprite = shared.get::<Actor>().unwrap();
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-
-    // (한국어) 선택된 스프라이트의 이미지를 변경합니다. 
-    // (English Translation) Changes the image of the selected sprite. 
-    if let Some((sprite, _)) = this.sprites.get(*sprite as usize) {
-        sprite.update(queue, |instances| {
-            for instance in instances.iter_mut() {
-                instance.texture_index = 0;
-            }
-        });
+fn ui_pressed(focuse: FocuseUi, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match focuse {
+        FocuseUi::PreviewButton | FocuseUi::StageEnterButton => {
+            sound::play_click_sound(shared)
+        }, 
+        FocuseUi::ReturnButton => {
+            sound::play_cancel_sound(shared)
+        }
     }
-
-    this.state = TitleState::ExitSelected;
-    this.timer = 0.0;
-    Ok(())
 }
-
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
-fn ui_dragged(this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    Ok(())
-}
+fn ui_released(focuse: FocuseUi, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+    match focuse {
+        FocuseUi::PreviewButton => {
+            this.timer = 0.0;
+            this.state = TitleState::EnterViewer;
+        },
+        FocuseUi::ReturnButton => {
+            // (한국어) 선택된 스프라이트의 이미지를 변경합니다. 
+            // (English Translation) Changes the image of the selected sprite. 
+            let actor = shared.get::<Actor>().unwrap();
+            let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+            if let Some((sprite, _)) = this.sprites.get(*actor as usize) {
+                sprite.update(queue, |instances| {
+                    for instance in instances.iter_mut() {
+                        instance.texture_index = 0;
+                    }
+                });
+            }
+            
+            this.timer = 0.0;
+            this.state = TitleState::ExitSelected;
+        },
+        FocuseUi::StageEnterButton => {
+            let state = shared.get_mut::<SceneState>().unwrap();
+            *state = SceneState::Change(Box::new(InGameLoading::default()));
+        },
+    };
 
-
-#[allow(unused_variables)]
-#[allow(unreachable_patterns)]
-fn sys_ui_dragged(this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     Ok(())
 }

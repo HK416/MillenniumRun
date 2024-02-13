@@ -36,6 +36,10 @@ pub enum ScriptTags {
     TitleSettingButton,
     TitleExitButton,
     TitleStageEnterButton,
+    TutorialText0,
+    TutorialText1,
+    TutorialText2,
+    TutorialText3,
 
     /* Setting */
     SettingTitle, 

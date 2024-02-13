@@ -7,9 +7,9 @@ use crate::{
     components::{
         text::{TextBrush, Text}, 
         ui::{UiBrush, UiObject},
+        sprite::SpriteBrush,
         camera::GameCamera, 
         transform::Projection,
-        sprite::SpriteBrush,
     },
     nodes::title::{
         TitleScene, 
@@ -54,13 +54,17 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     // (한국어) 카메라와 사용자 인터페이스를 갱신합니다.
     // (English Translation) Updates the camera and user interfaces.
     let delta = delta_time((this.timer - SHOW_TIME).max(0.0), SHOW_TIME).min(1.0);
-    let menu_alpha = 1.0 * delta;
-    let delta = delta_time(this.timer, MOVING_TIME).min(1.0);
-    let stage_alpha = 1.0 - 1.0 * delta;
+    let transparency = 1.0 * delta;
+    this.credit_button.update(queue, |data| data.color.w = transparency);
+    update_button_alpha(this.menu_buttons.iter_mut(), &queue, transparency);
 
-    update_button_alpha(this.menu_buttons.iter_mut(), &queue, menu_alpha);
+    let delta = delta_time(this.timer, MOVING_TIME).min(1.0);
+    let transparency = 1.0 - 1.0 * delta;
     this.return_button.update(queue, |data| {
-        data.color.w = stage_alpha;
+        data.color.w = transparency;
+    });
+    this.info_button.update(queue, |data| {
+        data.color.w = transparency;
     });
     update_camera(camera, queue, delta);
 
@@ -195,20 +199,16 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 메뉴 버튼 그리기.
         // (English Translation) Drawing the menu buttons.
-        ui_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(ui, _)| ui)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(_, it)| it)
-        );
+        let iter = [
+            &this.credit_button, 
+            &this.return_button, 
+            &this.info_button,
+        ].into_iter()
+        .chain(this.menu_buttons.iter().map(|(ui, _)| ui));
+        ui_brush.draw(&mut rpass, iter);
 
-        // (한국어) 시스템 버튼 그리기.
-        // (English Translation) Drawing system buttons.
-        ui_brush.draw(&mut rpass, [&this.return_button].into_iter());
+        let iter = this.menu_buttons.iter().map(|(_, it)| it);
+        text_brush.draw(&mut rpass, iter);
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

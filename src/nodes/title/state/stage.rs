@@ -42,7 +42,13 @@ static FOCUSED_SPRITE: Mutex<Option<(usize, Vec<Vec3>)>> = Mutex::new(None);
 /// #### English (Translation) </br>
 /// Contains the original color data of the currently pressed system button. </br>
 /// 
-static FOCUSED_SYS_BTN: Mutex<Option<Vec3>> = Mutex::new(None);
+static FOCUSED_SYS_BTN: Mutex<Option<(Buttons, Vec3)>> = Mutex::new(None);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Buttons {
+    Return, 
+    Infomation,
+}
 
 
 
@@ -175,7 +181,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 시스템 버튼 그리기.
         // (English Translation) Drawing the system buttons.
-        ui_brush.draw(&mut rpass, [&this.return_button].into_iter());
+        ui_brush.draw(&mut rpass, [&this.return_button, &this.info_button].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -220,10 +226,11 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                     // (English Translation) Returns the color of the selected ui to its original color.
                     {
                         let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                        if let Some(ui_color) = guard.take() {
-                            this.return_button.update(queue, |data| {
-                                data.color = (ui_color, data.color.w).into();
-                            });
+                        if let Some((btn, ui_color)) = guard.take() {
+                            match btn {
+                                Buttons::Infomation => &this.info_button,
+                                Buttons::Return => &this.return_button
+                            }.update(queue, |data| data.color = (ui_color, data.color.w).into());
                         }
                     }
 
@@ -380,7 +387,9 @@ fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: 
                 if MouseButton::Left == *button && state.is_pressed() {
                     // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                     // (English Translation) Make sure the mouse cursor is inside the ui area.
-                    let selected = this.return_button.test(&(cursor_pos, camera));
+                    let selected = [(Buttons::Return, &this.return_button), (Buttons::Infomation, &this.info_button)]
+                        .into_iter()
+                        .find_map(|(btn, ui)| ui.test(&(cursor_pos, camera)).then_some(btn));
 
                     // (한국어)
                     // 마우스 커서가 ui 영역 안에 있는 경우:
@@ -394,39 +403,46 @@ fn handle_mouse_input_for_ui(this: &mut TitleScene, shared: &mut Shared, event: 
                     // 2. Change the color of the ui and the color of the text.
                     // 3. Calls the ui pressed function.
                     //
-                    if selected {
+                    if let Some(btn) = selected {
                         // <1>
-                        let ui_color = this.return_button.data.lock().expect("Failed to access variable.").color.xyz();
+                        let ui_color = match btn {
+                            Buttons::Infomation => &this.info_button.data,
+                            Buttons::Return => &this.return_button.data,
+                        }.lock().expect("Failed to access variable.").color.xyz();
                         let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                        *guard = Some(ui_color);
+                        *guard = Some((btn, ui_color));
 
                         // <2>
-                        this.return_button.update(queue, |data| {
-                            data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0);
-                        });
+                        match btn {
+                            Buttons::Infomation => &this.info_button,
+                            Buttons::Return => &this.return_button
+                        }.update(queue, |data| data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0));
 
                         // <3>
-                        ui_pressed(this, shared)?;
+                        ui_pressed(btn, this, shared)?;
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
                     let mut guard = FOCUSED_SYS_BTN.lock().expect("Failed to access variable.");
-                    if let Some(ui_color) = guard.take() {
+                    if let Some((btn, ui_color)) = guard.take() {
                         // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
                         // (English Translation) Returns the color of the selected ui to its original color.
-                        this.return_button.update(queue, |data| {
-                            data.color = (ui_color, data.color.w).into();
-                        });
+                        match btn {
+                            Buttons::Infomation => &this.info_button, 
+                            Buttons::Return => &this.return_button
+                        }.update(queue, |data| data.color = (ui_color, data.color.w).into());
                         
                         // (한국어) 마우스 커서가 ui 영역 안에 있는지 확인합니다.
                         // (English Translation) Make sure the mouse cursor is inside the ui area.
-                        let selected = this.return_button.test(&(cursor_pos, camera));
+                        let selected = [(Buttons::Return, &this.return_button), (Buttons::Infomation, &this.info_button)]
+                            .into_iter()
+                            .find_map(|(btn, ui)| ui.test(&(cursor_pos, camera)).then_some(btn));
 
                         // (한국어) 선택된 ui가 이전에 선택된 ui와 일치하는 경우:
                         // (English Translation) If the selected ui matches a previously selected ui:
-                        if selected {
+                        if selected.is_some_and(|selected| selected == btn) {
                             // (한국어) ui 떼어짐 함수를 호출합니다.
                             // (English Translation) Calls the ui released function.
-                            ui_released(this, shared)?;
+                            ui_released(btn, this, shared)?;
                         }
                     }
                 }
@@ -460,9 +476,12 @@ fn sprite_pressed(sp: Actor, this: &mut TitleScene, shared: &mut Shared) -> AppR
 
 
 #[allow(unused_variables)]
-fn ui_pressed(this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
+fn ui_pressed(btn: Buttons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     use crate::components::sound;
-    sound::play_cancel_sound(shared)
+    match btn {
+        Buttons::Infomation => sound::play_click_sound(shared),
+        Buttons::Return => sound::play_cancel_sound(shared),
+    }
 }
 
 
@@ -510,9 +529,17 @@ fn sprite_released(sp: Actor, this: &mut TitleScene, shared: &mut Shared) -> App
 
 
 #[allow(unused_variables)]
-fn ui_released(this: &mut TitleScene, _shared: &mut Shared) -> AppResult<()> {
-    this.state = TitleState::ExitStage;
-    this.timer = 0.0;
+fn ui_released(btn: Buttons, this: &mut TitleScene, _shared: &mut Shared) -> AppResult<()> {
+    match btn {
+        Buttons::Infomation => {
+            this.state = TitleState::Tutorial0;
+            this.timer = 0.0;
+        },
+        Buttons::Return => {
+            this.state = TitleState::ExitStage;
+            this.timer = 0.0;
+        }
+    }
     Ok(())
 }
 

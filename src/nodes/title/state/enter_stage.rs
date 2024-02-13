@@ -4,16 +4,21 @@ use winit::event::Event;
 
 use crate::{
     game_err,
+    assets::bundle::AssetBundle, 
     components::{
         text::{TextBrush, Text}, 
         ui::{UiBrush, UiObject},
-        camera::GameCamera, 
-        transform::Projection,
         sprite::SpriteBrush, 
+        transform::Projection,
+        camera::GameCamera, 
+        save::{SaveData, SaveEncoder}, 
     },
-    nodes::title::{
-        TitleScene, 
-        state::TitleState, 
+    nodes::{
+        path, 
+        title::{
+            TitleScene, 
+            state::TitleState, 
+        }
     },
     render::depth::DepthBuffer,
     system::{
@@ -54,21 +59,36 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     // (한국어) 카메라와 사용자 인터페이스를 갱신합니다.
     // (English Translation) Updates the camera and user interfaces.
     let delta = delta_time(this.timer.min(HIDE_TIME), HIDE_TIME).min(1.0);
-    let menu_alpha = 1.0 - 1.0 * delta;
+    let transparency = 1.0 - 1.0 * delta;
+    this.credit_button.update(queue, |data| data.color.w = transparency);
+    update_button_alpha(this.menu_buttons.iter_mut(), &queue, transparency);
+    
     let delta = delta_time(this.timer, MOVING_TIME).min(1.0);
-    let stage_alpha = 1.0 * delta;
-    update_button_alpha(this.menu_buttons.iter_mut(), &queue, menu_alpha);
+    let transparency = 1.0 * delta;
     this.return_button.update(queue, |data| {
-        data.color.w = stage_alpha;
+        data.color.w = transparency;
+    });
+    this.info_button.update(queue, |data| {
+        data.color.w = transparency;
     });
     update_camera(camera, queue, delta);
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) changes to the next state if it is greater than the duration.
     if this.timer >= DURATION {
-        this.state = TitleState::Stage;
-        this.timer = 0.0;
-        return Ok(());
+        let asset_bundle = shared.get::<AssetBundle>().unwrap().clone();
+        let save = shared.get_mut::<SaveData>().unwrap();
+        if save.beginner {
+            save.beginner = false;
+            asset_bundle.get(path::SAVE_PATH)?
+                .write(&SaveEncoder, save)?;
+
+            this.state = TitleState::Tutorial0;
+            this.timer = 0.0;
+        } else {
+            this.state = TitleState::Stage;
+            this.timer = 0.0;   
+        }
     }
 
     Ok(())
@@ -194,20 +214,16 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         
         // (한국어) 메뉴 버튼 그리기.
         // (English Translation) Drawing the menu buttons.
-        ui_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(it, _)| it)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(_, it)| it)
-        );
-
-        // (한국어) 시스템 버튼 그리기.
-        // (English Translation) Drawing system buttons.
-        ui_brush.draw(&mut rpass, [&this.return_button].into_iter());
+        let iter = [
+            &this.credit_button, 
+            &this.return_button, 
+            &this.info_button, 
+        ].into_iter()
+        .chain(this.menu_buttons.iter().map(|(ui, _)| ui));
+        ui_brush.draw(&mut rpass, iter);
+        
+        let iter = this.menu_buttons.iter().map(|(_, it)| it);
+        text_brush.draw(&mut rpass, iter);
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

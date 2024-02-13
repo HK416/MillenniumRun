@@ -8,10 +8,12 @@ use crate::{
     game_err,
     assets::bundle::AssetBundle,
     components::{
+        text::TextBrush,
         camera::GameCamera,
         sound::SoundDecoder,
         user::Settings, 
     },
+    render::depth::DepthBuffer, 
     nodes::intro::{IntroScene, state::IntroState},
     system::{
         error::{AppResult, GameError},
@@ -76,12 +78,14 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, _ela
 /// #### English (Translation) </br>
 /// This is a drawing function when the `intro` game scene is in the `PlayTitleVoice` state. </br>
 /// 
-pub fn draw(_this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
+pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
+    let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
     let surface = shared.get::<Arc<wgpu::Surface>>().unwrap();
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+    let depth = shared.get::<Arc<DepthBuffer>>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
 
     // (한국어) 이전 작업이 끝날 때 까지 기다립니다.
@@ -115,12 +119,20 @@ pub fn draw(_this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
                     store: wgpu::StoreOp::Store,
                 }
             })],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth.view(),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             timestamp_writes: None,
             occlusion_query_set: None,
         });
 
         camera.bind(&mut rpass);
+        text_brush.draw(&mut rpass, [&this.application_info].into_iter());
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

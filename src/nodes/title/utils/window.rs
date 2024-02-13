@@ -536,3 +536,65 @@ pub(super) fn create_setting_window_titles(
         item2_sub_title, 
     ]);
 }
+
+/// #### 한국어 </br>
+/// 튜토리얼 인터페이스를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a tutorial interface. </br>
+/// 
+pub(super) fn create_tutorial_windows(
+    font: &FontArc, 
+    script: &Script, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    tex_sampler: &wgpu::Sampler, 
+    texture: &wgpu::Texture, 
+    ui_brush: &UiBrush, 
+    text_brush: &TextBrush, 
+) -> AppResult<Vec<(UiObject, Text)>> {
+    const TUTORIAL_SCRIPTS: [ScriptTags; 4] = [
+        ScriptTags::TutorialText0, 
+        ScriptTags::TutorialText1, 
+        ScriptTags::TutorialText2, 
+        ScriptTags::TutorialText3, 
+    ];
+
+    let mut tutorials = Vec::with_capacity(4);
+    for (idx, tag) in TUTORIAL_SCRIPTS.into_iter().enumerate() {
+        let texture_view = texture.create_view(
+            &wgpu::TextureViewDescriptor {
+                base_array_layer: idx as u32, 
+                array_layer_count: Some(1), 
+                dimension: Some(wgpu::TextureViewDimension::D2),
+                ..Default::default()
+            }
+        );
+        tutorials.push((
+            UiObjectBuilder::new(
+                Some(&format!("Tutorial_{}", idx)), 
+                tex_sampler, 
+                &texture_view, 
+                ui_brush
+            )
+            .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+            .with_margin(Margin::new(160, -320, -160, 320))
+            .with_color((1.0, 1.0, 1.0, 1.0).into())
+            .with_global_translation((0.0, 0.0, 0.2).into())
+            .build(device), 
+            TextBuilder::new(
+                Some(&format!("TutorialText_{}", idx)), 
+                font, 
+                script.get(tag)?, 
+                text_brush
+            )
+            .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+            .with_margin(Margin::new(-28, -320, -76, 320))
+            .with_color((1.0, 1.0, 1.0, 1.0).into())
+            .with_translation((0.0, 0.0, 0.1).into())
+            .build(device, queue)
+        ));
+    }
+
+    return Ok(tutorials);
+}

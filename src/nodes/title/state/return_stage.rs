@@ -55,10 +55,20 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     this.return_button.update(queue, |data| {
         data.color.w = alpha;
     });
+    this.info_button.update(queue, |data| {
+        data.color.w = alpha;
+    });
 
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) changes to the next state if it is greater than the duration.
     if this.timer >= DURATION {
+        // (한국어) 메뉴 상태에서 사용되는 인터페이스의 알파 값을 갱신합니다.
+        // (English Translation) Updates the alpha value of the interface used in the menu state. 
+        for (ui, text) in this.menu_buttons.iter() {
+            ui.update(queue, |data| data.color.w = 0.0);
+            text.update(queue, |data| data.color.w = 0.0);
+        }
+
         this.state = TitleState::Stage;
         this.timer = 0.0;
         return Ok(());
@@ -186,7 +196,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 시스템 버튼 그리기.
         // (English Translation) Drawing the system buttons.
-        ui_brush.draw(&mut rpass, [&this.return_button].into_iter());
+        ui_brush.draw(&mut rpass, [&this.return_button, &this.info_button].into_iter());
     }
 
     {

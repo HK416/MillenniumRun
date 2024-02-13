@@ -153,16 +153,11 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 메뉴 버튼 그리기.
         // (English Translation) Drawing the menu buttons.
-        ui_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(ui, _)| ui)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(_, it)| it)
-        );
+        let iter = [&this.credit_button].into_iter()
+            .chain(this.menu_buttons.iter().map(|(ui, _)| ui));
+        ui_brush.draw(&mut rpass, iter);
+
+        text_brush.draw(&mut rpass, this.menu_buttons.iter().map(|(_, it)| it));
     }
 
     {

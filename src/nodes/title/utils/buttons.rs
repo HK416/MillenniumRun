@@ -234,7 +234,7 @@ pub(super) fn create_system_buttons<'a>(
     // (한국어) `되돌아가기` 버튼을 생성합니다.
     // (English Translation) Create a `Return` button.
     let anchor = Anchor::new(1.0, 0.0, 1.0, 0.0);
-    let margin = Margin::new(-16, 16, -96, 96);
+    let margin = Margin::new(-16, 16, -80, 80);
     let color = Vec4::new(1.0, 1.0, 1.0, 0.0);
     let translation = Vec3::new(0.0, 0.0, 0.5);
     UiObjectBuilder::new(
@@ -247,6 +247,31 @@ pub(super) fn create_system_buttons<'a>(
     .with_margin(margin)
     .with_color(color)
     .with_global_translation(translation)
+    .build(device)
+}
+
+/// #### 한국어 </br>
+/// 게임 플레이 방법을 설명하는 버튼을 생성합니다. </br>
+/// 
+/// #### English (Translation)
+/// Create a button that describes how to play the game. </br>
+/// 
+pub(super) fn create_information_button(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush
+) -> UiObject {
+    UiObjectBuilder::new(
+        Some("InformationButton"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(1.0, 0.0, 1.0, 0.0))
+    .with_margin(Margin::new(-96, 16, -160, 80))
+    .with_color((1.0, 1.0, 1.0, 0.0).into())
+    .with_global_translation((0.0, 0.0, 0.5).into())
     .build(device)
 }
 
@@ -624,4 +649,70 @@ pub(super) fn create_setting_volume_bar(
     );
 
     return bar;
+}
+
+/// #### 한국어 </br>
+/// 튜토리얼 인터페이스를 조작하는 버튼들을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create buttons to manipulate the tutorial interface. </br>
+/// 
+pub(super) fn create_tutorial_buttons(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush
+) -> (UiObject, UiObject) {
+    let prev_button = UiObjectBuilder::new(
+        Some("TutorialPrev"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(32, -392, -32, -328))
+    .with_local_scale((1.0, 1.0, 1.0).into())
+    .with_color((1.0, 1.0, 1.0, 1.0).into())
+    .with_global_translation((0.0, 0.0, 0.15).into())
+    .build(device);
+
+    let next_button = UiObjectBuilder::new(
+        Some("TutorialNext"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.5, 0.5, 0.5, 0.5))
+    .with_margin(Margin::new(32, 328, -32, 392))
+    .with_local_scale((-1.0, 1.0, 1.0).into())
+    .with_color((1.0, 1.0, 1.0, 1.0).into())
+    .with_global_translation((0.0, 0.0, 0.15).into())
+    .build(device);
+
+    return (prev_button, next_button);
+}
+
+/// #### 한국어 </br>
+/// 게임 크레딧 버튼을 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a game credit button. </br>
+/// 
+pub(super) fn create_credit_button(
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_view: &wgpu::TextureView, 
+    ui_brush: &UiBrush
+) -> UiObject {
+    UiObjectBuilder::new(
+        Some("CreditButton"), 
+        tex_sampler, 
+        texture_view, 
+        ui_brush
+    )
+    .with_anchor(Anchor::new(0.0, 1.0, 0.0, 1.0))
+    .with_margin(Margin::new(80, -80, 16, -16))
+    .with_color((18.0 / 255.0, 23.0 / 255.0, 40.0 / 255.0, 1.0).into())
+    .with_global_translation((0.0, 0.0, 0.1).into())
+    .build(device)
 }

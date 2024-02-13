@@ -3,16 +3,23 @@ mod enter_msgbox;
 mod enter_stage;
 mod enter_selected;
 mod enter_setting;
+mod enter_viewer;
 mod exit_msgbox;
 mod exit_stage;
 mod exit_selected;
 mod exit_setting;
+mod exit_viewer;
 mod menu;
 mod msgbox;
 mod stage;
 mod selected;
 mod setting;
+mod viewer;
 mod return_stage;
+mod tutorial0;
+mod tutorial1;
+mod tutorial2;
+mod tutorial3;
 
 use winit::event::Event;
 
@@ -50,7 +57,14 @@ pub enum TitleState {
     EnterSelected,
     ExitSelected,
     Selected,
+    EnterViewer, 
+    ExitViewer, 
+    Viewer,
     ReturnStage, 
+    Tutorial0, 
+    Tutorial1, 
+    Tutorial2, 
+    Tutorial3, 
 }
 
 
@@ -59,7 +73,7 @@ type HandleEventsFn = dyn Fn(&mut TitleScene, &mut Shared, Event<AppEvent>) -> A
 type UpdateFn = dyn Fn(&mut TitleScene, &mut Shared, f64, f64) -> AppResult<()>;
 type DrawFn = dyn Fn(&TitleScene, &mut Shared) -> AppResult<()>;
 
-pub const HANDLE_EVENTS: [&'static HandleEventsFn; 15] = [
+pub const HANDLE_EVENTS: [&'static HandleEventsFn; 22] = [
     &enter::handle_events,
     &menu::handle_events,
     &enter_setting::handle_events,
@@ -74,10 +88,17 @@ pub const HANDLE_EVENTS: [&'static HandleEventsFn; 15] = [
     &enter_selected::handle_events,
     &exit_selected::handle_events,
     &selected::handle_events,
+    &enter_viewer::handle_events, 
+    &exit_viewer::handle_events, 
+    &viewer::handle_events, 
     &return_stage::handle_events, 
+    &tutorial0::handle_events, 
+    &tutorial1::handle_events, 
+    &tutorial2::handle_events, 
+    &tutorial3::handle_events, 
 ];
 
-pub const UPDATES: [&'static UpdateFn; 15] = [
+pub const UPDATES: [&'static UpdateFn; 22] = [
     &enter::update,
     &menu::update,
     &enter_setting::update,
@@ -92,10 +113,17 @@ pub const UPDATES: [&'static UpdateFn; 15] = [
     &enter_selected::update,
     &exit_selected::update,
     &selected::update,
+    &enter_viewer::update, 
+    &exit_viewer::update, 
+    &viewer::update, 
     &return_stage::update, 
+    &tutorial0::update, 
+    &tutorial1::update, 
+    &tutorial2::update, 
+    &tutorial3::update, 
 ];
 
-pub const DRAWS: [&'static DrawFn; 15] = [
+pub const DRAWS: [&'static DrawFn; 22] = [
     &enter::draw,
     &menu::draw,
     &enter_setting::draw,
@@ -110,5 +138,12 @@ pub const DRAWS: [&'static DrawFn; 15] = [
     &enter_selected::draw,
     &exit_selected::draw,
     &selected::draw,
+    &enter_viewer::draw, 
+    &exit_viewer::draw, 
+    &viewer::draw, 
     &return_stage::draw, 
+    &tutorial0::draw, 
+    &tutorial1::draw, 
+    &tutorial2::draw, 
+    &tutorial3::draw, 
 ];

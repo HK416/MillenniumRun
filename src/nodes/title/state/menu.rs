@@ -18,12 +18,16 @@ use crate::{
         camera::GameCamera, 
         sound, 
     },
-    nodes::title::{
-        utils,
-        TitleScene, 
-        state::TitleState,
+    nodes::{
+        credit::CreditLoadingScene, 
+        title::{
+            utils,
+            TitleScene, 
+            state::TitleState,
+        }
     },
     render::depth::DepthBuffer,
+    scene::state::SceneState, 
     system::{
         error::{AppResult, GameError},
         event::AppEvent,
@@ -44,6 +48,7 @@ static FOCUSED_MENU_BTN: Mutex<Option<(usize, Vec3, Vec3)>> = Mutex::new(None);
 pub fn handle_events(this: &mut TitleScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
     handle_keyboard_input(this, shared, &event)?;
     handle_mouse_input(this, shared, &event)?;
+    handle_mouse_input_for_credit(this, shared, &event)?;
     Ok(())
 }
 
@@ -141,16 +146,11 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 메뉴 버튼 그리기.
         // (English Translation) Drawing the menu buttons.
-        ui_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(ui, _)| ui)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(_, it)| it)
-        );
+        let iter = [&this.credit_button].into_iter()
+            .chain(this.menu_buttons.iter().map(|(it, _)| it));
+        ui_brush.draw(&mut rpass, iter);
+
+        text_brush.draw(&mut rpass, this.menu_buttons.iter().map(|(_, it)| it));
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.
@@ -302,6 +302,38 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
         },
         _ => { /* empty */ }
     };
+
+    Ok(())
+}
+
+fn handle_mouse_input_for_credit(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
+    // (한국어) 사용할 공유 객체들을 가져옵니다.
+    // (English Translation) Get shared objects to use.
+    let camera = shared.get::<Arc<GameCamera>>().unwrap();
+    let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
+
+    match event {
+        Event::WindowEvent { event, .. } => match event {
+            WindowEvent::MouseInput { state, button, .. } => {
+                if MouseButton::Left == *button && state.is_pressed() {
+                    // (한국어) 마우스 커서가 크레딧 버튼 영역 안에 있는지 확인합니다.
+                    // (English Translation) Make sure the mouse cursor is inside the credit button area. 
+                    let is_inside = this.credit_button.test(&(cursor_pos, camera));
+                    if is_inside {
+                        // (한국어) 소리를 재생합니다.
+                        // (English Translation) Play the sounds.
+                        sound::play_click_sound(shared)?;
+
+                        // (한국어) 다음 게임 장면으로 변경합니다.
+                        // (English Translation) Change to the next game scene. 
+                        *shared.get_mut::<SceneState>().unwrap() = SceneState::Push(Box::new(CreditLoadingScene::default()));
+                    }
+                }
+            }
+            _ => { /* empty */ }
+        },
+        _ => { /* empty */ }
+    }
 
     Ok(())
 }

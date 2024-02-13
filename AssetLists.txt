@@ -74,7 +74,9 @@ textures/enemy/yuuka_bullet.dds Static
 textures/ui/star.dds Static 
 textures/ui/heart.dds Static 
 textures/ui/finish.dds Static 
+textures/ui/tutorial.dds Static 
 textures/ui/button_etc.dds Static
+textures/ui/button_info.dds Static 
 textures/ui/button_return.dds Static
 textures/ui/button_medium.dds Static
 textures/ui/button_wide.dds Static

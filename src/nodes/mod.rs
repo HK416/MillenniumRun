@@ -1,3 +1,4 @@
+pub mod credit;
 pub mod first_time;
 pub mod intro;
 pub mod setup;
@@ -35,10 +36,12 @@ pub mod path {
     pub const STAR_TEXTURE_PATH: &'static str = "textures/ui/star.dds";
     pub const HEART_TEXTURE_PATH: &'static str = "textures/ui/heart.dds";
     pub const FINISH_TEXTURE_PATH: &'static str = "textures/ui/finish.dds";
+    pub const TUTORIAL_TEXTURE_PATH: &'static str = "textures/ui/tutorial.dds";
+    pub const BUTTON_ETC_TEXTURE_PATH: &'static str = "textures/ui/button_etc.dds";
+    pub const BUTTON_INFO_TEXTURE_PATH: &'static str = "textures/ui/button_info.dds";
+    pub const BUTTON_RETURN_TEXTURE_PATH: &'static str = "textures/ui/button_return.dds";
     pub const BUTTON_MEDIUM_TEXTURE_PATH: &'static str = "textures/ui/button_medium.dds";
     pub const BUTTON_WIDE_TEXTURE_PATH: &'static str = "textures/ui/button_wide.dds";
-    pub const BUTTON_ETC_TEXTURE_PATH: &'static str = "textures/ui/button_etc.dds";
-    pub const BUTTON_RETURN_TEXTURE_PATH: &'static str = "textures/ui/button_return.dds";
     pub const TITLE_BUTTON_START_TEXTURE_PATH: &'static str = "textures/ui/title_button_start.dds";
     pub const TITLE_BUTTON_SETTING_TEXTURE_PATH: &'static str = "textures/ui/title_button_setting.dds";
     pub const TITLE_BUTTON_EXIT_TEXTURE_PATH: &'static str = "textures/ui/title_button_exit.dds";

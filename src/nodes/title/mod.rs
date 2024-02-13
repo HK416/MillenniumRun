@@ -89,7 +89,9 @@ impl SceneNode for TitleLoading {
             asset_bundle.get(path::CANCEL_SOUND_PATH)?;
             asset_bundle.get(path::YUUKA_TITLE_SOUND_PATH)?;
             asset_bundle.get(path::YUUKA_HIDDEN_SOUND_PATH)?;
+            asset_bundle.get(path::LOGO_TEXTURE_PATH)?;
             asset_bundle.get(path::STAR_TEXTURE_PATH)?;
+            asset_bundle.get(path::TUTORIAL_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_RETURN_TEXTURE_PATH)?;
@@ -315,13 +317,16 @@ pub struct TitleScene {
 
     pub sprites: Vec<(Sprite, AABB)>,
     pub menu_buttons: Vec<(UiObject, Text)>,
+    pub credit_button: UiObject, 
     pub return_button: UiObject,
+    pub info_button: UiObject, 
     
     pub exit_msg_box: Vec<(UiObject, Text)>,
 
     pub stage_window: UiObject,
     pub stage_enter_button: (UiObject, Text), 
     pub stage_images: HashMap<Actor, (UiObject, UiObject, Text)>, 
+    pub stage_viewer_images: HashMap<Actor, UiObject>, 
     
     pub setting_titles: Vec<Text>, 
     pub setting_windows: Vec<UiObject>, 
@@ -330,6 +335,10 @@ pub struct TitleScene {
     pub setting_return_button: (UiObject, Text), 
     pub setting_volume_background: HashMap<utils::VolumeOptions, (UiObject, Text)>,
     pub setting_volume_bar: HashMap<utils::VolumeOptions, UiObject>, 
+
+    pub tutorial_prev_btn: UiObject, 
+    pub tutorial_next_btn: UiObject, 
+    pub tutorials: Vec<(UiObject, Text)>, 
 }
 
 impl SceneNode for TitleScene {

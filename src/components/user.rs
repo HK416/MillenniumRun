@@ -44,8 +44,8 @@ pub enum Language {
 #[derive(Serialize, Deserialize)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Resolution {
-    #[default]
     W800H600,
+    #[default]
     W1024H768,
     W1152H864,
     W1280H960,
@@ -108,9 +108,9 @@ impl Default for Settings {
             control: Control::default(), 
             language: Language::default(), 
             resolution: Resolution::default(), 
-            background_volume: Volume::new(80),
+            background_volume: Volume::new(70),
             effect_volume: Volume::new(100),
-            voice_volume: Volume::new(60),
+            voice_volume: Volume::new(50),
         }
     }
 }

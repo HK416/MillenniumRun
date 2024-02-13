@@ -11,14 +11,17 @@ use crate::{
     components::{
         collider2d::shape::AABB, 
         sprite::{Sprite, SpriteBrush, Instance as SpriteData}, 
-        bullet::Instance as BulletData,  
+        bullet::{Accelerator, Instance as BulletData},  
         table::{self, Table},
         user::Settings, 
         sound, 
     }, 
     nodes::{
         path, 
-        in_game::InGameScene, 
+        in_game::{
+            NUM_TILES, 
+            InGameScene, 
+        }, 
         consts::PIXEL_PER_METER, 
     }, 
     system::{
@@ -57,12 +60,16 @@ pub enum BossFaceState {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BossBehaviorState {
     #[default]
-    Idle = 0, 
-    PrepareRush = 1, 
-    Rush = 2, 
-    FireBulletPattern0 = 3, 
-    FireBulletPattern1 = 4, 
-    FireBulletPattern2 = 5,
+    Idle, 
+    PrepareRush, 
+    Rush, 
+    PrepareShotRush,
+    ShotRush, 
+    FireBulletPattern0, 
+    FireBulletPattern1, 
+    FireBulletPattern2,
+    FireBulletPattern3,
+    FireBulletPattern4,
     WaitForFinish, 
     MoveForFinish, 
 }
@@ -149,13 +156,17 @@ impl Boss {
 
 
 type UpdateFn = dyn for<'a> Fn(&'a mut InGameScene, &'a mut Shared, f64, f64) -> AppResult<()>;
-const UPDATE_FUNC: [&'static UpdateFn; 8] = [
+const UPDATE_FUNC: [&'static UpdateFn; 12] = [
     &update_boss_idle_state, 
     &update_boss_prepare_rush_state,
     &update_boss_rush_state,
+    &update_boss_prepare_shot_rush_state,
+    &update_boss_shot_rush_state,
     &update_boss_fire_bullet_pattern0, 
     &update_boss_fire_bullet_pattern1, 
     &update_boss_fire_bullet_pattern2, 
+    &update_boss_fire_bullet_pattern3, 
+    &update_boss_fire_bullet_pattern4, 
     &update_boss_wait_for_finish, 
     &update_boss_move_for_finish, 
 ];
@@ -192,12 +203,25 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
     // (한국어) 지속 시간보다 클 경우 임의의 상태로 변경합니다.
     // (English Translation) If it is greater than the duration, it changes to a random state. 
     if this.boss.behavior_timer >= DURATION {
-        let mut next_state = vec![
-            BossBehaviorState::FireBulletPattern0, 
-            BossBehaviorState::FireBulletPattern1, 
-            BossBehaviorState::FireBulletPattern2, 
-            BossBehaviorState::PrepareRush,
-        ];
+        let mut next_state = if this.remaining_time <= 30.0 
+        || this.num_owned_tiles >= NUM_TILES as u32 / 2 
+        || this.player.path.len() >= 150 {
+            vec![
+                BossBehaviorState::FireBulletPattern2, 
+                BossBehaviorState::FireBulletPattern3, 
+                BossBehaviorState::FireBulletPattern4,
+                BossBehaviorState::PrepareShotRush,
+                BossBehaviorState::PrepareRush,
+            ]
+        } else {
+            vec![
+                BossBehaviorState::FireBulletPattern0, 
+                BossBehaviorState::FireBulletPattern1, 
+                BossBehaviorState::FireBulletPattern2, 
+                BossBehaviorState::PrepareRush,
+            ]
+        };
+
         next_state.shuffle(&mut rand::thread_rng());
 
         // (한국어) 사용할 공유 객체들을 가져옵니다.
@@ -219,6 +243,19 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
                 this.boss.behavior_timer = 0.0;
                 this.boss.behavior_state = BossBehaviorState::PrepareRush;
             }, 
+            BossBehaviorState::PrepareShotRush => {
+                let source = asset_bundle.get(path::YUUKA_ATTACK1_SOUND_PATH)?
+                    .read(&sound::SoundDecoder)?;
+                let sink = sound::play_sound(settings.voice_volume, source, stream)?;
+                thread::spawn(move || {
+                    sink.sleep_until_end();
+                    sink.detach();
+                });
+
+                this.boss.behavior_timer = 0.0;
+                this.boss.max_behavior_count = 3;
+                this.boss.behavior_state = BossBehaviorState::PrepareShotRush;
+            }
             BossBehaviorState::FireBulletPattern0 => {
                 let mut rng = rand::thread_rng();
                 if rng.gen_ratio(1, 4) {
@@ -276,6 +313,44 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
                 this.boss.behavior_timer = 0.0;
                 this.boss.behavior_state = BossBehaviorState::FireBulletPattern2;
             },
+            BossBehaviorState::FireBulletPattern3 => {
+                let mut rng = rand::thread_rng();
+                if rng.gen_ratio(1, 4) {
+                    const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
+                    let rel_path = PATHS[rng.gen_range(0..2)];
+                    let source = asset_bundle.get(rel_path)?
+                        .read(&sound::SoundDecoder)?;
+                    let sink = sound::play_sound(settings.voice_volume, source, stream)?;
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                        sink.detach();
+                    });
+                }
+
+                this.boss.behavior_count = 0;
+                this.boss.max_behavior_count = 24;
+                this.boss.behavior_timer = 0.0;
+                this.boss.behavior_state = BossBehaviorState::FireBulletPattern3;
+            }, 
+            BossBehaviorState::FireBulletPattern4 => {
+                let mut rng = rand::thread_rng();
+                if rng.gen_ratio(1, 4) {
+                    const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
+                    let rel_path = PATHS[rng.gen_range(0..2)];
+                    let source = asset_bundle.get(rel_path)?
+                        .read(&sound::SoundDecoder)?;
+                    let sink = sound::play_sound(settings.voice_volume, source, stream)?;
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                        sink.detach();
+                    });
+                }
+
+                this.boss.behavior_count = 0;
+                this.boss.max_behavior_count = 24;
+                this.boss.behavior_timer = 0.0;
+                this.boss.behavior_state = BossBehaviorState::FireBulletPattern4;
+            }
             _ => { panic!("Invalid patterns!") }
         }
     }
@@ -357,8 +432,80 @@ fn update_boss_rush_state(this: &mut InGameScene, _shared: &mut Shared, _total_t
     Ok(())
 }
 
+fn update_boss_prepare_shot_rush_state(this: &mut InGameScene, _shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    const DURATION: f64 = 1.0;
+
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer. 
+    this.boss.behavior_timer += elapsed_time;
+
+    // (한국어) 지속 시간보다 클 경우 `Rush` 상태로 변경합니다.
+    // (English Translation) If it is greater than the duration, it changes to `Rush` state. 
+    if this.boss.behavior_timer >= DURATION {
+        // (한국어) 보스의 현재 위치를 가져옵니다.
+        // (English Translation) Get the current position of the boss. 
+        let boss_position = {
+            let instances = this.boss.sprite.instances.lock().expect("Failed to access variable.");
+            instances[0].translation.xy()
+        };
+
+        // (한국어) 플레이어의 현재 위치를 가져옵니다.
+        // (English Translation) Get the current position of the player.
+        let player_position = {
+            let instances = this.player.sprite.instances.lock().expect("Failed to access variable.");
+            instances[0].translation.xy()
+        };
+
+        // (한국어) 보스의 돌진 방향을 계산합니다.
+        // (English Translation) Calculate the boss' charging direction. 
+        let direction = (player_position - boss_position).normalize();
+
+        this.boss.direction = direction;
+        this.boss.behavior_timer = 0.0;
+        this.boss.behavior_state = BossBehaviorState::ShotRush;
+    }
+
+    Ok(())
+}
+
+fn update_boss_shot_rush_state(this: &mut InGameScene, _shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
+    const DURATION: f64 = 1.5;
+    const SPEED: f32 = 70.0 * PIXEL_PER_METER; // meter per sec;
+    
+    // (한국어) 타이머를 갱신합니다.
+    // (English Translation) Updates the timer. 
+    this.boss.behavior_timer += elapsed_time;
+
+    // (한국어) 보스의 위치를 갱신합니다.
+    // (English Translation) Updates the boss's position. 
+    let delta = rush_speed_interpolation(this.boss.behavior_timer, DURATION) as f32;
+    let velocity = this.boss.direction * SPEED * delta;
+    let distance: Vec3 = (velocity * elapsed_time as f32, 0.0).into();
+    let mut instances = this.boss.sprite.instances.lock().expect("Failed to access variable.");
+    instances[0].translation += distance;
+
+    // (한국어) 다음 상태로 변경합니다.
+    // (English Translation) Changes to the next state. 
+    if this.boss.behavior_timer >= DURATION {
+        this.boss.behavior_count += 1;
+        if this.boss.behavior_count >= this.boss.max_behavior_count {
+            this.boss.behavior_count = 0;
+            this.boss.max_behavior_count = 0;
+            this.boss.behavior_timer = 0.25;
+            this.boss.behavior_state = BossBehaviorState::WaitForFinish;
+            this.boss.previous_behavior = None;
+        } else {
+            this.boss.behavior_timer = 0.0;
+            this.boss.behavior_state = BossBehaviorState::PrepareShotRush;
+            this.boss.previous_behavior = None;
+        }
+    }
+
+    Ok(())
+}
+
 fn update_boss_fire_bullet_pattern0(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
-    const BULLET_SPEED: f32 = 0.5 * PIXEL_PER_METER;
+    const BULLET_SPEED: f32 = 30.0 * PIXEL_PER_METER;
 
     // (한국어) 총알 발사 소리를 재생합니다.
     // (English Translation) Play the sound of a bullet being fired.
@@ -382,21 +529,20 @@ fn update_boss_fire_bullet_pattern0(this: &mut InGameScene, shared: &mut Shared,
 
     let mut instances = this.enemy_bullet.instances.lock().expect("Failed to access variable.");
     let mut count = 8;
-    let mut angle = if this.boss.behavior_count % 2 == 0 { 0.0 * PI } else { 0.1666666667 * PI };
+    let mut degree: f32 = if this.boss.behavior_count % 2 == 0 { 0.0 } else { 22.5 };
     while count > 0 {
-        let rotation = Quat::from_rotation_z(angle);
-        let direction = rotation.mul_vec3(Vec3::X);
+        let rotation = Quat::from_rotation_z(degree.to_radians());
+        let direction = rotation.mul_vec3(Vec3::X).normalize_or_zero().xy();
         instances.push(BulletData {
-            speed: BULLET_SPEED, 
+            velocity: direction * BULLET_SPEED, 
             life_time: BULLET_LIFE_TIME, 
-            direction, 
             translation, 
             size: BULLET_SIZE, 
             box_size: COLLIDE_SIZE, 
             ..Default::default()
         });
 
-        angle += 0.25 * PI;
+        degree += 45.0;
         count -= 1;
     }
 
@@ -422,7 +568,7 @@ fn update_boss_fire_bullet_pattern0(this: &mut InGameScene, shared: &mut Shared,
 }
 
 fn update_boss_fire_bullet_pattern1(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
-    const BULLET_SPEED: f32 = 0.75 * PIXEL_PER_METER;
+    const BULLET_SPEED: f32 = 40.0 * PIXEL_PER_METER;
 
     // (한국어) 총알 발사 소리를 재생합니다.
     // (English Translation) Play the sound of a bullet being fired.
@@ -448,11 +594,11 @@ fn update_boss_fire_bullet_pattern1(this: &mut InGameScene, shared: &mut Shared,
         instances[0].translation
     };
 
+    let direction = (dist - origin).normalize_or_zero().xy();
     let mut instances = this.enemy_bullet.instances.lock().expect("Failed to access variable.");
     instances.push(BulletData {
-        speed: BULLET_SPEED, 
+        velocity: direction * BULLET_SPEED,
         life_time: BULLET_LIFE_TIME, 
-        direction: (dist - origin).normalize(), 
         translation: origin, 
         size: BULLET_SIZE, 
         box_size: COLLIDE_SIZE,
@@ -481,7 +627,7 @@ fn update_boss_fire_bullet_pattern1(this: &mut InGameScene, shared: &mut Shared,
 }
 
 fn update_boss_fire_bullet_pattern2(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
-    const BULLET_SPEED: f32 = 0.5 * PIXEL_PER_METER;
+    const BULLET_SPEED: f32 = 30.0 * PIXEL_PER_METER;
 
     // (한국어) 총알 발사 소리를 재생합니다.
     // (English Translation) Play the sound of a bullet being fired.
@@ -505,21 +651,21 @@ fn update_boss_fire_bullet_pattern2(this: &mut InGameScene, shared: &mut Shared,
 
     let mut instances = this.enemy_bullet.instances.lock().expect("Failed to access variable.");
     let mut count = 8;
-    let mut angle = if this.boss.behavior_count % 2 == 0 { 0.0 * PI } else { 0.1666666667 * PI };
+    let mut degree: f32 = if this.boss.behavior_count % 2 == 0 { 0.0 } else { 22.5 };
     while count > 0 {
-        let rotation = Quat::from_rotation_z(angle);
-        let direction = rotation.mul_vec3(Vec3::X);
+        let rotation = Quat::from_rotation_z(degree.to_radians());
+        let direction = rotation.mul_vec3(Vec3::X).normalize_or_zero().xy();
         instances.push(BulletData {
-            speed: BULLET_SPEED, 
+            velocity: direction * BULLET_SPEED, 
+            accelerator: None,
             life_time: BULLET_LIFE_TIME, 
-            direction, 
             translation, 
             size: BULLET_SIZE, 
             box_size: COLLIDE_SIZE, 
             ..Default::default()
         });
 
-        angle += 0.25 * PI;
+        degree += 45.0;
         count -= 1;
     }
 
@@ -543,6 +689,161 @@ fn update_boss_fire_bullet_pattern2(this: &mut InGameScene, shared: &mut Shared,
 
     Ok(())
 }
+
+#[derive(Debug)]
+pub struct Curve;
+
+impl Accelerator for Curve {
+    fn value(&self, velocity: Vec2, _timer: f64) -> Vec2 {
+        const VALUE: f32 = 500.0; // meter per sec^2
+        let forward: Vec3 = (velocity, 0.0).into();
+        let right = Vec3::Z.cross(forward.normalize()).xy();
+        right * VALUE
+    }
+}
+
+fn update_boss_fire_bullet_pattern3(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
+    const BULLET_SPEED: f32 = 30.0 * PIXEL_PER_METER;
+
+    // (한국어) 총알 발사 소리를 재생합니다.
+    // (English Translation) Play the sound of a bullet being fired.
+    let stream = shared.get::<OutputStreamHandle>().unwrap();
+    let settings = shared.get::<Settings>().unwrap();
+    let asset_bundle = shared.get::<AssetBundle>().unwrap();    
+    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
+        .read(&sound::SoundDecoder)?;
+    let sink = sound::play_sound(settings.effect_volume, source, stream)?;
+    thread::spawn(move || {
+        sink.sleep_until_end();
+        sink.detach();
+    });
+    
+    // (한국어) 총알을 추가합니다.
+    // (English Translation) Add bullets.
+    let translation = {
+        let instances = this.boss.sprite.instances.lock().expect("Failed to access variable.");
+        instances[0].translation
+    };
+
+    let mut instances = this.enemy_bullet.instances.lock().expect("Failed to access variable.");
+    let mut count = 8;
+    let mut degree: f32 = if this.boss.behavior_count % 2 == 0 { 0.0 } else { 22.5 };
+    while count > 0 {
+        let rotation = Quat::from_rotation_z(degree.to_radians());
+        let direction = rotation.mul_vec3(Vec3::X).normalize().xy();
+        instances.push(BulletData {
+            velocity: direction * BULLET_SPEED, 
+            accelerator: Some(Arc::new(Curve)), 
+            life_time: BULLET_LIFE_TIME, 
+            translation, 
+            size: BULLET_SIZE, 
+            box_size: COLLIDE_SIZE, 
+            ..Default::default()
+        });
+
+        degree += 45.0;
+        count -= 1;
+    }
+
+    // (한국어) 행동 카운트를 증가시킵니다.
+    // (English Translation) Increases behavior count. 
+    this.boss.behavior_count += 1;
+
+    // (한국어) 다음 상태로 변경합니다.
+    // (English Translation) Changes to the next state. 
+    if this.boss.behavior_count >= this.boss.max_behavior_count {
+        this.boss.behavior_count = 0;
+        this.boss.max_behavior_count = 0;
+        this.boss.behavior_timer = 0.25;
+        this.boss.behavior_state = BossBehaviorState::WaitForFinish;
+        this.boss.previous_behavior = None;
+    } else {
+        this.boss.behavior_timer = 0.05;
+        this.boss.behavior_state = BossBehaviorState::MoveForFinish;
+        this.boss.previous_behavior = Some(BossBehaviorState::FireBulletPattern3);
+    }
+
+    Ok(())
+}
+
+#[derive(Debug)]
+pub struct Transmission;
+
+impl Accelerator for Transmission {
+    fn value(&self, velocity: Vec2, timer: f64) -> Vec2 {
+        const VALUE: f32 = 2400.0;
+        if timer > 1.0 {
+            velocity.normalize() * VALUE
+        } else {
+            Vec2::ZERO
+        }
+    }
+}
+
+fn update_boss_fire_bullet_pattern4(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
+    const BULLET_SPEED: f32 = 1.0 * PIXEL_PER_METER;
+
+    // (한국어) 총알 발사 소리를 재생합니다.
+    // (English Translation) Play the sound of a bullet being fired.
+    let stream = shared.get::<OutputStreamHandle>().unwrap();
+    let settings = shared.get::<Settings>().unwrap();
+    let asset_bundle = shared.get::<AssetBundle>().unwrap();    
+    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
+        .read(&sound::SoundDecoder)?;
+    let sink = sound::play_sound(settings.effect_volume, source, stream)?;
+    thread::spawn(move || {
+        sink.sleep_until_end();
+        sink.detach();
+    });
+
+    // (한국어) 총알을 추가합니다.
+    // (English Translation) Add bullets.
+    let translation = {
+        let instances = this.boss.sprite.instances.lock().expect("Failed to access variable.");
+        instances[0].translation
+    };
+
+    let mut instances = this.enemy_bullet.instances.lock().expect("Failed to access variable.");
+    let mut count = 4;
+    let mut degree = Vec2::X.angle_between(this.boss.direction).to_degrees() + this.boss.behavior_count as f32 * 15.0;
+    while count > 0 {
+        let rotation = Quat::from_rotation_z(degree.to_radians());
+        let direction = rotation.mul_vec3(Vec3::X).normalize_or_zero().xy();
+        instances.push(BulletData {
+            velocity: direction * BULLET_SPEED, 
+            accelerator: Some(Arc::new(Transmission)), 
+            life_time: BULLET_LIFE_TIME, 
+            translation, 
+            size: BULLET_SIZE, 
+            box_size: COLLIDE_SIZE, 
+            ..Default::default()
+        });
+
+        degree += 90.0;
+        count -= 1;
+    }
+
+    // (한국어) 행동 카운트를 증가시킵니다.
+    // (English Translation) Increases behavior count. 
+    this.boss.behavior_count += 1;
+
+    // (한국어) 다음 상태로 변경합니다.
+    // (English Translation) Changes to the next state. 
+    if this.boss.behavior_count >= this.boss.max_behavior_count {
+        this.boss.behavior_count = 0;
+        this.boss.max_behavior_count = 0;
+        this.boss.behavior_timer = 0.25;
+        this.boss.behavior_state = BossBehaviorState::WaitForFinish;
+        this.boss.previous_behavior = None;
+    } else {
+        this.boss.behavior_timer = 0.05;
+        this.boss.behavior_state = BossBehaviorState::WaitForFinish;
+        this.boss.previous_behavior = Some(BossBehaviorState::FireBulletPattern4);
+    }
+
+    Ok(())
+}
+
 
 fn update_boss_wait_for_finish(this: &mut InGameScene, _shared: &mut Shared, _total_time: f64, elapsed_time: f64) -> AppResult<()> {
     // (한국어) 타이머를 갱신합니다.

@@ -392,6 +392,44 @@ pub fn create_title_scene(
     );
 
 
+    // (한국어) `dds` 이미지 파일로부터 되돌아가기 버튼 텍스처를 생성합니다.
+    // (English Translation) Create a return button texture from the `dds` image file. 
+    let texture = asset_bundle.get(path::BUTTON_INFO_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("InfoButton"),
+            size: wgpu::Extent3d {
+                width: 256,
+                height: 256,
+                depth_or_array_layers: 1,
+            },
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            mip_level_count: 9,
+            sample_count: 1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            device,
+            queue, 
+        })?;
+    let info_btn_texture_view = texture.create_view(
+        &wgpu::TextureViewDescriptor {
+            ..Default::default()
+        }
+    );
+
+    // (한국어) 사용을 완료한 에셋을 해제합니다.
+    // (English Translation) Release assets that have been used. 
+    asset_bundle.release(path::BUTTON_INFO_TEXTURE_PATH);
+
+    let info_button = create_information_button(
+        device, 
+        tex_sampler, 
+        &info_btn_texture_view, 
+        ui_brush
+    );
+
+
+
     // (한국어) `dds`이미지 파일로부터 윈도우 배경 텍스처를 생성합니다.
     // (English Translation) Create a window background texture from a `dds`image file. 
     let texture = asset_bundle.get(path::WINDOW_RATIO_4_3_TEXTURE_PATH)?
@@ -659,6 +697,87 @@ pub fn create_title_scene(
         ui_brush, 
         text_brush
     );
+    let stage_viewer_images = create_stage_viewer_images(
+        &save, 
+        device, 
+        tex_sampler, 
+        texture_map, 
+        ui_brush
+    );
+
+
+    let tutorial_textture = asset_bundle.get(path::TUTORIAL_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("Tutorial"),
+            size: wgpu::Extent3d {
+                width: 1024,
+                height: 512,
+                depth_or_array_layers: 4,
+            },
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            mip_level_count: 11,
+            sample_count: 1,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+            device,
+            queue,
+        })?;
+    let tutorials = create_tutorial_windows(
+        nexon_lv2_gothic_bold, 
+        script, 
+        device, 
+        queue, 
+        tex_sampler, 
+        &tutorial_textture, 
+        ui_brush, 
+        text_brush
+    )?;
+    let (tutorial_prev_btn, tutorial_next_btn) = create_tutorial_buttons(
+        device, 
+        tex_sampler, 
+        &return_btn_texture_view, 
+        ui_brush
+    );
+
+
+    // (한국어) 로고 이미지 텍스처를 생성합니다.
+    // (English Translation) Create a logo image texture. 
+    let logo_texture = asset_bundle.get(path::LOGO_TEXTURE_PATH)?
+        .read(&DdsTextureDecoder {
+            name: Some("Logo"), 
+            size: wgpu::Extent3d {
+                width: 512, 
+                height: 512, 
+                depth_or_array_layers: 1, 
+            }, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: wgpu::TextureFormat::Bgra8Unorm, 
+            mip_level_count: 10, 
+            sample_count: 1, 
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+            view_formats: &[], 
+            device: &device, 
+            queue: &queue
+        })?;
+
+    // (한국어) 사용을 완료한 에셋을 정리합니다.
+    // (English Translation) Release assets that have been used.
+    asset_bundle.release(path::LOGO_TEXTURE_PATH);
+
+    let logo_texture_view = logo_texture.create_view(
+        &wgpu::TextureViewDescriptor { 
+            ..Default::default()
+        }
+    );
+    let credit_button = create_credit_button(
+        device, 
+        tex_sampler, 
+        &logo_texture_view, 
+        ui_brush
+    );
+
+
 
 
     return Ok(TitleScene {
@@ -668,11 +787,14 @@ pub fn create_title_scene(
         background, 
         sprites,
         menu_buttons, 
+        credit_button, 
         return_button, 
+        info_button, 
         exit_msg_box, 
         stage_window, 
         stage_enter_button, 
         stage_images, 
+        stage_viewer_images, 
         setting_titles, 
         setting_windows, 
         setting_languages, 
@@ -680,6 +802,9 @@ pub fn create_title_scene(
         setting_return_button, 
         setting_volume_background, 
         setting_volume_bar, 
+        tutorial_prev_btn, 
+        tutorial_next_btn, 
+        tutorials, 
     })
 }
 
@@ -841,4 +966,81 @@ fn create_stage_image(
     }
 
     return stage_image;
+}
+
+/// #### 한국어 </br>
+/// 스테이지 보기 이미지를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a stage view image. </br>
+/// 
+fn create_stage_viewer_images(
+    save: &SaveData, 
+    device: &wgpu::Device, 
+    tex_sampler: &wgpu::Sampler, 
+    texture_map: &HashMap<String, wgpu::Texture>, 
+    ui_brush: &UiBrush
+) -> HashMap<Actor, UiObject> {
+    const MAP: [(Actor, &'static str, &'static str); 4] = [
+        (Actor::Aris, "Aris", path::ARIS_IMG_TEXTURE_PATH), 
+        (Actor::Momoi, "Momoi", path::MOMOI_IMG_TEXTURE_PATH), 
+        (Actor::Midori, "Midori", path::MIDORI_IMG_TEXTURE_PATH), 
+        (Actor::Yuzu, "Yuzu", path::YUZU_IMG_TEXTURE_PATH)
+    ];
+
+    let mut stage_viewer_images = HashMap::new();
+    for (actor, label, rel_path) in MAP {
+        let percent = match actor {
+            Actor::Aris => save.stage_aris, 
+            Actor::Momoi => save.stage_momoi, 
+            Actor::Midori => save.stage_midori, 
+            Actor::Yuzu => save.stage_yuzu
+        } as f32 / NUM_TILES as f32 * 100.0;
+
+        let stage_image_texture_view = match percent < 20.0 {
+            true => {
+                let texture = texture_map.get(path::DEF_IMG_TEXTURE_PATH)
+                    .expect("Registered texture not found!");
+                texture.create_view(
+                    &wgpu::TextureViewDescriptor {
+                        ..Default::default()
+                    }
+                )
+            },
+            false => {
+                let texture = texture_map.get(rel_path)
+                    .expect("Registered texture not found!");
+                texture.create_view(
+                    &wgpu::TextureViewDescriptor {
+                        base_array_layer: if 20.0 <= percent && percent < 50.0 {
+                            0
+                        } else if 50.0 <= percent && percent < 80.0 {
+                            1
+                        } else {
+                            2
+                        },
+                        array_layer_count: Some(1), 
+                        dimension: Some(wgpu::TextureViewDimension::D2), 
+                        ..Default::default()
+                    }
+                )
+            }
+        };
+
+        stage_viewer_images.insert(
+            actor, 
+            UiObjectBuilder::new(
+                Some(&format!("{}StageViewerImage", label)), 
+                tex_sampler, 
+                &stage_image_texture_view, 
+                ui_brush
+            ) 
+            .with_anchor(Anchor::new(0.95, 0.2875, 0.05, 0.9625))
+            .with_color((1.0, 1.0, 1.0, 0.0).into())
+            .with_global_translation((0.0, 0.0, 0.1).into())
+            .build(device)
+        );
+    }
+
+    return stage_viewer_images;
 }

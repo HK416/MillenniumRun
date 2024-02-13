@@ -335,7 +335,7 @@ pub fn create_game_scene(
         tex_sampler, 
         &texture_view, 
         bullet_brush, 
-        128
+        256
     );
 
 

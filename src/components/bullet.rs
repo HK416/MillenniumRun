@@ -1,3 +1,4 @@
+use std::fmt;
 use std::mem::size_of;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -42,6 +43,10 @@ impl Default for VertexInput {
 }
 
 
+pub trait Accelerator : fmt::Debug + Send + Sync {
+    fn value(&self, velocity: Vec2, timer: f64) -> Vec2;
+}
+
 
 /// #### 한국어 </br>
 /// 총알 객체를 렌더링하는데 사용되는 정점 입력 데이터를 담고 있습니다. </br>
@@ -49,16 +54,19 @@ impl Default for VertexInput {
 /// #### English (Translation) </br>
 /// Contains vertex input data used for rendering bullet objects. </br>
 /// 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug)]
 pub struct Instance {
-    pub speed: f32, 
+    pub velocity: Vec2, 
+    pub accelerator: Option<Arc<dyn Accelerator>>,
+
     pub timer: f64, 
     pub life_time: f64, 
+
     pub size: Vec2, 
     pub color: Vec4, 
     pub scale: Vec3, 
-    pub direction: Vec3, 
     pub translation: Vec3, 
+
     pub box_size: Vec2, 
 }
 
@@ -68,9 +76,9 @@ impl Instance {
         VertexInput { 
             transform: Mat4::from_scale_rotation_translation(
                 self.scale, 
-                Quat::from_rotation_arc(
-                    Vec3::X, 
-                    self.direction
+                Quat::from_rotation_arc_2d(
+                    Vec2::X, 
+                    self.velocity.try_normalize().unwrap_or(Vec2::X)
                 ), 
                 self.translation
             ), 
@@ -86,7 +94,9 @@ impl Instance {
             y: self.translation.y, 
             width: self.box_size.x, 
             height: self.box_size.y, 
-            radian: Vec3::X.angle_between(self.direction), 
+            radian: Vec2::X.angle_between(
+                self.velocity.try_normalize().unwrap_or(Vec2::X)
+            ), 
         }
     }
 }
@@ -95,13 +105,13 @@ impl Default for Instance {
     #[inline]
     fn default() -> Self {
         Self { 
-            speed: 0.0, 
+            velocity: Vec2 { x: 0.0, y: 0.0 }, 
+            accelerator: None, 
             timer: 0.0, 
             life_time: 0.0, 
             size: Vec2 { x: 0.0, y: 0.0 }, 
             color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 }, 
             scale: Vec3 { x: 1.0, y: 1.0, z: 1.0 }, 
-            direction: Vec3 { x: 1.0, y: 0.0, z: 0.0 }, 
             translation: Vec3 { x: 0.0, y: 0.0, z: 0.0 }, 
             box_size: Vec2 { x: 0.0, y: 0.0 }, 
         }
@@ -445,8 +455,14 @@ pub fn update_bullets(
 
             // (한국어) 총알의 위치를 갱신합니다. 
             // (English Translation) Updates the bullet's position. 
-            let distance = bullet.direction.normalize() * bullet.speed;
-            bullet.translation += distance;
+            let acceleration = match bullet.accelerator.as_ref() {
+                Some(accelerator) => accelerator.value(bullet.velocity, bullet.timer), 
+                None => Vec2 { x: 0.0, y: 0.0 }
+            };
+
+            bullet.velocity += acceleration * elapsed_time as f32;
+            let distance = bullet.velocity * elapsed_time as f32;
+            bullet.translation += Vec3::new(distance.x, distance.y, 0.0);
 
             next.push(bullet);
         }

@@ -52,6 +52,7 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
     // (English Translation) Updates the scale over time.
     let delta = smooth_step(this.timer, DURATION);
     let alpha = 1.0 * delta;
+    this.credit_button.update(queue, |data| data.color.w = alpha);
     update_ui_alpha(this.menu_buttons.iter_mut(), queue, alpha);
 
     let scale = 1.0 - 1.0 * delta;
@@ -183,16 +184,11 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
         
         // (한국어) 사용자 인터페이스 그리기.
         // (English Translation) Drawing the user interface.
-        ui_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(ui, _)| ui)
-        );
-        text_brush.draw(
-            &mut rpass, 
-            this.menu_buttons.iter()
-            .map(|(_, it)| it)
-        );
+        let iter = [&this.credit_button].into_iter()
+            .chain(this.menu_buttons.iter().map(|(it, _)| it));
+        ui_brush.draw(&mut rpass, iter);
+
+        text_brush.draw(&mut rpass, this.menu_buttons.iter().map(|(_, it)| it));
     }
 
     {

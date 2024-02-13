@@ -111,7 +111,7 @@ pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
         });
 
         camera.bind(&mut rpass);
-        text_brush.draw(&mut rpass, this.notifications.iter());
+        text_brush.draw(&mut rpass, [&this.application_info].into_iter().chain(this.notifications.iter()));
     }
 
     // (한국어) 명령어 대기열에 커맨드 버퍼를 제출하고, 프레임 버퍼를 출력합니다.

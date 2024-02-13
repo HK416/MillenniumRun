@@ -1,3 +1,5 @@
+use std::io::Write;
+
 mod assets {
     use std::include_str;
     use std::path::PathBuf;
@@ -204,7 +206,7 @@ mod utils {
 /// 
 fn gen_asset_sha256_keys() {
     use std::fs;
-    use std::io::{self, Write};
+    use std::io;
     use std::path::{Path, PathBuf};
     use std::thread;
 
@@ -364,6 +366,24 @@ fn copy_asset_to_target() {
     panic!("Target build directory is not found!");
 }
 
+fn create_application_info() {
+    use std::env;
+    use std::fs::OpenOptions;
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open("./target/app.info")
+        .expect("Failed to create file.");
+
+    let pkg_name = env::var("CARGO_PKG_NAME").unwrap();
+    let pkg_version = env::var("CARGO_PKG_VERSION").unwrap();
+    let pkg_toolchain = env::var("RUSTUP_TOOLCHAIN").unwrap();
+    let build_mode = if cfg!(debug_assertions) { "Debug" } else { "Release" };
+    file.set_len(0).expect("Failed to write file.");
+    file.write_all(&format!("{pkg_name}-v{pkg_version}::{pkg_toolchain}::{build_mode}").as_bytes())
+        .expect("Failed to write file.");
+}
 
 
 fn main() {
@@ -371,4 +391,5 @@ fn main() {
     println!("cargo:rerun-if-changed=AssetLists.txt");
     gen_asset_sha256_keys();
     copy_asset_to_target();
+    create_application_info();
 }

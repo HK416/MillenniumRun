@@ -120,7 +120,7 @@ pub fn draw(this: &IntroScene, shared: &mut Shared) -> AppResult<()> {
         });
 
         camera.bind(&mut rpass);
-        text_brush.draw(&mut rpass, this.notifications.iter());
+        text_brush.draw(&mut rpass, [&this.application_info].into_iter().chain(this.notifications.iter()));
     }
 
     {

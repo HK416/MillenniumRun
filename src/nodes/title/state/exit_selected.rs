@@ -85,6 +85,9 @@ pub fn update(this: &mut TitleScene, shared: &mut Shared, _total_time: f64, elap
         );
     });
 
+    let transparency = 1.0 * delta;
+    this.info_button.update(queue, |data| data.color.w = transparency);
+
     // (한국어) 스테이지 윈도우 알파 값을 갱신합니다.
     // (English Translation) Updates the stage window alpha value.
     let alpha = 1.0 - 1.0 * delta;
@@ -243,7 +246,7 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
         // (한국어) 버튼 그리기.
         // (English Translation) Drawing the buttons.
-        ui_brush.draw(&mut rpass, [&this.return_button].into_iter());
+        ui_brush.draw(&mut rpass, [&this.return_button, &this.info_button].into_iter());
     }
 
     {

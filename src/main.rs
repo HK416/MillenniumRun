@@ -272,12 +272,15 @@ fn game_loop(
 fn main() {
     use crate::{
         render::setup_render_ctx,
-        system::error::popup_err_msg_and_abort
+        system::error::popup_err_msg_and_abort, 
+        system::APPLICATION_INFORMATION,
     };
 
+    
     // (한국어) 로그 시스템을 초기화 합니다.
     // (English Translation) Initialize log system.
     env_logger::init();
+    log::info!("{}", APPLICATION_INFORMATION);
     log::info!("❖ Application Launching. ❖");
 
     if cfg!(not(any(target_os = "macos", target_os = "windows", target_os = "linux"))) {
@@ -303,6 +306,7 @@ fn main() {
         WindowBuilder::new()
             .with_visible(false)
             .with_resizable(false)
+            .with_maximized(false)
             .with_window_icon(None)
             .with_title("Application Initialize...")
             .build(&event_loop)

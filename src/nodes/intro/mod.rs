@@ -131,10 +131,17 @@ impl SceneNode for IntroLoading {
                 &queue, 
                 &text_brush
             );
+            let application_info = create_application_info(
+                nexon_lv2_gothic_bold, 
+                &device, 
+                &queue, 
+                &text_brush
+            );
 
             Ok(IntroScene { 
                 timer: 0.0, 
                 state: state::IntroState::default(), 
+                application_info, 
                 loading: None, 
                 loading_text, 
                 notifications, 
@@ -253,6 +260,7 @@ pub struct IntroScene {
     timer: f64,
     state: state::IntroState,
     loading: Option<JoinHandle<AppResult<()>>>,
+    application_info: Text, 
     loading_text: Text, 
     notifications: Vec<Text>,
     foreground: UiObject, 
@@ -271,9 +279,12 @@ impl SceneNode for IntroScene {
             asset_bundle.get(path::CANCEL_SOUND_PATH)?;
             asset_bundle.get(path::YUUKA_TITLE_SOUND_PATH)?;
             asset_bundle.get(path::YUUKA_HIDDEN_SOUND_PATH)?;
+            asset_bundle.get(path::LOGO_TEXTURE_PATH)?;
             asset_bundle.get(path::STAR_TEXTURE_PATH)?;
+            asset_bundle.get(path::TUTORIAL_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_WIDE_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_MEDIUM_TEXTURE_PATH)?;
+            asset_bundle.get(path::BUTTON_INFO_TEXTURE_PATH)?;
             asset_bundle.get(path::BUTTON_RETURN_TEXTURE_PATH)?;
             asset_bundle.get(path::TITLE_BUTTON_START_TEXTURE_PATH)?;
             asset_bundle.get(path::TITLE_BUTTON_SETTING_TEXTURE_PATH)?;
@@ -428,6 +439,12 @@ fn create_foreground(
     return foreground;
 }
 
+/// #### 한국어 </br>
+/// 로딩 텍스트를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a loading text. </br>
+/// 
 fn create_loading_text(
     font: &FontArc,
     device: &wgpu::Device, 
@@ -443,5 +460,31 @@ fn create_loading_text(
     .with_anchor(Anchor::new(0.0, 1.0, 0.0, 1.0))
     .with_margin(Margin::new(128, -256, 0, 0))
     .with_color((0.0, 0.0, 0.0, 1.0).into())
+    .build(device, queue)
+}
+
+/// #### 한국어 </br>
+/// 애플리케이션 빌드 정보 텍스트를 생성합니다. </br>
+/// 
+/// #### English (Translation) </br>
+/// Create a application build information text. </br>
+/// 
+fn create_application_info(
+    font: &FontArc, 
+    device: &wgpu::Device, 
+    queue: &wgpu::Queue, 
+    text_brush: &TextBrush
+) -> Text {
+    use crate::system::APPLICATION_INFORMATION;
+    TextBuilder::new(
+        Some("ApplicationInformationText"), 
+        font, 
+        APPLICATION_INFORMATION, 
+        text_brush
+    )
+    .with_anchor(Anchor::new(0.0, 0.5, 0.0, 0.5))
+    .with_margin(Margin::new(32, -400, 0, 400))
+    .with_color((0.0, 0.0, 0.0, 1.0).into())
+    .with_translation((0.0, 0.0, 0.1).into())
     .build(device, queue)
 }
