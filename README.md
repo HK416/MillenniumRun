@@ -1,4 +1,4 @@
-# Millennium Run (ver 0.10.0)
+# Millennium Run (ver 0.10.1)
 
 [한국어](#개요) </br>
 [English (Translation)](#overview) </br>
@@ -10,14 +10,14 @@ Blue Archive의 2차 창작 가이드라인을 준수하며, \"Nexon Company\", 
 # 실행 요구 사양
 |Windows|Linux|macOS| 
 |:---:|:---:|:---:|
-|<b>DirectX 12</b>를 지원하는 그래픽스 하드웨어|<b>Vulkan</b>을 지원하는 그래픽스 하드웨어|<b>Metal<b>을 지원하는 그래픽스 하드웨어|
+|<b>DirectX 12</b>를 지원하는 그래픽스 하드웨어|<b>Vulkan</b>을 지원하는 그래픽스 하드웨어|<b>Metal</b>을 지원하는 그래픽스 하드웨어|
 
 - 공통 요구사항: BC7 텍스처 압축 포맷을 지원하는 그래픽스 하드웨어
 
 ### 실행 확인 표
 |Windows|Linux|macOS|
 |:---:|:---:|:---:|
-|❓|❓|✅|
+|✅|❓|✅|
 
 # 개발 현황
 - 한국어 지원
@@ -31,6 +31,10 @@ Blue Archive의 2차 창작 가이드라인을 준수하며, \"Nexon Company\", 
 - ~~튜토리얼 구현~~ (완료)
 - 다국어 지원
 - 기타 요소 추가...
+
+# 발견된 문제
+- `[2024/02/15]` `Windows`에서 사용자가 기본 소리 출력 장치를 변경해도 이전 장치에서 소리가 계속 출력됩니다.
+- `[2024/02/15]` `Windows`에서 사용자가 기본 소리 출력 장치를 제거했다가 다시 연결했을 때 소리가 나지 않습니다.
 
 # 라이선스
 - <b>이 게임은 \"Blue Archive\" 2차 창작 가이드라인을 준수합니다.</b>
@@ -53,7 +57,7 @@ Blue Archive의 2차 창작 가이드라인을 준수하며, \"Nexon Company\", 
 ### Execution check table
 |Windows|Linux|macOS|
 |:---:|:---:|:---:|
-|❓|❓|✅|
+|✅|❓|✅|
 
 # Development status
 - Korean language support
@@ -67,6 +71,10 @@ Blue Archive의 2차 창작 가이드라인을 준수하며, \"Nexon Company\", 
 - ~~Tutorial Implementation~~ (complete)
 - Multilingual support
 - Add other elements...
+
+# Issue
+- `[02/15/2024]` In `Windows`, even if the user changes the default sound output device, sound continues to be output from the previous device. 
+- `[02/15/2024]` In `Windows`, if the user removes and reconnects the default sound output device, no sound is output.
 
 # License 
 - <b>This game complies with the \"Blue Archive\" secondary creation guidelines.</b>

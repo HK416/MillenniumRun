@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::collections::VecDeque;
 
-use rodio::Source;
 use winit::event::Event;
+use rodio::{Sink, Source};
 
 use crate::{
     game_err, 
@@ -21,7 +21,6 @@ use crate::{
         save::{SaveData, SaveEncoder}, 
     },
     nodes::in_game::{
-        utils,
         InGameScene, 
         state::InGameState, 
     },
@@ -47,7 +46,6 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, total_time: f64, elap
         // (한국어) 사용할 공유 객체들을 가져옵니다.
         // (English Translation) Get shared objects to use.
         let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
         let settings = shared.get::<Settings>().unwrap();
         
         // (한국어) 타이머를 갱신합니다.
@@ -57,7 +55,9 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, total_time: f64, elap
         
         // (한국어) 배경 음악 소리를 줄입니다.
         // (English Translation) Reduce the background music sound.
-        audio.background.set_volume(settings.background_volume.norm() * scale);
+        if let Some((background, _)) = shared.get::<(Sink, Sink)>() {
+            background.set_volume(settings.background_volume.norm() * scale);
+        }
         
         // (한국어) 적이 발사한 총알들을 갱신합니다.
         // (English Translation) Updates the bullets fired by the enemy.
@@ -127,26 +127,27 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, total_time: f64, elap
 
         // (한국어) 사용할 공유 객체들을 가져옵니다.
         // (English Translation) Get shared object to use.
-        let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
-        let settings = shared.get::<Settings>().unwrap();
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        if let Some((background, voice)) = shared.get::<(Sink, Sink)>() {
+            let settings = shared.get::<Settings>().unwrap();
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
 
-        audio.background.stop();
-        audio.background.set_volume(settings.background_volume.norm());
-        audio.voice.stop();
+            voice.stop();
+            background.stop();
+            background.set_volume(settings.background_volume.norm());
 
-        if this.owned_hearts.len() == 0 {
-            let source = asset_bundle.get(path::THEME27_SOUND_PATH)?
-                .read(&sound::SoundDecoder)?
-                .amplify(0.5)
-                .repeat_infinite();
-            audio.background.append(source);
-        } else {
-            let source = asset_bundle.get(path::THEME23_SOUND_PATH)?
-                .read(&sound::SoundDecoder)?
-                .amplify(0.5)
-                .repeat_infinite();
-            audio.background.append(source);
+            if this.owned_hearts.len() == 0 {
+                let source = asset_bundle.get(path::THEME27_SOUND_PATH)?
+                    .read(&sound::SoundDecoder)?
+                    .amplify(0.5)
+                    .repeat_infinite();
+                background.append(source);
+            } else {
+                let source = asset_bundle.get(path::THEME23_SOUND_PATH)?
+                    .read(&sound::SoundDecoder)?
+                    .amplify(0.5)
+                    .repeat_infinite();
+                background.append(source);
+            }
         }
 
         this.timer = 0.0;

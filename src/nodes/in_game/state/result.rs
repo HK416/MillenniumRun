@@ -1,6 +1,8 @@
+use std::thread;
 use std::sync::{Arc, Mutex};
 
 use glam::{Vec3, Vec4Swizzles, Vec4};
+use rodio::{OutputStream, OutputStreamHandle};
 use winit::{
     event::{Event, WindowEvent, MouseButton}, 
     keyboard::{PhysicalKey, KeyCode}, 
@@ -9,6 +11,7 @@ use winit::{
 
 use crate::{
     game_err, 
+    assets::bundle::AssetBundle, 
     components::{
         ui::UiBrush, 
         text::TextBrush, 
@@ -16,9 +19,11 @@ use crate::{
         camera::GameCamera, 
         collider2d::Collider2d, 
         player::Actor, 
+        user::Settings, 
         sound, 
     },
     nodes::{
+        path, 
         title::TitleLoading, 
         in_game::InGameScene
     },
@@ -248,7 +253,19 @@ fn handle_mouse_input(this: &mut InGameScene, shared: &mut Shared, event: &Event
                     this.result_window_btn.1.update(queue, |data| data.color *= Vec4::new(0.5, 0.5, 0.5, 1.0));
 
                     // <3>
-                    sound::play_click_sound(shared)?;
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
                 }
             } else if MouseButton::Left == *button && !state.is_pressed() {
                 let mut guard = FOCUSED_EXIT_BTN.lock().expect("Failed to access variable.");

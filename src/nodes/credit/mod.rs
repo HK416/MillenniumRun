@@ -3,6 +3,7 @@ use std::thread::{self, JoinHandle};
 use std::collections::HashMap;
 
 use glam::{Vec3, Vec4, Vec4Swizzles};
+use rodio::{OutputStream, OutputStreamHandle};
 use ab_glyph::FontArc;
 use winit::{
     keyboard::{KeyCode, PhysicalKey},
@@ -10,11 +11,11 @@ use winit::{
     dpi::PhysicalPosition, 
 };
 
-use crate::components::collider2d::Collider2d;
 use crate::{
     game_err, 
     assets::bundle::AssetBundle, 
     components::{
+        collider2d::Collider2d,
         ui::{UiObject, UiBrush, UiObjectBuilder}, 
         text::{Text, TextBrush, TextBuilder}, 
         camera::GameCamera, 
@@ -22,6 +23,7 @@ use crate::{
         margin::Margin, 
         save::SaveData, 
         interpolation, 
+        user::Settings, 
         sound, 
     }, 
     nodes::{
@@ -485,7 +487,6 @@ static FOCUSED_UI: Mutex<Option<(Buttons, Vec3)>> = Mutex::new(None);
 fn main_state_handle_events(this: &mut CreditScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared objects to use.
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
 
@@ -496,10 +497,23 @@ fn main_state_handle_events(this: &mut CreditScene, shared: &mut Shared, event: 
                 if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
                     // (한국어) 소리를 재생합니다.
                     // (English Translation) Play the sounds. 
-                    sound::play_cancel_sound(shared)?;
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
 
                     // (한국어) 눌려져있는 버튼을 원래 상태로 되돌립니다.
                     // (English Translation) Returns a pressed button to its original state. 
+                    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                     let mut guard = FOCUSED_UI.lock().expect("Failed to access variable.");
                     if let Some((button, ui_color)) = guard.take() {
                         match button {
@@ -532,6 +546,7 @@ fn main_state_handle_events(this: &mut CreditScene, shared: &mut Shared, event: 
 
                         // (한국어) 선택된 인터페이스의 색상을 변경합니다.
                         // (English Translation) Changes the color of the selected interface. 
+                        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                         match button {
                             Buttons::Return => &this.return_button, 
                             Buttons::HiddenImage => &this.hidden_image_button
@@ -540,13 +555,42 @@ fn main_state_handle_events(this: &mut CreditScene, shared: &mut Shared, event: 
                         // (한국어) 소리를 재생합니다.
                         // (English Translation) Play the sounds. 
                         match button {
-                            Buttons::Return => sound::play_cancel_sound(shared), 
-                            Buttons::HiddenImage => sound::play_click_sound(shared)
-                        }?;
+                            Buttons::Return => {
+                                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                                        let settings = shared.get::<Settings>().unwrap();
+                                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                                        let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                                        sink.set_volume(settings.effect_volume.norm());
+                                        sink.append(source);
+                                        thread::spawn(move || {
+                                            sink.sleep_until_end();
+                                        });
+                                        shared.push((stream, stream_handle));
+                                    }
+                                }
+                            }, 
+                            Buttons::HiddenImage => {
+                                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                                        let settings = shared.get::<Settings>().unwrap();
+                                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                                        let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                                        sink.set_volume(settings.effect_volume.norm());
+                                        sink.append(source);
+                                        thread::spawn(move || {
+                                            sink.sleep_until_end();
+                                        });
+                                        shared.push((stream, stream_handle));
+                                    }
+                                }
+                            }
+                        };
                     }
                 } else if MouseButton::Left == button && !state.is_pressed() {
                     // (한국어) 눌려져있는 버튼을 원래 상태로 되돌립니다.
                     // (English Translation) Returns a pressed button to its original state. 
+                    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                     let mut guard = FOCUSED_UI.lock().expect("Failed to access variable.");
                     if let Some((button, ui_color)) = guard.take() {
                         match button {
@@ -896,7 +940,6 @@ fn exit_viewer_state_draw(this: &CreditScene, shared: &mut Shared) -> AppResult<
 fn viewer_state_handle_events(this: &mut CreditScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared objects to use.
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
 
@@ -907,10 +950,23 @@ fn viewer_state_handle_events(this: &mut CreditScene, shared: &mut Shared, event
                 if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
                     // (한국어) 소리를 재생합니다.
                     // (English Translation) Play the sounds. 
-                    sound::play_cancel_sound(shared)?;
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
 
                     // (한국어) 눌려져있는 버튼을 원래 상태로 되돌립니다.
                     // (English Translation) Returns a pressed button to its original state. 
+                    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                     let mut guard = FOCUSED_UI.lock().expect("Failed to access variable.");
                     if let Some((button, ui_color)) = guard.take() {
                         match button {
@@ -944,6 +1000,7 @@ fn viewer_state_handle_events(this: &mut CreditScene, shared: &mut Shared, event
 
                         // (한국어) 선택된 인터페이스의 색상을 변경합니다.
                         // (English Translation) Changes the color of the selected interface. 
+                        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                         match button {
                             Buttons::Return => &this.return_button, 
                             Buttons::HiddenImage => &this.hidden_image_button
@@ -952,13 +1009,42 @@ fn viewer_state_handle_events(this: &mut CreditScene, shared: &mut Shared, event
                         // (한국어) 소리를 재생합니다.
                         // (English Translation) Play the sounds. 
                         match button {
-                            Buttons::Return => sound::play_cancel_sound(shared), 
-                            Buttons::HiddenImage => sound::play_click_sound(shared)
-                        }?;
+                            Buttons::Return => {
+                                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                                        let settings = shared.get::<Settings>().unwrap();
+                                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                                        let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                                        sink.set_volume(settings.effect_volume.norm());
+                                        sink.append(source);
+                                        thread::spawn(move || {
+                                            sink.sleep_until_end();
+                                        });
+                                        shared.push((stream, stream_handle));
+                                    }
+                                }
+                            }, 
+                            Buttons::HiddenImage => {
+                                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                                        let settings = shared.get::<Settings>().unwrap();
+                                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                                        let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                                        sink.set_volume(settings.effect_volume.norm());
+                                        sink.append(source);
+                                        thread::spawn(move || {
+                                            sink.sleep_until_end();
+                                        });
+                                        shared.push((stream, stream_handle));
+                                    }
+                                }
+                            }
+                        };
                     }
                 } else if MouseButton::Left == button && !state.is_pressed() {
                     // (한국어) 눌려져있는 버튼을 원래 상태로 되돌립니다.
                     // (English Translation) Returns a pressed button to its original state. 
+                    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                     let mut guard = FOCUSED_UI.lock().expect("Failed to access variable.");
                     if let Some((button, ui_color)) = guard.take() {
                         match button {

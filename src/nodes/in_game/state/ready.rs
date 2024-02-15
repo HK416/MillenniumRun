@@ -2,7 +2,7 @@ use std::thread;
 use std::sync::Arc;
 
 use winit::event::Event;
-use rodio::OutputStreamHandle;
+use rodio::{OutputStream, OutputStreamHandle};
 
 use crate::{
     game_err, 
@@ -52,16 +52,19 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, ela
 
         // (한국어) 게임 시작 소리를 재생합니다.
         // (English Translation) Play the game start sound. 
-        let stream = shared.get::<OutputStreamHandle>().unwrap();
-        let settings = shared.get::<Settings>().unwrap();
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
-        let source = asset_bundle.get(path::START_SOUND_PATH)?
-            .read(&sound::SoundDecoder)?;
-        let sink = sound::play_sound(settings.effect_volume, source, stream)?;
-        thread::spawn(move || {
-            sink.sleep_until_end();
-            sink.detach();
-        });
+        if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+            if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                let settings = shared.get::<Settings>().unwrap();
+                let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                let source = asset_bundle.get(path::START_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                sink.set_volume(settings.effect_volume.norm());
+                sink.append(source);
+                thread::spawn(move || {
+                    sink.sleep_until_end();
+                });
+                shared.push((stream, stream_handle));
+            }
+        }
     }
     
     Ok(())

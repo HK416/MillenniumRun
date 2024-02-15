@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 
 use rand::prelude::*;
 use glam::{Vec3, Vec4Swizzles, Vec4};
-use rodio::{Sink, OutputStreamHandle};
+use rodio::{Sink, OutputStream, OutputStreamHandle};
 use winit::{
     keyboard::{PhysicalKey, KeyCode},
     event::{Event, WindowEvent, MouseButton},
@@ -28,10 +28,12 @@ use crate::{
         sound::{self, SoundDecoder}, 
         interpolation, 
     },
-    nodes::in_game::{
-        utils, 
-        InGameScene, 
-        state::InGameState, 
+    nodes::{
+        path, 
+        in_game::{
+            InGameScene, 
+            state::InGameState, 
+        }
     },
     render::depth::DepthBuffer,
     system::{
@@ -236,16 +238,11 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
 /// Handles the player's mouse input events. </br>
 /// 
 fn handle_player_mouse_events(this: &mut InGameScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    use crate::nodes::path;
-
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared object to use.
     let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();
     
     match event {
         Event::WindowEvent { event, .. } => match event {
@@ -278,13 +275,19 @@ fn handle_player_mouse_events(this: &mut InGameScene, shared: &mut Shared, event
 
                     // (한국어) 일시정지 사운드를 재생합니다.
                     // (English Translation) Play pause sound. 
-                    let source = asset_bundle.get(path::PAUSE_SOUND_PATH)?
-                        .read(&SoundDecoder)?;
-                    let sink = sound::play_sound(settings.effect_volume, source, stream)?;
-                    thread::spawn(move || {
-                        sink.sleep_until_end();
-                        sink.detach();
-                    });
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::PAUSE_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
                 }
             } else if MouseButton::Left == *button && !state.is_pressed() {
                 let mut guard = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
@@ -324,16 +327,6 @@ fn handle_player_mouse_events(this: &mut InGameScene, shared: &mut Shared, event
 /// Handles the player's keyboard input events. </br>
 /// 
 fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    use crate::nodes::path;
-
-    // (한국어) 사용할 공유 객체를 가져옵니다.
-    // (English Translation) Get the shared object to use.
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();
-    let control = &settings.control;
-    
     match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput { event, .. } => 
@@ -343,16 +336,23 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                 if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
                     // (한국어) 일시정지 사운드를 재생합니다.
                     // (English Translation) Play pause sound. 
-                    let source = asset_bundle.get(path::PAUSE_SOUND_PATH)?
-                        .read(&SoundDecoder)?;
-                    let sink = sound::play_sound(settings.effect_volume, source, stream)?;
-                    thread::spawn(move || {
-                        sink.sleep_until_end();
-                        sink.detach();
-                    });
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::PAUSE_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
 
                     // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다. 
                     // (English Translation) Returns the color of the selected ui to its original color.
+                    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                     let mut guard = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
                     if let Some(ui_color) = guard.take() {
                         this.menu_button.update(queue, |data| {
@@ -366,6 +366,9 @@ fn handle_player_keyboard_events(this: &mut InGameScene, shared: &mut Shared, ev
                     this.state = InGameState::EnterPause; 
                     this.player.control_state = PlayerControlState::Idle;
                 }
+                
+                let settings = shared.get::<Settings>().unwrap();
+                let control = &settings.control;
 
                 // (한국어) 사용자가 `위쪽`키를 눌렀을 경우.
                 // (English Translation) When the user presses the `Up` key.
@@ -453,7 +456,6 @@ fn update_remaining_time(this: &mut InGameScene, shared: &mut Shared, _total_tim
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
-    let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
 
     // (한국어) 타이머를 갱신합니다.
     // (English Translation) Updates the timer.
@@ -471,7 +473,9 @@ fn update_remaining_time(this: &mut InGameScene, shared: &mut Shared, _total_tim
     );
 
     if this.remaining_time <= 0.0 {
-        audio.voice.stop();
+        if let Some((_, voice)) = shared.get::<(Sink, Sink)>() {
+            voice.stop();
+        }
 
         this.player.face_timer = 0.0;
         this.player.face_state = PlayerFaceState::Hit;
@@ -584,7 +588,6 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
     // (English Translation) Get the shared object to use.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let tile_brush = shared.get::<Arc<TileBrush>>().unwrap();
-    let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
     let asset_bundle = shared.get::<AssetBundle>().unwrap();
 
     player::update_player_face(elapsed_time, queue, &mut this.player);
@@ -664,11 +667,13 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
             // (한국어) 무작위로 캐릭터 목소리를 재생합니다.
             // (English Translation) Plays character voices randomly. 
             if rand::thread_rng().gen_bool(0.3) {
-                play_random_character_voice(
-                    &this.player_smile_sounds, 
-                    &audio.voice, 
-                    asset_bundle
-                )?;
+                if let Some((_, voice)) = shared.get::<(Sink, Sink)>() {
+                    play_random_character_voice(
+                        &this.player_smile_sounds, 
+                        voice, 
+                        asset_bundle
+                    )?;
+                }
             }
         } else {
             // (한국어) 플레이어의 라이프 카운트를 감소시킵니다.
@@ -679,7 +684,9 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
             );
 
             if remaining_life == 0 {
-                audio.voice.stop();
+                if let Some((_, voice)) = shared.get::<(Sink, Sink)>() {
+                    voice.stop();
+                }
 
                 tile_brush.update(queue, |instances| {
                     for &(r, c) in this.player.path.iter() {
@@ -715,11 +722,13 @@ fn player_update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, 
                     tile_brush
                 );
 
-                play_random_character_voice(
-                    &this.player_damage_sounds, 
-                    &audio.voice, 
-                    asset_bundle
-                )?;
+                if let Some((_, voice)) = shared.get::<(Sink, Sink)>() {
+                    play_random_character_voice(
+                        &this.player_damage_sounds, 
+                        voice, 
+                        asset_bundle
+                    )?;
+                }
             }
         }
     };
@@ -744,7 +753,6 @@ fn update_percent_text(this: &mut InGameScene, shared: &mut Shared, _total_time:
     let device = shared.get::<Arc<wgpu::Device>>().unwrap();
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let text_brush = shared.get::<Arc<TextBrush>>().unwrap();
-    let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
 
     // (한국어) 타이머를 갱신합니다.
     // (English Translation) Updates the timer.
@@ -765,7 +773,9 @@ fn update_percent_text(this: &mut InGameScene, shared: &mut Shared, _total_time:
     // (한국어) 플레이어가 모든 타일을 차지한 경우 다음 장면 상태로 변경합니다.
     // (English Translation) When a player occupies all tiles, they change to the next scene state. 
     if per >= 100.0 {
-        audio.voice.stop();
+        if let Some((_, voice)) = shared.get::<(Sink, Sink)>() {
+            voice.stop();
+        }
 
         this.player.face_timer = 0.0;
         this.player.face_state = PlayerFaceState::Smile;
@@ -832,7 +842,6 @@ fn handles_collision(this: &mut InGameScene, shared: &mut Shared, _total_time: f
     // (English Translation) Get shared objects to use.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
     let tile_brush = shared.get::<Arc<TileBrush>>().unwrap();
-    let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
     let asset_bundle = shared.get::<AssetBundle>().unwrap();
 
     // (한국어) 발사된 총알들을 가져옵니다.
@@ -850,7 +859,9 @@ fn handles_collision(this: &mut InGameScene, shared: &mut Shared, _total_time: f
         );
 
         if remaining_life == 0 {
-            audio.voice.stop();
+            if let Some((_, voice)) = shared.get::<(Sink, Sink)>(){
+                voice.stop();
+            }
 
             tile_brush.update(queue, |instances| {
                 for &(r, c) in this.player.path.iter() {
@@ -886,11 +897,13 @@ fn handles_collision(this: &mut InGameScene, shared: &mut Shared, _total_time: f
                 tile_brush
             );
 
-            play_random_character_voice(
-                &this.player_damage_sounds, 
-                &audio.voice, 
-                asset_bundle
-            )?;
+            if let Some((_, voice)) = shared.get::<(Sink, Sink)>() {
+                play_random_character_voice(
+                    &this.player_damage_sounds, 
+                    voice, 
+                    asset_bundle
+                )?;
+            }
         }
     }
 

@@ -782,6 +782,7 @@ pub fn create_title_scene(
 
     return Ok(TitleScene {
         timer: 0.0, 
+        duration: 0.0, 
         state: TitleState::Enter,
         foreground, 
         background, 

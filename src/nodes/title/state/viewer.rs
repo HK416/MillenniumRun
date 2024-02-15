@@ -1,6 +1,8 @@
+use std::thread;
 use std::sync::{Arc, Mutex};
 
 use glam::{Vec4, Vec3, Vec4Swizzles};
+use rodio::{OutputStream, OutputStreamHandle};
 use winit::{
     event::{Event, WindowEvent, MouseButton}, 
     keyboard::{KeyCode, PhysicalKey},
@@ -8,11 +10,26 @@ use winit::{
 };
 
 use crate::{
+    game_err, 
+    assets::bundle::AssetBundle, 
     components::{
-        camera::GameCamera, collider2d::Collider2d, player::Actor, sound, sprite::SpriteBrush, ui::UiBrush 
-    }, game_err, nodes::title::{
-        state::TitleState, TitleScene
-    }, render::depth::DepthBuffer, system::{
+        ui::UiBrush,
+        sprite::SpriteBrush, 
+        collider2d::Collider2d, 
+        camera::GameCamera, 
+        player::Actor, 
+        user::Settings, 
+        sound, 
+    }, 
+    nodes::{
+        path,
+        title::{
+            TitleScene, 
+            state::TitleState, 
+        },
+    }, 
+    render::depth::DepthBuffer, 
+    system::{
         error::{AppResult, GameError}, 
         event::AppEvent, 
         shared::Shared, 
@@ -139,19 +156,28 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 }
 
 fn handle_keyboard_events(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    // (한국어) 사용할 공유 객체들을 가져옵니다.
-    // (English Translation) Get shared objects to use.
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    
     match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput { event, .. } => 
             if let PhysicalKey::Code(code) = event.physical_key {
                 if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
-                    sound::play_cancel_sound(shared)?;
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
 
                     // (한국어) 선택된 인터페이스를 원래 상태로 되돌립니다.
                     // (English Translation) Return the selected interface to its original state. 
+                    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                     let mut guard = FOCUSED_UI.lock().expect("Failed to access variable.");
                     if let Some(ui_color) = guard.take() {
                         this.return_button.update(queue, |data| data.color = (ui_color, data.color.w).into());
@@ -201,7 +227,19 @@ fn handle_mouse_events(this: &mut TitleScene, shared: &mut Shared, event: &Event
 
                         // (한국어) 소리를 재생합니다.
                         // (English Translation) Play the sounds.
-                        sound::play_cancel_sound(shared)?;
+                        if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                            if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                                let settings = shared.get::<Settings>().unwrap();
+                                let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                                let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                                sink.set_volume(settings.effect_volume.norm());
+                                sink.append(source);
+                                thread::spawn(move || {
+                                    sink.sleep_until_end();
+                                });
+                                shared.push((stream, stream_handle));
+                            }
+                        }
                     }
                 } else if MouseButton::Left == *button && !state.is_pressed() {
                     // (한국어) 선택된 인터페이스를 원래 상태로 되돌립니다.

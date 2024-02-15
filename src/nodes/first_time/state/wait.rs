@@ -10,6 +10,7 @@ use std::thread;
 use std::sync::Arc;
 
 use glam::{Vec4, Vec3, Vec4Swizzles};
+use rodio::{OutputStream, OutputStreamHandle};
 use winit::{
     dpi::PhysicalPosition,
     event::{Event, WindowEvent, MouseButton},
@@ -24,7 +25,8 @@ use crate::{
         ui::UiBrush,
         script::ScriptDecoder,
         camera::GameCamera,
-        user::Language, 
+        user::{Settings, Language}, 
+        sound, 
     },
     render::depth::DepthBuffer,
     nodes::{
@@ -45,7 +47,6 @@ use crate::{
 
 pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event: Event<AppEvent>) -> AppResult<()> {
     use std::sync::Mutex;
-    use crate::components::sound::play_click_sound;
 
     // (한국어) 눌린 버튼의 색상을 저장하는 변수입니다. 
     // (English Translation) This is a variable that stores the color of the pressed button. 
@@ -54,9 +55,9 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
     // (한국어) 사용할 공유 객체 가져오기.
     // (English Translation) Get shared object to use.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();
-    let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
     let camera = shared.get::<Arc<GameCamera>>().unwrap();
+    let cursor_pos = shared.get::<PhysicalPosition<f64>>().unwrap();
+    let asset_bundle = shared.get::<AssetBundle>().unwrap();
 
     match event {
         Event::WindowEvent { event, .. } => match event {
@@ -80,7 +81,7 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
                 // If the mouse cursor is inside the button area:
                 // 1. Store the language of the button, button color, and text color in `FOCUSED`.
                 // 2. Change the color of the button and the color of the text.
-                // 3. Play the `click`sound.
+                // 3. Play the `click` sound.
                 //
                 if let Some((language, (ui, text))) = select {
                     // <1>
@@ -98,7 +99,19 @@ pub fn handle_events(this: &mut FirstTimeSetupScene, shared: &mut Shared, event:
                     });
 
                     // <3>
-                    play_click_sound(shared)?;
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
                 }
             } else if MouseButton::Left == button && !state.is_pressed() {
                 let mut guard = FOCUSED.lock().expect("Failed to access variable.");

@@ -1,7 +1,8 @@
+use std::thread;
 use std::sync::{Arc, Mutex};
 
-use rodio::OutputStreamHandle;
 use glam::{Vec4, Vec3, Vec4Swizzles};
+use rodio::{OutputStream, OutputStreamHandle};
 use winit::{
     event::{Event, WindowEvent, MouseButton},
     keyboard::{PhysicalKey, KeyCode},
@@ -10,15 +11,18 @@ use winit::{
 
 use crate::{
     game_err,
+    assets::bundle::AssetBundle, 
     components::{
         collider2d::Collider2d,
         text::TextBrush,  
         ui::UiBrush, 
         sprite::SpriteBrush,
         camera::GameCamera, 
+        user::Settings,
         sound, 
     },
     nodes::{
+        path, 
         credit::CreditLoadingScene, 
         title::{
             utils,
@@ -163,19 +167,28 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
 
 fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    // (한국어) 사용할 공유 객체를 가져옵니다.
-    // (English Translation) Get shared object to use.
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-
     match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput { event, .. }
             => if let PhysicalKey::Code(code) = event.physical_key {
                 if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
-                    sound::play_click_sound(shared)?;
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
 
                     // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다. 
                     // (English Translation) Returns the color of the selected ui to its original color.
+                    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                     let mut guard = FOCUSED_MENU_BTN.lock().expect("Failed to access variable.");
                     if let Some((index, ui_color, text_color)) = guard.take() {
                         if let Some((ui, text)) = this.menu_buttons.get(index) {
@@ -322,7 +335,19 @@ fn handle_mouse_input_for_credit(this: &mut TitleScene, shared: &mut Shared, eve
                     if is_inside {
                         // (한국어) 소리를 재생합니다.
                         // (English Translation) Play the sounds.
-                        sound::play_click_sound(shared)?;
+                        if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                            if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                                let settings = shared.get::<Settings>().unwrap();
+                                let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                                let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                                sink.set_volume(settings.effect_volume.norm());
+                                sink.append(source);
+                                thread::spawn(move || {
+                                    sink.sleep_until_end();
+                                });
+                                shared.push((stream, stream_handle));
+                            }
+                        }
 
                         // (한국어) 다음 게임 장면으로 변경합니다.
                         // (English Translation) Change to the next game scene. 
@@ -343,17 +368,24 @@ fn handle_mouse_input_for_credit(this: &mut TitleScene, shared: &mut Shared, eve
 #[allow(unreachable_patterns)]
 fn ui_pressed(btn: utils::MenuButtons, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
     match btn {
-        utils::MenuButtons::Start => {
-            sound::play_click_sound(shared)
-        },
-        utils::MenuButtons::Setting => {
-            sound::play_click_sound(shared)
-        },
-        utils::MenuButtons::Exit => {
-            sound::play_click_sound(shared)
-        },
-        _ => Ok(())
-    }
+        _ => {
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                    sink.set_volume(settings.effect_volume.norm());
+                    sink.append(source);
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                    });
+                    shared.push((stream, stream_handle));
+                }
+            }
+        }
+    };
+
+    Ok(())
 }
 
 
@@ -367,9 +399,12 @@ fn ui_released(btn: utils::MenuButtons, this: &mut TitleScene, shared: &mut Shar
             Ok(())
         },
         utils::MenuButtons::Setting => {
-            let stream = shared.get::<OutputStreamHandle>().unwrap();
-            let sink = sound::create_sink(stream)?;
-            shared.push((1usize, sink));
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    shared.push((1usize, sink));
+                    shared.push((stream, stream_handle));
+                }
+            }
 
             this.state = TitleState::EnterSetting;
             this.timer = 0.0;

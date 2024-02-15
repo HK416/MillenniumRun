@@ -1,31 +1,31 @@
 use std::sync::Arc;
 use std::collections::VecDeque;
 
+use rodio::Sink;
 use winit::event::Event;
 
 use crate::{
     game_err, 
     assets::bundle::AssetBundle, 
     components::{
-        ui::UiBrush, 
+        ui::UiBrush,  
         text::TextBrush, 
-        table::TileBrush, 
         sprite::SpriteBrush, 
+        table::TileBrush, 
         camera::GameCamera, 
-        sound::SoundDecoder, 
         interpolation, 
-    },
+        sound, 
+    }, 
     nodes::in_game::{
-        utils, 
         InGameScene, 
         state::InGameState, 
-    },
-    render::depth::DepthBuffer,
+    }, 
+    render::depth::DepthBuffer, 
     system::{
         error::{AppResult, GameError}, 
         event::AppEvent, 
         shared::Shared, 
-    }, 
+    } 
 };
 
 const DURATION: f64 = 0.3;
@@ -117,11 +117,11 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, ela
 
         // (한국어) 플레이어 시작 목소리를 재생합니다.
         // (English Translation) Play the player startup voice.
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
-        let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
-        let source = asset_bundle.get(this.player_startup_sound)?
-            .read(&SoundDecoder)?;
-        audio.voice.append(source);
+        if let Some((_, voice)) = shared.get::<(Sink, Sink)>() {
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let source = asset_bundle.get(this.player_startup_sound)?.read(&sound::SoundDecoder)?;
+            voice.append(source);
+        }
     }
 
     Ok(())

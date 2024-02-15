@@ -1,8 +1,8 @@
 use std::thread;
 use std::sync::Arc;
 
-use rodio::OutputStreamHandle;
-use rand::{self, Rng};
+use rand::prelude::*;
+use rodio::{OutputStream, OutputStreamHandle};
 
 use crate::{
     game_err,
@@ -10,11 +10,17 @@ use crate::{
     components::{
         text::TextBrush,
         camera::GameCamera,
-        sound::SoundDecoder,
         user::Settings, 
+        sound, 
     },
     render::depth::DepthBuffer, 
-    nodes::intro::{IntroScene, state::IntroState},
+    nodes::{
+        path, 
+        intro::{
+            IntroScene, 
+            state::IntroState
+        },
+    },
     system::{
         error::{AppResult, GameError},
         shared::Shared,
@@ -30,8 +36,6 @@ use crate::{
 /// This is an update function when the `intro` game scene is in the `PlayTitleVoice` state. </br>
 /// 
 pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, _elapsed_time: f64) -> AppResult<()> {
-    use crate::{components::sound::play_sound, nodes::path};
-
     const NUM_CHARACTER: usize = 4;
     const VOICES: [&'static str; NUM_CHARACTER] = [
         path::ARIS_TITLE_SOUND_PATH,
@@ -40,25 +44,25 @@ pub fn update(this: &mut IntroScene, shared: &mut Shared, _total_time: f64, _ela
         path::YUZU_TITLE_SOUND_PATH,
     ];
     
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use.
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-
     // (한국어) 캐릭터 타이틀 음성을 무작위로 재생합니다.
     // (English Translation) Plays character title voices randomly.
-    let mut rng = rand::thread_rng();
-    let source = asset_bundle.get(VOICES[rng.gen_range(0..NUM_CHARACTER)])?
-        .read(&SoundDecoder)?;
-    let sink = play_sound(settings.voice_volume, source, stream)?;
-    thread::spawn(move || {
-        sink.sleep_until_end();
-        sink.detach();
-    });
+    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+            let settings = shared.get::<Settings>().unwrap();
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let source = asset_bundle.get(VOICES[rand::thread_rng().gen_range(0..NUM_CHARACTER)])?.read(&sound::SoundDecoder)?;
+            sink.set_volume(settings.voice_volume.norm());
+            sink.append(source);
+            thread::spawn(move || {
+                sink.sleep_until_end();
+            });
+            shared.push((stream, stream_handle));
+        }
+    }
 
     // (한국어) 사용을 완료한 에셋을 정리합니다.
     // (English Translation) Release assets that have been used.
+    let asset_bundle = shared.get::<AssetBundle>().unwrap();
     for rel_path in VOICES { 
         asset_bundle.release(rel_path) 
     };

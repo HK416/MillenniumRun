@@ -4,10 +4,16 @@ mod utils;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::collections::HashMap;
+use std::time::Duration;
 
 use ab_glyph::FontArc;
 use winit::event::Event;
-use rodio::{OutputStreamHandle, Source, Sink};
+use rodio::{
+    Sink,
+    Source, 
+    OutputStream, 
+    OutputStreamHandle, 
+};
 
 use crate::{
     game_err,
@@ -20,11 +26,11 @@ use crate::{
         anchor::Anchor, margin::Margin, 
         camera::{CameraCreator, GameCamera},
         transform::Projection, 
-        sound::SoundDecoder,
         script::Script,
-        user::{Language, Resolution, Settings},
         player::Actor, 
         save::SaveData, 
+        user::{Language, Resolution, Settings},
+        sound, 
     },
     render::depth::DepthBuffer, 
     nodes::{
@@ -310,6 +316,7 @@ impl Default for TitleLoading {
 #[derive(Debug)]
 pub struct TitleScene {
     pub timer: f64,
+    pub duration: f64, 
     pub state: state::TitleState,
 
     pub foreground: UiObject, 
@@ -343,29 +350,28 @@ pub struct TitleScene {
 
 impl SceneNode for TitleScene {
     fn enter(&mut self, shared: &mut Shared) -> AppResult<()> {
-        use crate::components::sound;
-
-        // (한국어) 사용할 공유 객체를 가져옵니다.
-        // (English Translation) Get shared object to use.
-        let stream = shared.get::<OutputStreamHandle>().unwrap();
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
-        let settings = shared.get::<Settings>().unwrap();
-
         // (한국어) 배경 음악을 재생합니다.
         // (English Translation) Play background music.
-        let source = asset_bundle.get(path::THEME64_SOUND_PATH)?
-            .read(&SoundDecoder)?
-            .amplify(0.5)
-            .repeat_infinite();
-        let sink = sound::play_sound(settings.background_volume, source, stream)?;
+        if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+            if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                let settings = shared.get::<Settings>().unwrap();
+                let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                let source = asset_bundle.get(path::THEME64_SOUND_PATH)?
+                    .read(&sound::SoundDecoder)?
+                    .amplify(0.5)
+                    .repeat_infinite();
+                sink.set_volume(settings.background_volume.norm());
+                sink.append(source);
+
+                shared.push(sink);
+                shared.push((stream, stream_handle));
+            }
+        }
 
         // (한국어) 사용을 완료한 에셋을 정리합니다.
         // (English Translation) Release assets that have been used.
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
         asset_bundle.release(path::THEME64_SOUND_PATH);
-    
-        // (한국어) 배경 음악을 공유 객체에 등록합니다.
-        // (English Translation) Register background music to a shared object.
-        shared.push(sink);
 
         Ok(())
     }
@@ -390,6 +396,37 @@ impl SceneNode for TitleScene {
 
     #[inline]
     fn update(&mut self, shared: &mut Shared, total_time: f64, elapsed_time: f64) -> AppResult<()> {
+        // (한국어) 게임 장면의 지속 시간을 갱신합니다.
+        // (English Translation) Updates the duration of the game scene. 
+        self.duration += elapsed_time;
+        
+        // (한국어) 현재 사운드 출력 장치가 존재하지 않는 경우:
+        // (English Translation) If the current sound output device does not exist:
+        if shared.get::<(OutputStream, OutputStreamHandle)>().is_none() {
+            // (한국어) 현재 기본 사운드 출력 장치를 가져옵니다.
+            // (English Translation) Gets the current defualt sound output device.
+            if let Some((stream, stream_handle)) = sound::get_default_output_stream()? {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::THEME64_SOUND_PATH)?
+                        .read(&sound::SoundDecoder)?;
+
+                    let max_sound_duration = source.total_duration().unwrap_or_default().as_secs_f64();
+
+                    let source = source
+                        .amplify(0.5)
+                        .skip_duration(Duration::from_secs_f64(self.duration % max_sound_duration))
+                        .repeat_infinite();
+                    sink.set_volume(settings.background_volume.norm());
+                    sink.append(source);
+    
+                    shared.push(sink);
+                    shared.push((stream, stream_handle));
+                }
+            }
+        }
+
         state::UPDATES[self.state as usize](self, shared, total_time, elapsed_time)
     }
 

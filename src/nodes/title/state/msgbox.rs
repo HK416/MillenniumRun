@@ -1,6 +1,8 @@
+use std::thread;
 use std::sync::{Arc, Mutex};
 
 use glam::{Vec4, Vec3, Vec4Swizzles};
+use rodio::{OutputStream, OutputStreamHandle};
 use winit::{
     event::{Event, WindowEvent, MouseButton},
     keyboard::{PhysicalKey, KeyCode},
@@ -9,17 +11,23 @@ use winit::{
 
 use crate::{
     game_err,
+    assets::bundle::AssetBundle, 
     components::{
         collider2d::Collider2d,
         text::TextBrush, 
         ui::UiBrush,
         camera::GameCamera,
         sprite::SpriteBrush,
+        user::Settings, 
+        sound, 
     },
-    nodes::title::{
-        utils,
-        TitleScene,
-        state::TitleState,
+    nodes::{
+        path, 
+        title::{
+            utils,
+            TitleScene,
+            state::TitleState,
+        }
     }, 
     render::depth::DepthBuffer,
     scene::state::SceneState,
@@ -162,12 +170,6 @@ pub fn draw(this: &TitleScene, shared: &mut Shared) -> AppResult<()> {
 
 
 fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    use crate::components::sound;
-    
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use.
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-
     match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput { event, .. }
@@ -175,10 +177,23 @@ fn handle_keyboard_input(this: &mut TitleScene, shared: &mut Shared, event: &Eve
                 if KeyCode::Enter == code && !event.repeat && event.state.is_pressed() {
                     *shared.get_mut::<SceneState>().unwrap() = SceneState::Pop;
                 } else if KeyCode::Escape == code && !event.repeat && event.state.is_pressed() {
-                    sound::play_cancel_sound(shared)?;
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
                     
                     // (한국어) 선택했던 ui의 색상을 원래대로 되돌립니다.
                     // (English Translation) Returns the color of the selected ui to its original color.
+                    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                     let mut guard = FOCUSED_MSG_BTN.lock().expect("Failed to access variable.");
                     if let Some((index, ui_color, text_color)) = guard.take() {
                         if let Some((ui, text)) = this.exit_msg_box.get(index) {
@@ -315,17 +330,41 @@ fn handle_mouse_input(this: &mut TitleScene, shared: &mut Shared, event: &Event<
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
 fn ui_pressed(btn: utils::ExitMessageBox, this: &mut TitleScene, shared: &mut Shared) -> AppResult<()> {
-    use crate::components::sound;
-    
     match btn {
         utils::ExitMessageBox::Yes => {
-            sound::play_click_sound(shared)
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                    sink.set_volume(settings.effect_volume.norm());
+                    sink.append(source);
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                    });
+                    shared.push((stream, stream_handle));
+                }
+            }
         },
         utils::ExitMessageBox::No => {
-            sound::play_cancel_sound(shared)
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                    sink.set_volume(settings.effect_volume.norm());
+                    sink.append(source);
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                    });
+                    shared.push((stream, stream_handle));
+                }
+            }
         },
-        _ => Ok(())
-    }
+        _ => { /* empty */ }
+    };
+
+    Ok(())
 }
 
 

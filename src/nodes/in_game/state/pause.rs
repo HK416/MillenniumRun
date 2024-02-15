@@ -1,13 +1,16 @@
+use std::thread;
 use std::sync::{Arc, Mutex};
 
 use glam::{Vec3, Vec4Swizzles, Vec4};
+use rodio::{OutputStream, OutputStreamHandle};
 use winit::{
     event::{Event, WindowEvent, MouseButton}, 
     keyboard::{PhysicalKey, KeyCode}, dpi::PhysicalPosition, 
 };
 
 use crate::{
-    game_err, 
+    game_err,
+    assets::bundle::AssetBundle,  
     components::{
         collider2d::Collider2d, 
         ui::UiBrush, 
@@ -16,12 +19,16 @@ use crate::{
         table::TileBrush, 
         bullet::BulletBrush, 
         camera::GameCamera, 
+        user::Settings, 
         sound, 
     },
-    nodes::in_game::{
-        utils, 
-        InGameScene, 
-        state::InGameState, 
+    nodes::{
+        path, 
+        in_game::{
+            utils, 
+            InGameScene, 
+            state::InGameState, 
+        }
     },
     render::depth::DepthBuffer,
     system::{
@@ -394,11 +401,40 @@ fn handle_mouse_input(this: &mut InGameScene, shared: &mut Shared, event: &Event
 #[allow(unreachable_patterns)]
 fn btn_pressed(tag: utils::PauseButton, this: &mut InGameScene, shared: &mut Shared) -> AppResult<()> {
     match tag {
-        utils::PauseButton::Resume => sound::play_cancel_sound(shared),
-        utils::PauseButton::Setting => sound::play_click_sound(shared),
-        utils::PauseButton::GiveUp => sound::play_click_sound(shared), 
-        _ => Ok(())
-    }
+        utils::PauseButton::Resume => {
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                    sink.set_volume(settings.effect_volume.norm());
+                    sink.append(source);
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                    });
+                    shared.push((stream, stream_handle));
+                }
+            }
+        },
+        utils::PauseButton::Setting | utils::PauseButton::GiveUp => {
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                    sink.set_volume(settings.effect_volume.norm());
+                    sink.append(source);
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                    });
+                    shared.push((stream, stream_handle));
+                }
+            }
+        }
+        _ => { /* empty */ }
+    };
+
+    Ok(())
 }
 
 #[allow(unused_variables)]

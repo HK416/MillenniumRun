@@ -2,9 +2,9 @@ use std::thread;
 use std::sync::Arc;
 use std::f32::consts::PI;
 
-use rodio::OutputStreamHandle;
-use rand::{Rng, seq::SliceRandom};
 use glam::{Quat, Vec3, Vec3Swizzles, Vec2};
+use rand::{Rng, seq::SliceRandom};
+use rodio::{OutputStream, OutputStreamHandle};
 
 use crate::{
     assets::bundle::AssetBundle, 
@@ -224,51 +224,60 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
 
         next_state.shuffle(&mut rand::thread_rng());
 
-        // (한국어) 사용할 공유 객체들을 가져옵니다.
-        // (English Translation) Get shared object to use. 
-        let stream = shared.get::<OutputStreamHandle>().unwrap();
-        let settings = shared.get::<Settings>().unwrap();
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
 
         match next_state.pop().unwrap() {
             BossBehaviorState::PrepareRush => {
-                let source = asset_bundle.get(path::YUUKA_ATTACK1_SOUND_PATH)?
-                    .read(&sound::SoundDecoder)?;
-                let sink = sound::play_sound(settings.voice_volume, source, stream)?;
-                thread::spawn(move || {
-                    sink.sleep_until_end();
-                    sink.detach();
-                });
+                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                        let settings = shared.get::<Settings>().unwrap();
+                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                        let source = asset_bundle.get(path::YUUKA_ATTACK1_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                        sink.set_volume(settings.voice_volume.norm());
+                        sink.append(source);
+                        thread::spawn(move || {
+                            sink.sleep_until_end();
+                        });
+                        shared.push((stream, stream_handle));
+                    }
+                };
 
                 this.boss.behavior_timer = 0.0;
                 this.boss.behavior_state = BossBehaviorState::PrepareRush;
             }, 
             BossBehaviorState::PrepareShotRush => {
-                let source = asset_bundle.get(path::YUUKA_ATTACK1_SOUND_PATH)?
-                    .read(&sound::SoundDecoder)?;
-                let sink = sound::play_sound(settings.voice_volume, source, stream)?;
-                thread::spawn(move || {
-                    sink.sleep_until_end();
-                    sink.detach();
-                });
+                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                        let settings = shared.get::<Settings>().unwrap();
+                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                        let source = asset_bundle.get(path::YUUKA_ATTACK1_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                        sink.set_volume(settings.voice_volume.norm());
+                        sink.append(source);
+                        thread::spawn(move || {
+                            sink.sleep_until_end();
+                        });
+                        shared.push((stream, stream_handle));
+                    }
+                };
 
                 this.boss.behavior_timer = 0.0;
                 this.boss.max_behavior_count = 3;
                 this.boss.behavior_state = BossBehaviorState::PrepareShotRush;
             }
             BossBehaviorState::FireBulletPattern0 => {
-                let mut rng = rand::thread_rng();
-                if rng.gen_ratio(1, 4) {
-                    const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
-                    let rel_path = PATHS[rng.gen_range(0..2)];
-                    let source = asset_bundle.get(rel_path)?
-                        .read(&sound::SoundDecoder)?;
-                    let sink = sound::play_sound(settings.voice_volume, source, stream)?;
-                    thread::spawn(move || {
-                        sink.sleep_until_end();
-                        sink.detach();
-                    });
-                }
+                const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
+                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                        let settings = shared.get::<Settings>().unwrap();
+                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                        let source = asset_bundle.get(PATHS[rand::thread_rng().gen_range(0..2)])?.read(&sound::SoundDecoder)?;
+                        sink.set_volume(settings.voice_volume.norm());
+                        sink.append(source);
+                        thread::spawn(move || {
+                            sink.sleep_until_end();
+                        });
+                        shared.push((stream, stream_handle));
+                    }
+                };
 
                 this.boss.behavior_count = 0;
                 this.boss.max_behavior_count = 8;
@@ -276,18 +285,20 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
                 this.boss.behavior_state = BossBehaviorState::FireBulletPattern0;
             },
             BossBehaviorState::FireBulletPattern1 => {
-                let mut rng = rand::thread_rng();
-                if rng.gen_ratio(1, 4) {
-                    const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
-                    let rel_path = PATHS[rng.gen_range(0..2)];
-                    let source = asset_bundle.get(rel_path)?
-                        .read(&sound::SoundDecoder)?;
-                    let sink = sound::play_sound(settings.voice_volume, source, stream)?;
-                    thread::spawn(move || {
-                        sink.sleep_until_end();
-                        sink.detach();
-                    });
-                }
+                const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
+                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                        let settings = shared.get::<Settings>().unwrap();
+                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                        let source = asset_bundle.get(PATHS[rand::thread_rng().gen_range(0..2)])?.read(&sound::SoundDecoder)?;
+                        sink.set_volume(settings.voice_volume.norm());
+                        sink.append(source);
+                        thread::spawn(move || {
+                            sink.sleep_until_end();
+                        });
+                        shared.push((stream, stream_handle));
+                    }
+                };
 
                 this.boss.behavior_count = 0;
                 this.boss.max_behavior_count = 24;
@@ -295,18 +306,20 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
                 this.boss.behavior_state = BossBehaviorState::FireBulletPattern1;
             }, 
             BossBehaviorState::FireBulletPattern2 => {
-                let mut rng = rand::thread_rng();
-                if rng.gen_ratio(1, 4) {
-                    const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
-                    let rel_path = PATHS[rng.gen_range(0..2)];
-                    let source = asset_bundle.get(rel_path)?
-                        .read(&sound::SoundDecoder)?;
-                    let sink = sound::play_sound(settings.voice_volume, source, stream)?;
-                    thread::spawn(move || {
-                        sink.sleep_until_end();
-                        sink.detach();
-                    });
-                }
+                const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
+                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                        let settings = shared.get::<Settings>().unwrap();
+                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                        let source = asset_bundle.get(PATHS[rand::thread_rng().gen_range(0..2)])?.read(&sound::SoundDecoder)?;
+                        sink.set_volume(settings.voice_volume.norm());
+                        sink.append(source);
+                        thread::spawn(move || {
+                            sink.sleep_until_end();
+                        });
+                        shared.push((stream, stream_handle));
+                    }
+                };
 
                 this.boss.behavior_count = 0;
                 this.boss.max_behavior_count = 8;
@@ -314,18 +327,20 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
                 this.boss.behavior_state = BossBehaviorState::FireBulletPattern2;
             },
             BossBehaviorState::FireBulletPattern3 => {
-                let mut rng = rand::thread_rng();
-                if rng.gen_ratio(1, 4) {
-                    const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
-                    let rel_path = PATHS[rng.gen_range(0..2)];
-                    let source = asset_bundle.get(rel_path)?
-                        .read(&sound::SoundDecoder)?;
-                    let sink = sound::play_sound(settings.voice_volume, source, stream)?;
-                    thread::spawn(move || {
-                        sink.sleep_until_end();
-                        sink.detach();
-                    });
-                }
+                const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
+                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                        let settings = shared.get::<Settings>().unwrap();
+                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                        let source = asset_bundle.get(PATHS[rand::thread_rng().gen_range(0..2)])?.read(&sound::SoundDecoder)?;
+                        sink.set_volume(settings.voice_volume.norm());
+                        sink.append(source);
+                        thread::spawn(move || {
+                            sink.sleep_until_end();
+                        });
+                        shared.push((stream, stream_handle));
+                    }
+                };
 
                 this.boss.behavior_count = 0;
                 this.boss.max_behavior_count = 24;
@@ -333,18 +348,20 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
                 this.boss.behavior_state = BossBehaviorState::FireBulletPattern3;
             }, 
             BossBehaviorState::FireBulletPattern4 => {
-                let mut rng = rand::thread_rng();
-                if rng.gen_ratio(1, 4) {
-                    const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
-                    let rel_path = PATHS[rng.gen_range(0..2)];
-                    let source = asset_bundle.get(rel_path)?
-                        .read(&sound::SoundDecoder)?;
-                    let sink = sound::play_sound(settings.voice_volume, source, stream)?;
-                    thread::spawn(move || {
-                        sink.sleep_until_end();
-                        sink.detach();
-                    });
-                }
+                const PATHS: [&'static str; 2]  = [path::YUUKA_ATTACK2_SOUND_PATH, path::YUUKA_ATTACK3_SOUND_PATH];
+                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                        let settings = shared.get::<Settings>().unwrap();
+                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                        let source = asset_bundle.get(PATHS[rand::thread_rng().gen_range(0..2)])?.read(&sound::SoundDecoder)?;
+                        sink.set_volume(settings.voice_volume.norm());
+                        sink.append(source);
+                        thread::spawn(move || {
+                            sink.sleep_until_end();
+                        });
+                        shared.push((stream, stream_handle));
+                    }
+                };
 
                 this.boss.behavior_count = 0;
                 this.boss.max_behavior_count = 24;
@@ -509,16 +526,19 @@ fn update_boss_fire_bullet_pattern0(this: &mut InGameScene, shared: &mut Shared,
 
     // (한국어) 총알 발사 소리를 재생합니다.
     // (English Translation) Play the sound of a bullet being fired.
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();    
-    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
-        .read(&sound::SoundDecoder)?;
-    let sink = sound::play_sound(settings.effect_volume, source, stream)?;
-    thread::spawn(move || {
-        sink.sleep_until_end();
-        sink.detach();
-    });
+    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+            let settings = shared.get::<Settings>().unwrap();
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+            sink.set_volume(settings.effect_volume.norm());
+            sink.append(source);
+            thread::spawn(move || {
+                sink.sleep_until_end();
+            });
+            shared.push((stream, stream_handle));
+        }
+    }
 
     // (한국어) 총알을 추가합니다.
     // (English Translation) Add bullets.
@@ -572,16 +592,19 @@ fn update_boss_fire_bullet_pattern1(this: &mut InGameScene, shared: &mut Shared,
 
     // (한국어) 총알 발사 소리를 재생합니다.
     // (English Translation) Play the sound of a bullet being fired.
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();    
-    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
-        .read(&sound::SoundDecoder)?;
-    let sink = sound::play_sound(settings.effect_volume, source, stream)?;
-    thread::spawn(move || {
-        sink.sleep_until_end();
-        sink.detach();
-    });
+    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+            let settings = shared.get::<Settings>().unwrap();
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+            sink.set_volume(settings.effect_volume.norm());
+            sink.append(source);
+            thread::spawn(move || {
+                sink.sleep_until_end();
+            });
+            shared.push((stream, stream_handle));
+        }
+    }
 
     // (한국어) 총알을 추가합니다.
     // (English Translation) Add bullets.
@@ -631,16 +654,19 @@ fn update_boss_fire_bullet_pattern2(this: &mut InGameScene, shared: &mut Shared,
 
     // (한국어) 총알 발사 소리를 재생합니다.
     // (English Translation) Play the sound of a bullet being fired.
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();    
-    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
-        .read(&sound::SoundDecoder)?;
-    let sink = sound::play_sound(settings.effect_volume, source, stream)?;
-    thread::spawn(move || {
-        sink.sleep_until_end();
-        sink.detach();
-    });
+    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+            let settings = shared.get::<Settings>().unwrap();
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+            sink.set_volume(settings.effect_volume.norm());
+            sink.append(source);
+            thread::spawn(move || {
+                sink.sleep_until_end();
+            });
+            shared.push((stream, stream_handle));
+        }
+    }
     
     // (한국어) 총알을 추가합니다.
     // (English Translation) Add bullets.
@@ -707,16 +733,19 @@ fn update_boss_fire_bullet_pattern3(this: &mut InGameScene, shared: &mut Shared,
 
     // (한국어) 총알 발사 소리를 재생합니다.
     // (English Translation) Play the sound of a bullet being fired.
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();    
-    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
-        .read(&sound::SoundDecoder)?;
-    let sink = sound::play_sound(settings.effect_volume, source, stream)?;
-    thread::spawn(move || {
-        sink.sleep_until_end();
-        sink.detach();
-    });
+    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+            let settings = shared.get::<Settings>().unwrap();
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+            sink.set_volume(settings.effect_volume.norm());
+            sink.append(source);
+            thread::spawn(move || {
+                sink.sleep_until_end();
+            });
+            shared.push((stream, stream_handle));
+        }
+    }
     
     // (한국어) 총알을 추가합니다.
     // (English Translation) Add bullets.
@@ -785,16 +814,19 @@ fn update_boss_fire_bullet_pattern4(this: &mut InGameScene, shared: &mut Shared,
 
     // (한국어) 총알 발사 소리를 재생합니다.
     // (English Translation) Play the sound of a bullet being fired.
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();    
-    let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?
-        .read(&sound::SoundDecoder)?;
-    let sink = sound::play_sound(settings.effect_volume, source, stream)?;
-    thread::spawn(move || {
-        sink.sleep_until_end();
-        sink.detach();
-    });
+    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+            let settings = shared.get::<Settings>().unwrap();
+            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+            let source = asset_bundle.get(path::BULLET_FIRE_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+            sink.set_volume(settings.effect_volume.norm());
+            sink.append(source);
+            thread::spawn(move || {
+                sink.sleep_until_end();
+            });
+            shared.push((stream, stream_handle));
+        }
+    }
 
     // (한국어) 총알을 추가합니다.
     // (English Translation) Add bullets.

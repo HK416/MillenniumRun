@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rodio::Sink;
 use winit::event::Event;
 
 use crate::{
@@ -17,7 +18,6 @@ use crate::{
     nodes::{
         path, 
         in_game::{
-            utils, 
             InGameScene, 
             state::InGameState, 
         }
@@ -41,7 +41,6 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, ela
     // (한국어) 사용할 공유 객체들을 가져옵니다.
     // (English Translation) Get shared objects to use.
     let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
     let asset_bundle = shared.get::<AssetBundle>().unwrap();
 
     // (한국어) 타이머를 갱신합니다.  
@@ -73,13 +72,14 @@ pub fn update(this: &mut InGameScene, shared: &mut Shared, _total_time: f64, ela
     // (한국어) 지속 시간보다 클 경우 다음 상태로 변경합니다.
     // (English Translation) If it is greater than the duration, it changes to the next state. 
     if this.timer >= DURATION {
-        let rel_path = match this.owned_hearts.len() == 0 {
-            true => path::YUUKA_VICTORY_SOUND_PATH, 
-            false => path::YUUKA_DEFEAT_SOUND_PATH, 
-        };
-        let source = asset_bundle.get(rel_path)?
-            .read(&sound::SoundDecoder)?;
-        audio.voice.append(source);
+        if let Some((_, voice)) = shared.get::<(Sink, Sink)>() { 
+            let rel_path = match this.owned_hearts.len() == 0 {
+                true => path::YUUKA_VICTORY_SOUND_PATH, 
+                false => path::YUUKA_DEFEAT_SOUND_PATH, 
+            };
+            let source = asset_bundle.get(rel_path)?.read(&sound::SoundDecoder)?;
+            voice.append(source);
+        }
 
         this.timer = 0.0;
         this.state = InGameState::AppearResult;

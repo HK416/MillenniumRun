@@ -1,6 +1,8 @@
+use std::thread;
 use std::sync::{Arc, Mutex};
 
 use glam::{Vec3, Vec4Swizzles, Vec4};
+use rodio::{OutputStream, OutputStreamHandle};
 use winit::{
     keyboard::{PhysicalKey, KeyCode},
     event::{Event, WindowEvent, MouseButton}, 
@@ -9,6 +11,7 @@ use winit::{
 
 use crate::{
     game_err, 
+    assets::bundle::AssetBundle, 
     components::{
         ui::UiBrush, 
         text::TextBrush, 
@@ -18,8 +21,11 @@ use crate::{
         collider2d::Collider2d, 
         camera::GameCamera, 
         player::Actor, 
+        user::Settings, 
+        sound, 
     },
     nodes::{
+        path, 
         title::TitleLoading, 
         in_game::{
             utils, 
@@ -406,13 +412,40 @@ fn handle_mouse_input(this: &mut InGameScene, shared: &mut Shared, event: &Event
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
 fn btn_pressed(tag: utils::ExitWndButton, this: &mut InGameScene, shared: &mut Shared) -> AppResult<()> {
-    use crate::components::sound;
-
     match tag {
-        utils::ExitWndButton::Yes => sound::play_click_sound(shared),
-        utils::ExitWndButton::No => sound::play_cancel_sound(shared), 
-        _ => Ok(())
+        utils::ExitWndButton::Yes => {
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                    sink.set_volume(settings.effect_volume.norm());
+                    sink.append(source);
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                    });
+                    shared.push((stream, stream_handle));
+                }
+            }
+        },
+        utils::ExitWndButton::No => {
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                    sink.set_volume(settings.effect_volume.norm());
+                    sink.append(source);
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                    });
+                    shared.push((stream, stream_handle));
+                }
+            }
+        }, 
+        _ => { /* empty */ }
     }
+    Ok(())
 }
 
 #[allow(unused_variables)]

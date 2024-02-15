@@ -2,24 +2,17 @@ use std::io::Cursor;
 
 use serde::{Serialize, Deserialize};
 use rodio::{
-    Sink, 
-    Sample,
-    Source,
+    Sink,
+    OutputStream, 
     OutputStreamHandle, 
-    cpal::FromSample,
+    StreamError, 
+    PlayError, 
 };
 
 use crate::{
     game_err,
-    assets::{
-        bundle::AssetBundle, 
-        interface::AssetDecoder, 
-    },
-    components::user::Settings,
-    system::{
-        error::{AppResult, GameError}, 
-        shared::Shared
-    }, 
+    assets::interface::AssetDecoder,
+    system::error::{AppResult, GameError}, 
 };
 
 
@@ -34,7 +27,6 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Volume(u8);
 
-#[allow(dead_code)]
 impl Volume {
     /// #### 한국어 </br>
     /// 새로운 볼륨을 생성합니다. </br>
@@ -91,116 +83,62 @@ impl AssetDecoder for SoundDecoder {
 }
 
 
-
-#[inline]
-pub fn create_sink(stream: &OutputStreamHandle) -> AppResult<Sink> {
-    Sink::try_new(stream)
-        .map_err(|err| game_err!(
-            "Sound player creation failed",
-            "Sound player creation failed for following reasons: {}",
-            err.to_string()
-        ))
-}
-
-
-
 /// #### 한국어 </br>
-/// 주어진 소리를 재생합니다. </br>
+/// 사용자의 기본 소리 출력 장치를 가져옵니다. </br>
+/// - 기본 소리 출력 장치를 찾을 경우 `Ok(Some(...))`를 반환합니다. </br>
+/// - 기본 소리 출력 장치가 없는 경우 `Ok(None)`를 반환합니다. </br>
+/// - 기본 소리 출력 장치를 찾는 도중 오류가 발생한 경우 `Err`를 반환합니다. </br>
 /// 
 /// #### English (Translation) </br>
-/// Play the given sound. </br>
+/// Gets the user's default sound output device. </br>
+/// - Returns `Ok(Some(...))`, if the default sound ouput device is found. </br>
+/// - If there is no default sound output device, returns `Ok(None)` </br>
+/// - Returns `Err` if an error occurs while finding the default sound output device. </br>
 /// 
-#[inline]
-pub fn play_sound<S>(
-    volume: Volume,
-    source: S,
-    stream: &OutputStreamHandle
-) -> AppResult<Sink> 
-where 
-    S: Source + Send + 'static,
-    f32: FromSample<S::Item>,
-    S::Item: Sample + Send,
-{
-    let sink = create_sink(stream)?;
-    sink.set_volume(volume.norm());
-    sink.append(source);
-    return Ok(sink);
+pub fn get_default_output_stream() -> AppResult<Option<(OutputStream, OutputStreamHandle)>> {
+    match OutputStream::try_default() {
+        Ok((stream, handle)) => {
+            Ok(Some((stream, handle)))
+        },
+        Err(err) => match err {
+            StreamError::NoDevice => {
+                log::warn!("Default sound output device not found!");
+                Ok(None)
+            },
+            _ => Err(game_err!(
+                "Failed to find default sound output device",
+                "The following error occurred while searching for a sound output device: {}", 
+                err.to_string()
+            ))
+        }
+    }
 }
 
-
-
 /// #### 한국어 </br>
-/// 클릭음을 재생하는 유틸리티 함수입니다. </br>
+/// 새로운 소리 제어자를 생성합니다. </br>
+/// - 소리 제어자 생성에 성공할 경우 `Ok(Some(...))`을 반환합니다. </br>
+/// - 기본 소리 출력 장치를 사용할 수 없는 경우 `Ok(None)`을 반환합니다. </br> 
+/// - 소리 제어자 생성 중 오류가 발생한 경우 `Err`를 반환합니다. </br>
 /// 
 /// #### English (Translation) </br>
-/// This is a utility function that plays a click sound. </br>
+/// Creates a new sound controller. </br>
+/// - If sound controller creation is successful, it returns `Ok(Some(...))`. </br>
+/// - Returns `Ok(None)` if the default sound output device is not available. </br>
+/// - If an error occurs while creating a sound controller, `Err` is returned. </br>
 /// 
-#[inline]
-pub fn play_click_sound(shared: &Shared) -> AppResult<()> {
-    use std::thread;
-    use crate::nodes::path;
-
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use. 
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-
-    // (한국어) 클릭 소리를 로드하고, 재생합니다.
-    // (English Translation) Load and play the click sound. 
-    let source = asset_bundle.get(path::CLICK_SOUND_PATH)?
-        .read(&SoundDecoder)?;
-    let sink = play_sound(
-        settings.effect_volume, 
-        source, 
-        stream
-    )?;
-
-    // (한국어) 새로운 스레드에서 재생이 끝날 때까지 기다립니다.
-    // (English Translation) Wait for playback to finish in a new thread.
-    thread::spawn(move || {
-        sink.sleep_until_end();
-        sink.detach();
-    });
-
-    Ok(())
-}
-
-
-
-/// #### 한국어 </br>
-/// 취소음을 재생하는 유틸리티 함수입니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// This is a utility function that plays a cancel sound. </br>
-/// 
-#[inline]
-pub fn play_cancel_sound(shared: &Shared) -> AppResult<()> {
-    use std::thread;
-    use crate::nodes::path;
-
-    // (한국어) 사용할 공유 객체 가져오기.
-    // (English Translation) Get shared object to use. 
-    let stream = shared.get::<OutputStreamHandle>().unwrap();
-    let asset_bundle = shared.get::<AssetBundle>().unwrap();
-    let settings = shared.get::<Settings>().unwrap();
-
-    // (한국어) 클릭 소리를 로드하고, 재생합니다.
-    // (English Translation) Load and play the click sound. 
-    let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?
-        .read(&SoundDecoder)?;
-    let sink = play_sound(
-        settings.effect_volume, 
-        source, 
-        stream
-    )?;
-
-    // (한국어) 새로운 스레드에서 재생이 끝날 때까지 기다립니다.
-    // (English Translation) Wait for playback to finish in a new thread.
-    thread::spawn(move || {
-        sink.sleep_until_end();
-        sink.detach();
-    });
-
-    Ok(())
+pub fn try_new_sink(stream_handle: &OutputStreamHandle) -> AppResult<Option<Sink>> {
+    match Sink::try_new(&stream_handle) {
+        Ok(sink) => Ok(Some(sink)), 
+        Err(err) => match err {
+            PlayError::NoDevice => {
+                log::warn!("Default sound output device is not available!");
+                Ok(None)
+            }, 
+            _ => Err(game_err!(
+                "Failed to create sound controller", 
+                "Sound controller creation failed for the following reasons: {}", 
+                err.to_string()
+            ))
+        }
+    }
 }

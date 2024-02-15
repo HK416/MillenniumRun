@@ -7,7 +7,12 @@ use std::collections::{VecDeque, HashMap};
 
 use ab_glyph::FontArc;
 use winit::event::Event;
-use rodio::{OutputStreamHandle, Source};
+use rodio::{
+    Sink, 
+    Source, 
+    OutputStream, 
+    OutputStreamHandle, 
+};
 
 use crate::components::anchor::Anchor;
 use crate::{
@@ -23,9 +28,9 @@ use crate::{
         table::{Table, TileBrush}, 
         player::{Actor, Player, PlayerFaceState},
         boss::{Boss, BossFaceState},
-        sound::SoundDecoder, 
         script::Script, 
         user::{Language, Resolution, Settings}, 
+        sound, 
     },
     nodes::{path, consts::PIXEL_PER_METER}, 
     scene::{node::SceneNode, state::SceneState},
@@ -399,7 +404,7 @@ impl SceneNode for InGameScene {
         // (한국어) 현재 게임 장면에서 사용할 카메라를 생성합니다.
         // (English Translation) Creates a camera to use in the current game scene. 
         let camera_creator = shared.get::<Arc<CameraCreator>>().unwrap().clone();
-        let camera = camera_creator.create(
+        let camera = Arc::new(camera_creator.create(
             Some("InGame"), 
             None, 
             None, 
@@ -412,25 +417,34 @@ impl SceneNode for InGameScene {
                 1000.0 * PIXEL_PER_METER
             )), 
             None
-        );
-        shared.push(Arc::new(camera));
+        ));
+        shared.push(camera);
 
         // (한국어) 현재 게임 장면에서 사용되는 [`rodio::Sink`] 집합을 생성합니다.
         // (English Translation) Creates a set of [`rodio::Sink`] used in current game scene. 
-        let settings = shared.get::<Settings>().unwrap();
-        let stream = shared.get::<OutputStreamHandle>().unwrap();
-        let audio = utils::InGameAudio::new(settings, stream)?;
-        
-        // (한국어) 배경 음악 소리를 재생합니다.
-        // (English Translation) Play background music sound. 
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
-        let source = asset_bundle.get(self.bgm_sound)?
-            .read(&SoundDecoder)?
-            .amplify(0.5)
-            .repeat_infinite();
-        audio.background.append(source);
-        shared.push(audio);
-        
+        if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+            let background = sound::try_new_sink(&stream_handle)?;
+            let voice = sound::try_new_sink(&stream_handle)?;
+            
+            if background.is_some() && voice.is_some() {
+                let settings = shared.get::<Settings>().unwrap();
+                let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                let source = asset_bundle.get(self.bgm_sound)?
+                    .read(&sound::SoundDecoder)?
+                    .amplify(0.5)
+                    .repeat_infinite();
+                let background = background.unwrap();
+                background.set_volume(settings.background_volume.norm());
+                background.append(source);
+
+                let voice = voice.unwrap();
+                voice.set_volume(settings.voice_volume.norm());
+
+                shared.push((background, voice));
+                shared.push((stream, stream_handle));
+            }
+        } 
+
         Ok(())
     }
 
@@ -458,7 +472,7 @@ impl SceneNode for InGameScene {
 
         // (한국어) 현재 게임 장면에서 사용되는 [`rodio::Sink`] 집합을 해제합니다.
         // (English Translation) Releases a set of [`rodio::Sink`] used in current game scene. 
-        shared.pop::<Arc<utils::InGameAudio>>().unwrap();
+        shared.pop::<(Sink, Sink)>().unwrap();
 
         // (한국어) 사용한 그리기 도구를 공유객체에서 해제합니다.
         // (English Translation) Release the used drawing tool from the shared object. 

@@ -1,10 +1,8 @@
-use std::sync::Arc;
 use std::collections::{VecDeque, HashMap};
 
 use rand::prelude::*;
 use ab_glyph::FontArc;
 use glam::{Vec4, Vec3, Vec2};
-use rodio::{Sink, OutputStreamHandle};
 
 use crate::{
     assets::bundle::AssetBundle, 
@@ -76,35 +74,6 @@ pub enum VolumeOptions {
 pub const SETTING_VOLUME_RANGE_MAX: i32 = 272;
 pub const SETTING_VOLUME_RANGE_MIN: i32 = -240;
 pub const VOLUME_BAR_WIDTH: i32 = 8;
-
-
-/// #### 한국어 </br>
-/// `InGame` 게임 장면에서 사용되는 [`rodio::Sink`]의 집합입니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// A setof [`rodio::Sink`] used in `InGame` game scene. </br>
-/// 
-pub struct InGameAudio {
-    pub background: Sink, 
-    pub voice: Sink, 
-}
-
-impl InGameAudio {
-    pub fn new(settings: &Settings, stream: &OutputStreamHandle) -> AppResult<Arc<Self>> {
-        use crate::components::sound;
-
-        let background = sound::create_sink(stream)?;
-        background.set_volume(settings.background_volume.norm());
-
-        let voice = sound::create_sink(stream)?;
-        voice.set_volume(settings.voice_volume.norm());
-
-        Ok(Self {
-            background, 
-            voice, 
-        }.into())
-    }
-}
 
 
 

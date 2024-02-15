@@ -1,6 +1,8 @@
+use std::thread;
 use std::sync::{Arc, Mutex};
 
 use glam::{Vec4, Vec4Swizzles, Vec3};
+use rodio::{Sink, OutputStream, OutputStreamHandle};
 use winit::{
     window::Window, 
     keyboard::{KeyCode, PhysicalKey}, 
@@ -28,10 +30,13 @@ use crate::{
             SettingsEncoder, 
         }, 
     },
-    nodes::in_game::{
-        utils, 
-        InGameScene, 
-        state::InGameState, 
+    nodes::{
+        path, 
+        in_game::{
+            utils, 
+            InGameScene, 
+            state::InGameState, 
+        },
     },
     render::depth::DepthBuffer, 
     system::{
@@ -285,20 +290,29 @@ pub fn draw(this: &InGameScene, shared: &mut Shared) -> AppResult<()> {
     Ok(())
 }
 
-fn handle_keyboard_input(this: &mut InGameScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {
-    // (한국어) 사용할 공유 객체들을 가져옵니다.
-    // (English Translation) Get shared objects to use.
-    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-    
+fn handle_keyboard_input(this: &mut InGameScene, shared: &mut Shared, event: &Event<AppEvent>) -> AppResult<()> {    
     match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::KeyboardInput { event, .. } => 
             if let PhysicalKey::Code(code) = event.physical_key {
                 if KeyCode::Escape == code && event.state.is_pressed() {
-                    sound::play_cancel_sound(shared)?;
+                    if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                        if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                            let settings = shared.get::<Settings>().unwrap();
+                            let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                            let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                            sink.set_volume(settings.effect_volume.norm());
+                            sink.append(source);
+                            thread::spawn(move || {
+                                sink.sleep_until_end();
+                            });
+                            shared.push((stream, stream_handle));
+                        }
+                    }
 
                     // (한국어) 선택된 설정 창 인터페이스를 원래 상태로 되돌립니다.
                     // (English Translation) Returns the selected settings window interface to its original state. 
+                    let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
                     let mut guard = FOCUSED_ITEM.lock().expect("Failed to access variable.");
                     if let Some((item, ui_color, text_color)) = guard.take() {
                         match item {
@@ -494,81 +508,111 @@ fn handle_mouse_input(this: &mut InGameScene, shared: &mut Shared, event: &Event
 #[allow(unreachable_patterns)]
 fn ui_pressed(this: &mut InGameScene, shared: &mut Shared, item: Items) -> AppResult<()> {
     match item {
-        Items::Language(_) => {
-            sound::play_click_sound(shared)
-        },
-        Items::Resolution(_) => {
-            sound::play_click_sound(shared)
+        Items::Language(_) | Items::Resolution(_) => {
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                    sink.set_volume(settings.effect_volume.norm());
+                    sink.append(source);
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                    });
+                    shared.push((stream, stream_handle));
+                }
+            }
         },
         Items::Return => {
-            sound::play_cancel_sound(shared)
+            if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                    let source = asset_bundle.get(path::CANCEL_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                    sink.set_volume(settings.effect_volume.norm());
+                    sink.append(source);
+                    thread::spawn(move || {
+                        sink.sleep_until_end();
+                    });
+                    shared.push((stream, stream_handle));
+                }
+            }
         },
-        _ => Ok(())
-    }
+        _ => { /* empty */ }
+    };
+
+    Ok(())
 }
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
 fn ui_released(this: &mut InGameScene, shared: &mut Shared, item: Items) -> AppResult<()> {
-    use crate::nodes::path;
-
     match item {
         Items::Language(new) => {
-            change_language(this, shared, new)
+            change_language(this, shared, new)?;
         },
         Items::Resolution(new) => {
-            change_resolution(this, shared, new)
+            change_resolution(this, shared, new)?;
         },
         Items::Volume(option) => match option {
-            utils::VolumeOptions::Background => Ok(()), 
-            utils::VolumeOptions::Effect => sound::play_click_sound(shared),
+            utils::VolumeOptions::Background => { /* empty */ }, 
+            utils::VolumeOptions::Effect => {
+                if let Some((stream, stream_handle)) = shared.pop::<(OutputStream, OutputStreamHandle)>() {
+                    if let Some(sink) = sound::try_new_sink(&stream_handle)? {
+                        let settings = shared.get::<Settings>().unwrap();
+                        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+                        let source = asset_bundle.get(path::CLICK_SOUND_PATH)?.read(&sound::SoundDecoder)?;
+                        sink.set_volume(settings.effect_volume.norm());
+                        sink.append(source);
+                        thread::spawn(move || {
+                            sink.sleep_until_end();
+                        });
+                        shared.push((stream, stream_handle));
+                    }
+                }
+            },
             utils::VolumeOptions::Voice => {
-                const NUM_HIDDEN: usize = 10;
+                const NUM_HIDDEN: usize = 7;
 
                 // (한국어) 사용할 공유 객체들을 가져옵니다.
                 // (English Translation) Get shared objects to use.
                 let cnt = shared.pop::<usize>().unwrap();
-                let settings = shared.get::<Settings>().unwrap();
-                let asset_bundle = shared.get::<AssetBundle>().unwrap();
-                let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
+                if let Some((_, voice)) = shared.get::<(Sink, Sink)>() {
+                    let settings = shared.get::<Settings>().unwrap();
+                    let asset_bundle = shared.get::<AssetBundle>().unwrap();
 
-                // (한국어) 캐릭터 목소리 데이터를 가져옵니다.
-                // (English Translation) Get character voice data. 
-                let source = if cnt % NUM_HIDDEN == 0 {
-                    asset_bundle.get(path::YUUKA_HIDDEN_SOUND_PATH)?
-                        .read(&sound::SoundDecoder)?
-                } else {
-                    asset_bundle.get(path::YUUKA_TITLE_SOUND_PATH)?
-                        .read(&sound::SoundDecoder)?
-                };
+                    // (한국어) 캐릭터 목소리 데이터를 가져옵니다.
+                    // (English Translation) Get character voice data. 
+                    let source = match cnt % NUM_HIDDEN == 0 {
+                        true => asset_bundle.get(path::YUUKA_HIDDEN_SOUND_PATH)?.read(&sound::SoundDecoder)?,
+                        false => asset_bundle.get(path::YUUKA_TITLE_SOUND_PATH)?.read(&sound::SoundDecoder)?
+                    };
 
-                // (한국어) 캐릭터 목소리를 재생시킵니다.
-                // (English Translation) Play the character's voice.
-                audio.voice.stop();
-                audio.voice.set_volume(settings.voice_volume.norm());
-                audio.voice.append(source);
+                    // (한국어) 캐릭터 목소리를 재생시킵니다.
+                    // (English Translation) Play the character's voice.
+                    voice.stop();
+                    voice.set_volume(settings.voice_volume.norm());
+                    voice.append(source);
 
-                // (한국어) 사용한 공유 객체들 반환합니다.
-                // (English Translation) Returns the shared objects used. 
+                    // (한국어) 사용한 공유 객체들 반환합니다.
+                    // (English Translation) Returns the shared objects used. 
+                }
                 shared.push((cnt + 1) % NUM_HIDDEN);
-
-                Ok(())
             },
         },
         Items::Return => {
             this.timer = 0.0;
             this.state = InGameState::ExitSetting;
-            Ok(())
         },
-        _ => Ok(())
-    }
+        _ => { /* empty */ }
+    };
+
+    Ok(())
 }
 
 #[allow(unused_variables)]
 #[allow(unreachable_patterns)]
 fn ui_dragged(this: &mut InGameScene, shared: &mut Shared, item: Items) -> AppResult<()> {
-    use crate::nodes::path;
-
     match item {
         Items::Volume(option) => {
             // (한국어) 사용할 공유 객체들을 가져옵니다.
@@ -609,14 +653,16 @@ fn ui_dragged(this: &mut InGameScene, shared: &mut Shared, item: Items) -> AppRe
             match option {
                 utils::VolumeOptions::Background => {
                     settings.background_volume.set(volume);
-                    let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
-                    audio.background.set_volume(settings.background_volume.norm());
+                    if let Some((background, _)) = shared.get::<(Sink, Sink)>() {
+                        background.set_volume(settings.background_volume.norm());
+                    }
                 }, 
                 utils::VolumeOptions::Effect => settings.effect_volume.set(volume),
                 utils::VolumeOptions::Voice => {
                     settings.voice_volume.set(volume);
-                    let audio = shared.get::<Arc<utils::InGameAudio>>().unwrap();
-                    audio.voice.set_volume(settings.voice_volume.norm());
+                    if let Some((_, voice)) = shared.get::<(Sink, Sink)>() {
+                        voice.set_volume(settings.voice_volume.norm());
+                    }
                 }, 
             };
 
@@ -632,8 +678,6 @@ fn ui_dragged(this: &mut InGameScene, shared: &mut Shared, item: Items) -> AppRe
 }
 
 fn change_language(this: &mut InGameScene, shared: &mut Shared, new: Language) -> AppResult<()> {    
-    use crate::nodes::path;
-
     // (한국어) 현재 설정된 언어와 같을 경우 실행하지 않습니다.
     // (English Translation) If it is the same as the currently set language, it will not run.
     let settings = shared.get::<Settings>().unwrap();
@@ -759,7 +803,6 @@ fn change_language(this: &mut InGameScene, shared: &mut Shared, new: Language) -
 }
 
 fn change_resolution(_this: &mut InGameScene, shared: &mut Shared, new: Resolution) -> AppResult<()> {
-    use crate::nodes::path;
     use crate::components::user::set_window_size;
 
     // (한국어) 현재 해상도와 같을 경우 실행하지 않습니다.

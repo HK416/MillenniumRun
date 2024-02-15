@@ -7,16 +7,15 @@ use std::collections::HashMap;
 
 use ab_glyph::FontArc;
 use winit::window::Window;
-use rodio::{OutputStream, OutputStreamHandle};
 
 use crate::{
-    game_err,
     assets::bundle::AssetBundle,
     components::{
         ui::UiBrush,
         text::TextBrush,
         sprite::SpriteBrush,
         camera::CameraCreator,
+        sound, 
         font::FontDecoder,
         script::{Script, ScriptDecoder},
         save::{SaveDecoder, SaveEncoder},
@@ -30,7 +29,7 @@ use crate::{
     render::texture::DdsTextureDecoder, 
     scene::{node::SceneNode, state::SceneState},
     system::{
-        error::{AppResult, GameError},
+        error::AppResult,
         shared::Shared,
     },
 };
@@ -89,14 +88,15 @@ impl SceneNode for SetupScene {
     fn exit(&mut self, shared: &mut Shared) -> AppResult<()> {
         // (한국어) 사용할 공유 객체 가져오기.
         // (English Translation) Get shared object to use.
-        let asset_bundle = shared.get::<AssetBundle>().unwrap();
-        let window = shared.get::<Arc<Window>>().unwrap();
-        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
-        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        let config = shared.get::<wgpu::SurfaceConfiguration>().unwrap();
+        // let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        // let window = shared.get::<Arc<Window>>().unwrap();
+        // let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+        // let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        // let config = shared.get::<wgpu::SurfaceConfiguration>().unwrap();
 
         // (한국어) 공용으로 사용하는 텍스처 샘플러를 생성합니다.
         // (English Translation) Creates a commonly used texture sampler.
+        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
         let tex_sampler = Arc::new(device.create_sampler(
             &wgpu::SamplerDescriptor {
                 label: Some("Sampler(General)"),
@@ -109,36 +109,79 @@ impl SceneNode for SetupScene {
                 ..Default::default()
             }
         ));
-
-        let fonts = setup_fonts(asset_bundle)?;
-        let (stream, handle) = setup_sound_engine()?;
-        let camera_creator = CameraCreator::new(device.clone(), window.clone());
-        let camera = camera_creator.create(Some("Default"), None, None, None, None);
-        let ui_brush = setup_ui_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
-        let text_brush = setup_text_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
-        let sprite_brush = setup_sprite_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
-        let textures = setup_texture_map(device, queue, asset_bundle)?;
-        let (settings, script) = setup_window(window, asset_bundle)?;
-        let save = asset_bundle.get(path::SAVE_PATH)?
-            .read_or_default(&SaveEncoder, &SaveDecoder)?;
-
-        // (한국어) 공유할 객체들을 공유 객체에 등록합니다.
-        // (English Translation) Register objects to be shared as shared objects.
         shared.push(tex_sampler);
+
+        // (한국어) 애플리케이션에서 사용할 폰트를 로드하고 공유 객체에 등록합니다.
+        // (English Translation) Loads the font to be used in the application and registers it in the shared object.
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let fonts = setup_fonts(asset_bundle)?;
         shared.push(fonts);
-        shared.push(stream);
-        shared.push(handle);
-        shared.push(camera_creator);
-        shared.push(Arc::new(camera));
-        shared.push(text_brush);
+
+        // (한국어) 기본 소리 출력 장치가 존재하는 경우, 공유 객체에 등록합니다.
+        // (English Translation) If the default sound output device exists, register it with the shared object.
+        if let Some((stream, handle)) = sound::get_default_output_stream()? {
+            shared.push((stream, handle));
+        }
+
+        // (한국어) 기본 카메라를 생성하고 공유 객체에 등록합니다.
+        // (English Translation) Create a basic camera and register it with the shared object.
+        let window = shared.get::<Arc<Window>>().unwrap().clone();
+        let device = shared.get::<Arc<wgpu::Device>>().unwrap().clone();
+        let creator = CameraCreator::new(device, window);
+        let camera = Arc::new(creator.create(Some("Default"), None, None, None, None));
+        shared.push(creator);
+        shared.push(camera);
+
+        // (한국어) 인터페이스 그리기 도구를 생성하고 공유 객체에 등록합니다.
+        // (English Translation) Creates an interface drawing tool and registers it with the shared object.
+        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+        let config = shared.get::<wgpu::SurfaceConfiguration>().unwrap();
+        let camera_creator = shared.get::<Arc<CameraCreator>>().unwrap();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let ui_brush = setup_ui_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
         shared.push(ui_brush);
+
+        // (한국어) 텍스트 그리기 도구를 생성하고 공유 객체에 등록합니다.
+        // (English Translation) Creates an text drawing tool and registers it with the shared object.
+        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+        let config = shared.get::<wgpu::SurfaceConfiguration>().unwrap();
+        let camera_creator = shared.get::<Arc<CameraCreator>>().unwrap();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let text_brush = setup_text_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
+        shared.push(text_brush);
+
+        // (한국어) 스프라이트 그리기 도구를 생성하고 공유 객체에 등록합니다.
+        // (English Translation) Creates an sprite drawing tool and registers it with the shared object. 
+        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+        let config = shared.get::<wgpu::SurfaceConfiguration>().unwrap();
+        let camera_creator = shared.get::<Arc<CameraCreator>>().unwrap();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let sprite_brush = setup_sprite_brush(device, &camera_creator.camera_layout, config.format, asset_bundle)?;
         shared.push(sprite_brush);
-        shared.push(textures);
+
+        // (한국어) 미리 로드된 텍스처 모음을 생성하고 공유 객체에 등록합니다.
+        // (English Translation) Creates a collection of preloaded textures and registers them with a shared object. 
+        let device = shared.get::<Arc<wgpu::Device>>().unwrap();
+        let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let texture_map = setup_texture_map(device, queue, asset_bundle)?;
+        shared.push(texture_map);
+
+        // (한국어) 애플리케이션 윈도우를 설정하고 윈도우 설정과 언어 스크립트를 공유 객체에 등록합니다.
+        // (English Translation) Sets up an application window and registers window settings and language scripts to shared objects.
+        let window = shared.get::<Arc<Window>>().unwrap();
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let (settings, script) = setup_window(window, asset_bundle)?;
         shared.push(settings);
-        shared.push(save);
         if let Some(script) = script {
             shared.push(Arc::new(script));
-        };
+        }
+
+        // (한국어) 사용자 데이터가 저장된 파일을 불러오고 공유 객체에 등록합니다.
+        // (English Translation) Load the file where user data is stored and register it as a shared object.
+        let asset_bundle = shared.get::<AssetBundle>().unwrap();
+        let savedata = asset_bundle.get(path::SAVE_PATH)?.read_or_default(&SaveEncoder, &SaveDecoder)?;
+        shared.push(savedata);
 
         Ok(())
     }
@@ -226,7 +269,6 @@ fn setup_fonts(asset_bundle: &AssetBundle) -> AppResult<Arc<HashMap<String, Font
     ]).into());
 }
 
-
 /// #### 한국어 </br>
 /// 사용자 인터페이스 그리기 도구를 설정합니다. </br>
 /// 
@@ -256,7 +298,6 @@ fn setup_ui_brush(
     )
 }
 
-
 /// #### 한국어 </br>
 /// 텍스트 그리기 도구를 설정합니다. </br>
 /// 
@@ -285,7 +326,6 @@ fn setup_text_brush(
         asset_bundle,
     )
 }
-
 
 /// #### 한국어 </br>
 /// 스프라이트 그리기 도구를 설정합니다. </br>
@@ -317,7 +357,6 @@ fn setup_sprite_brush(
 
     return Ok(sprite_brush.into());
 }
-
 
 /// #### 한국어 </br>
 /// 텍스처 캐시를 설정합니다. </br>
@@ -490,24 +529,6 @@ fn setup_texture_map(
         (path::YUUKA_IMG_TEXTURE_PATH.to_string(), yuuka_img),
     ]).into());
 }
-
-
-/// #### 한국어 </br>
-/// 게임에서 사용할 사운드 엔진을 설정합니다. </br>
-/// 
-/// #### English (Translation) </br>
-/// Set the sound engine to use in the game. </br>
-/// 
-fn setup_sound_engine() -> AppResult<(OutputStream, OutputStreamHandle)> {
-    let (stream, handle) = OutputStream::try_default()
-        .map_err(|err| game_err!(
-            "Sound engine initialization failed",
-            "Sound engine initialization failed for following reasons: {}",
-            err.to_string()
-        ))?;
-    return Ok((stream, handle));
-}
-
 
 /// #### 한국어 </br>
 /// 사용자 설정 파일을 불러오고, 윈도우를 설정합니다. </br>
