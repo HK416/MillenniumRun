@@ -205,7 +205,7 @@ fn update_boss_idle_state(this: &mut InGameScene, shared: &mut Shared, _total_ti
     if this.boss.behavior_timer >= DURATION {
         let mut next_state = if this.remaining_time <= 30.0 
         || this.num_owned_tiles >= NUM_TILES as u32 / 2 
-        || this.player.path.len() >= 150 {
+        || this.player.path.len() >= 75 {
             vec![
                 BossBehaviorState::FireBulletPattern2, 
                 BossBehaviorState::FireBulletPattern3, 

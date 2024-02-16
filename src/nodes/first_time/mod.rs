@@ -95,7 +95,7 @@ impl SceneNode for FirstTimeSetupLoading {
                         depth_or_array_layers:1,
                     },
                     dimension: wgpu::TextureDimension::D2,
-                    format: wgpu::TextureFormat::Bgra8Unorm,
+                    format: wgpu::TextureFormat::Bc7RgbaUnorm,
                     mip_level_count: 11,
                     sample_count:1,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,

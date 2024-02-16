@@ -200,13 +200,13 @@ impl SceneNode for CreditLoadingScene {
                 .read(&DdsTextureDecoder {
                     name: Some("ReturnButton"),
                     size: wgpu::Extent3d {
-                        width: 256,
-                        height: 256,
+                        width: 128,
+                        height: 128,
                         depth_or_array_layers: 1,
                     },
                     dimension: wgpu::TextureDimension::D2,
-                    format: wgpu::TextureFormat::Bgra8Unorm,
-                    mip_level_count: 9,
+                    format: wgpu::TextureFormat::Bc7RgbaUnorm,
+                    mip_level_count: 8,
                     sample_count: 1,
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],

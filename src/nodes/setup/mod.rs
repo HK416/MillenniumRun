@@ -9,7 +9,10 @@ use ab_glyph::FontArc;
 use winit::window::Window;
 
 use crate::{
-    assets::bundle::AssetBundle,
+    assets::{
+        bundle::AssetBundle, 
+        interface::AssetDecoder, 
+    },
     components::{
         ui::UiBrush,
         text::TextBrush,
@@ -62,11 +65,6 @@ impl SceneNode for SetupScene {
             asset_bundle.get(path::SETTINGS_PATH)?;
 
             asset_bundle.get(path::DUMMY_TEXTURE_PATH)?;
-            asset_bundle.get(path::ARIS_IMG_TEXTURE_PATH)?;
-            asset_bundle.get(path::MOMOI_IMG_TEXTURE_PATH)?;
-            asset_bundle.get(path::MIDORI_IMG_TEXTURE_PATH)?;
-            asset_bundle.get(path::YUZU_IMG_TEXTURE_PATH)?;
-            asset_bundle.get(path::YUUKA_IMG_TEXTURE_PATH)?;
 
             asset_bundle.get(path::NEXON_LV2_GOTHIC_PATH)?;
             asset_bundle.get(path::NEXON_LV2_GOTHIC_BOLD_PATH)?;
@@ -86,14 +84,6 @@ impl SceneNode for SetupScene {
     }
 
     fn exit(&mut self, shared: &mut Shared) -> AppResult<()> {
-        // (한국어) 사용할 공유 객체 가져오기.
-        // (English Translation) Get shared object to use.
-        // let asset_bundle = shared.get::<AssetBundle>().unwrap();
-        // let window = shared.get::<Arc<Window>>().unwrap();
-        // let device = shared.get::<Arc<wgpu::Device>>().unwrap();
-        // let queue = shared.get::<Arc<wgpu::Queue>>().unwrap();
-        // let config = shared.get::<wgpu::SurfaceConfiguration>().unwrap();
-
         // (한국어) 공용으로 사용하는 텍스처 샘플러를 생성합니다.
         // (English Translation) Creates a commonly used texture sampler.
         let device = shared.get::<Arc<wgpu::Device>>().unwrap();
@@ -388,137 +378,128 @@ fn setup_texture_map(
             device, 
             queue
         })?;
+    asset_bundle.release(path::DUMMY_TEXTURE_PATH);
 
     // (한국어) 기본 스테이지 이미지 텍스처를 생성합니다.
     // (English Translation) Create an default stage image texture.
-    let default_img = asset_bundle.get(path::DEF_IMG_TEXTURE_PATH)?
-        .read(&DdsTextureDecoder {
-            name: Some("DefaultImage"), 
-            size: wgpu::Extent3d {
-                width: 2048, 
-                height: 2048, 
-                depth_or_array_layers: 1,
-            }, 
-            dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
-            mip_level_count: 12, 
-            sample_count: 1, 
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
-            view_formats: &[], 
-            device, 
-            queue
-        })?;
+    let img_data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/textures/img/default.dds"));
+    let default_img = DdsTextureDecoder {
+        name: Some("DefaultImage"), 
+        size: wgpu::Extent3d {
+            width: 2048, 
+            height: 2048, 
+            depth_or_array_layers: 1,
+        }, 
+        dimension: wgpu::TextureDimension::D2, 
+        format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+        mip_level_count: 12, 
+        sample_count: 1, 
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+        view_formats: &[], 
+        device, 
+        queue
+    }.decode(img_data)?;
 
     // (한국어) Aris 이미지 텍스처를 생성합니다.
     // (English Translation) Create an Aris image texture.
-    let aris_img = asset_bundle.get(path::ARIS_IMG_TEXTURE_PATH)?
-        .read(&DdsTextureDecoder {
-            name: Some("ArisImage"), 
-            size: wgpu::Extent3d {
-                width: 2048, 
-                height: 2048, 
-                depth_or_array_layers: 3,
-            }, 
-            dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
-            mip_level_count: 12, 
-            sample_count: 1, 
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
-            view_formats: &[], 
-            device, 
-            queue
-        })?;
+    let img_data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/textures/img/aris.dds"));
+    let aris_img = DdsTextureDecoder {
+        name: Some("ArisImage"), 
+        size: wgpu::Extent3d {
+            width: 2048, 
+            height: 2048, 
+            depth_or_array_layers: 3,
+        }, 
+        dimension: wgpu::TextureDimension::D2, 
+        format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+        mip_level_count: 12, 
+        sample_count: 1, 
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+        view_formats: &[], 
+        device, 
+        queue
+    }.decode(img_data)?;
 
     // (한국어) Momoi 이미지 텍스처를 생성합니다.
     // (English Translation) Create an Momoi image texture.
-    let momoi_img = asset_bundle.get(path::MOMOI_IMG_TEXTURE_PATH)?
-        .read(&DdsTextureDecoder {
-            name: Some("MomoiImage"), 
-            size: wgpu::Extent3d {
-                width: 2048, 
-                height: 2048, 
-                depth_or_array_layers: 3,
-            }, 
-            dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
-            mip_level_count: 12, 
-            sample_count: 1, 
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
-            view_formats: &[], 
-            device, 
-            queue
-        })?;
+    let img_data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/textures/img/momoi.dds"));
+    let momoi_img = DdsTextureDecoder {
+        name: Some("MomoiImage"), 
+        size: wgpu::Extent3d {
+            width: 2048, 
+            height: 2048, 
+            depth_or_array_layers: 3,
+        }, 
+        dimension: wgpu::TextureDimension::D2, 
+        format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+        mip_level_count: 12, 
+        sample_count: 1, 
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+        view_formats: &[], 
+        device, 
+        queue
+    }.decode(img_data)?;
 
     // (한국어) Midori 이미지 텍스처를 생성합니다.
     // (English Translation) Create an Midori image texture.
-    let midori_img = asset_bundle.get(path::MIDORI_IMG_TEXTURE_PATH)?
-        .read(&DdsTextureDecoder {
-            name: Some("MidoriImage"), 
-            size: wgpu::Extent3d {
-                width: 2048, 
-                height: 2048, 
-                depth_or_array_layers: 3,
-            }, 
-            dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
-            mip_level_count: 12, 
-            sample_count: 1, 
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
-            view_formats: &[], 
-            device, 
-            queue
-        })?;
+    let img_data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/textures/img/midori.dds"));
+    let midori_img = DdsTextureDecoder {
+        name: Some("MidoriImage"), 
+        size: wgpu::Extent3d {
+            width: 2048, 
+            height: 2048, 
+            depth_or_array_layers: 3,
+        }, 
+        dimension: wgpu::TextureDimension::D2, 
+        format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+        mip_level_count: 12, 
+        sample_count: 1, 
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+        view_formats: &[], 
+        device, 
+        queue
+    }.decode(img_data)?;
 
     // (한국어) Yuzu 이미지 텍스처를 생성합니다.
     // (English Translation) Create an Yuzu image texture.
-    let yuzu_img = asset_bundle.get(path::YUZU_IMG_TEXTURE_PATH)?
-        .read(&DdsTextureDecoder {
-            name: Some("YuzuImage"), 
-            size: wgpu::Extent3d {
-                width: 2048, 
-                height: 2048, 
-                depth_or_array_layers: 3,
-            }, 
-            dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
-            mip_level_count: 12, 
-            sample_count: 1, 
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
-            view_formats: &[], 
-            device, 
-            queue
-        })?;
+    let img_data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/textures/img/yuzu.dds"));
+    let yuzu_img = DdsTextureDecoder {
+        name: Some("YuzuImage"), 
+        size: wgpu::Extent3d {
+            width: 2048, 
+            height: 2048, 
+            depth_or_array_layers: 3,
+        }, 
+        dimension: wgpu::TextureDimension::D2, 
+        format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+        mip_level_count: 12, 
+        sample_count: 1, 
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+        view_formats: &[], 
+        device, 
+        queue
+    }.decode(img_data)?;
 
     // (한국어) Yuuka 이미지 텍스처를 생성합니다.
     // (English Translation) Create an Yuuka image texture.
-    let yuuka_img = asset_bundle.get(path::YUUKA_IMG_TEXTURE_PATH)?
-        .read(&DdsTextureDecoder {
-            name: Some("YuukaImage"), 
-            size: wgpu::Extent3d {
-                width: 2048, 
-                height: 2048, 
-                depth_or_array_layers: 1,
-            }, 
-            dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
-            mip_level_count: 12, 
-            sample_count: 1, 
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
-            view_formats: &[], 
-            device, 
-            queue
-        })?;
-
-    // (한국어) 사용완료한 에셋을 해제합니다.
-    // (English Translation)  Release assets that have been used. 
-    asset_bundle.release(path::DUMMY_TEXTURE_PATH);
-    asset_bundle.release(path::DEF_IMG_TEXTURE_PATH);
-    asset_bundle.release(path::ARIS_IMG_TEXTURE_PATH);
-    asset_bundle.release(path::MOMOI_IMG_TEXTURE_PATH);
-    asset_bundle.release(path::MIDORI_IMG_TEXTURE_PATH);
-    asset_bundle.release(path::YUZU_IMG_TEXTURE_PATH);
-    asset_bundle.release(path::YUUKA_IMG_TEXTURE_PATH);
-
+    let img_data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/textures/img/yuuka.dds"));
+    let yuuka_img = DdsTextureDecoder {
+        name: Some("YuukaImage"), 
+        size: wgpu::Extent3d {
+            width: 2048, 
+            height: 2048, 
+            depth_or_array_layers: 1,
+        }, 
+        dimension: wgpu::TextureDimension::D2, 
+        format: wgpu::TextureFormat::Bc7RgbaUnorm, 
+        mip_level_count: 12, 
+        sample_count: 1, 
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
+        view_formats: &[], 
+        device, 
+        queue
+    }.decode(img_data)?;
+    
     return Ok(HashMap::from_iter([
         (path::DUMMY_TEXTURE_PATH.to_string(), dummy), 
         (path::DEF_IMG_TEXTURE_PATH.to_string(), default_img), 

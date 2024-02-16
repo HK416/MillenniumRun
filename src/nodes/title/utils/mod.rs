@@ -73,7 +73,7 @@ pub fn create_title_scene(
             depth_or_array_layers: 1,
         },
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Bgra8Unorm,
+        format: wgpu::TextureFormat::Bc7RgbaUnorm,
         mip_level_count: 11,
         sample_count: 1,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
@@ -253,7 +253,7 @@ pub fn create_title_scene(
                 depth_or_array_layers: 1,
             },
             dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bgra8Unorm, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
             mip_level_count: 11,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
@@ -283,7 +283,7 @@ pub fn create_title_scene(
                 depth_or_array_layers: 1,
             },
             dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bgra8Unorm, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
             mip_level_count: 11,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
@@ -312,7 +312,7 @@ pub fn create_title_scene(
                 depth_or_array_layers: 1,
             },
             dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bgra8Unorm, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
             mip_level_count: 11,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
@@ -355,13 +355,13 @@ pub fn create_title_scene(
         .read(&DdsTextureDecoder {
             name: Some("ReturnButton"),
             size: wgpu::Extent3d {
-                width: 256,
-                height: 256,
+                width: 128,
+                height: 128,
                 depth_or_array_layers: 1,
             },
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
-            mip_level_count: 9,
+            format: wgpu::TextureFormat::Bc7RgbaUnorm,
+            mip_level_count: 8,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
@@ -398,13 +398,13 @@ pub fn create_title_scene(
         .read(&DdsTextureDecoder {
             name: Some("InfoButton"),
             size: wgpu::Extent3d {
-                width: 256,
-                height: 256,
+                width: 128,
+                height: 128,
                 depth_or_array_layers: 1,
             },
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
-            mip_level_count: 9,
+            format: wgpu::TextureFormat::Bc7RgbaUnorm,
+            mip_level_count: 8,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
@@ -441,7 +441,7 @@ pub fn create_title_scene(
                 depth_or_array_layers: 1,
             },
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            format: wgpu::TextureFormat::Bc7RgbaUnorm,
             mip_level_count: 11,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
@@ -471,7 +471,7 @@ pub fn create_title_scene(
                 depth_or_array_layers: 1,
             },
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            format: wgpu::TextureFormat::Bc7RgbaUnorm,
             mip_level_count: 11,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
@@ -501,7 +501,7 @@ pub fn create_title_scene(
                 depth_or_array_layers: 1,
             },
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            format: wgpu::TextureFormat::Bc7RgbaUnorm,
             mip_level_count: 10,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
@@ -529,7 +529,7 @@ pub fn create_title_scene(
                 depth_or_array_layers:1,
             },
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            format: wgpu::TextureFormat::Bc7RgbaUnorm,
             mip_level_count: 11,
             sample_count:1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
@@ -673,13 +673,13 @@ pub fn create_title_scene(
         .read(&DdsTextureDecoder {
             name: Some("Star"),
             size: wgpu::Extent3d {
-                width: 1024,
-                height: 512,
+                width: 512,
+                height: 256,
                 depth_or_array_layers: 5,
             },
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
-            mip_level_count: 11,
+            format: wgpu::TextureFormat::Bc7RgbaUnorm,
+            mip_level_count: 10,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
@@ -704,6 +704,7 @@ pub fn create_title_scene(
         texture_map, 
         ui_brush
     );
+    asset_bundle.release(path::STAR_TEXTURE_PATH);
 
 
     let tutorial_textture = asset_bundle.get(path::TUTORIAL_TEXTURE_PATH)?
@@ -715,7 +716,7 @@ pub fn create_title_scene(
                 depth_or_array_layers: 4,
             },
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            format: wgpu::TextureFormat::Bc7RgbaUnorm,
             mip_level_count: 11,
             sample_count: 1,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
@@ -739,6 +740,7 @@ pub fn create_title_scene(
         &return_btn_texture_view, 
         ui_brush
     );
+    asset_bundle.release(path::TUTORIAL_TEXTURE_PATH);
 
 
     // (한국어) 로고 이미지 텍스처를 생성합니다.
@@ -752,7 +754,7 @@ pub fn create_title_scene(
                 depth_or_array_layers: 1, 
             }, 
             dimension: wgpu::TextureDimension::D2, 
-            format: wgpu::TextureFormat::Bgra8Unorm, 
+            format: wgpu::TextureFormat::Bc7RgbaUnorm, 
             mip_level_count: 10, 
             sample_count: 1, 
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST, 
